@@ -19,7 +19,7 @@ Smart contracts for the Zyrcle recycling dApp, **reconstructed from the frontend
 ## Setup
 
 ```bash
-cd Contracts
+cd contracts
 npm install
 cp .env.example .env   # then fill in PRIVATE_KEY
 ```
@@ -32,7 +32,7 @@ npm test
 
 ## Deploy to Avalanche Fuji
 
-1. **Create a throwaway deployer wallet** in MetaMask and export its private key into `Contracts/.env`:
+1. **Create a throwaway deployer wallet** in MetaMask and export its private key into `contracts/.env`:
    ```
    PRIVATE_KEY=0xyour_test_key
    ```
@@ -48,7 +48,7 @@ The deploy script automatically:
 - seeds the 3 marketplace certificate prices (Bronze 50 / Silver 100 / Gold 200 ZYR),
 - mints 1000 ZYR to the deployer for testing,
 - writes `deployments.json`,
-- copies the compiled ABIs into `../Frontend/FRONTEND-ZYRCLE/src/lib/abi/`,
+- copies the compiled ABIs into `../apps/web/src/lib/abi/`,
 - writes the deployed addresses + chainId into the frontend `.env` (`VITE_TOKEN_ADDRESS`, `VITE_CERTIFICATE_ADDRESS`, `VITE_CORE_ADDRESS`, `VITE_CHAIN_ID`).
 
 After deploying, restart the frontend dev server so it picks up the new `.env`.

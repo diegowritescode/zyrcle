@@ -66,8 +66,8 @@ async function main() {
 }
 
 function syncFrontend(deployment) {
-  // contracts/ lives inside the frontend repo: scripts/ -> contracts/ -> FRONTEND-ZYRCLE
-  const feRoot = path.join(__dirname, "..", "..");
+  // Monorepo layout: contracts/scripts -> contracts -> repo root -> apps/web
+  const feRoot = path.join(__dirname, "..", "..", "apps", "web");
   if (!fs.existsSync(feRoot)) {
     console.warn("Frontend not found; skipping sync.");
     return;
