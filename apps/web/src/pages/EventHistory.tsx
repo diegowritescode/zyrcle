@@ -21,7 +21,7 @@ import {
 import { Select, SelectTrigger, SelectContent, SelectItem } from "@/components/ui/select";
 import { CheckCircle, Recycle } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import Web3 from "web3";
+import Web3, { type EventLog } from "web3";
 import { CORE_ABI, CORE_ADDRESS } from "@/lib/contracts";
 import { ensureChain } from "@/lib/network";
 
@@ -46,28 +46,28 @@ const EventHistoryPage = () => {
             const contract = new web3.eth.Contract(CONTRACT_ABI, CONTRACT_ADDRESS);
             const latestBlock = await web3.eth.getBlockNumber();
 
-            const recyclingEvents = await contract.getPastEvents("WasteDeposited", {
-                fromBlock: Number(latestBlock) - 2000, // Convert BigInt to number
-                toBlock: "latest",
-            });
-
-            const dropoffEvents = await contract.getPastEvents("BatchDelivered", {
-                fromBlock: Number(latestBlock) - 2000, // Convert BigInt to number
-                toBlock: "latest",
-            });
+            // The ABI comes from JSON, so event names are not in the contract's type: query by name.
+            const getPastEvents = contract.getPastEvents as unknown as (
+                name: string,
+                filter: { fromBlock: number; toBlock: "latest" },
+            ) => Promise<(string | EventLog)[]>;
+            const range = { fromBlock: Math.max(0, Number(latestBlock) - 2000), toBlock: "latest" as const };
+            const isLog = (e: string | EventLog): e is EventLog => typeof e !== "string";
+            const recyclingEvents = (await getPastEvents("WasteDeposited", range)).filter(isLog);
+            const dropoffEvents = (await getPastEvents("BatchDelivered", range)).filter(isLog);
 
             const recyclingEnriched = await Promise.all(
                 recyclingEvents.map(async (e) => {
                     const block = await web3.eth.getBlock(Number(e.blockNumber)); // Convert BigInt to number
-                    const full = await contract.methods.getEvent(e.returnValues.eventId).call();
+                    const full = (await contract.methods.getEvent(e.returnValues.eventId).call()) as unknown as { verified: boolean };
 
-                    const weightStr = e.returnValues.weight.toString(); // Convert BigInt to string
+
 
                     return {
                         type: "recycling",
                         eventId: Number(e.returnValues.eventId), // Convert BigInt to number
                         user: e.returnValues.user,
-                        weight: web3.utils.fromWei(weightStr, "ether"),
+                        weight: Number(e.returnValues.weight) / 1000, // grams -> kg
                         timestamp: new Date(Number(block.timestamp) * 1000).toISOString(), // Safe conversion
                         isValidated: full.verified,
                     };
@@ -82,8 +82,8 @@ const EventHistoryPage = () => {
                         type: "dropoff",
                         batchId: Number(e.returnValues.batchId), // Convert BigInt to number
                         user: e.returnValues.collector,
-                        containerIds: e.returnValues.containerIds.map((id) => Number(id)), // Convert BigInt to number
-                        totalWeight: Number(e.returnValues.totalWeight.toString()) / 1000, // Safe conversion
+                        containerIds: (e.returnValues.containerIds as bigint[]).map((id) => Number(id)),
+                        totalWeight: Number(e.returnValues.totalWeight) / 1000, // grams -> kg
                         timestamp: new Date(Number(block.timestamp) * 1000).toISOString(), // Safe conversion
                     };
                 })

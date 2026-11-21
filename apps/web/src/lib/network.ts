@@ -13,7 +13,15 @@ import { CHAIN_ID } from "./contracts";
 const TARGET_CHAIN_ID = Number(CHAIN_ID || "43113");
 
 // Parameters used to add the chain to MetaMask if the user doesn't have it yet.
-const CHAIN_PARAMS: Record<number, any> = {
+interface AddChainParams {
+    chainId: string;
+    chainName: string;
+    nativeCurrency: { name: string; symbol: string; decimals: number };
+    rpcUrls: string[];
+    blockExplorerUrls: string[];
+}
+
+const CHAIN_PARAMS: Record<number, AddChainParams> = {
     43113: {
         chainId: "0xa869",
         chainName: "Avalanche Fuji C-Chain",
@@ -30,11 +38,11 @@ const toHex = (id: number) => "0x" + id.toString(16);
  * (or successfully switched to) the right network, false otherwise.
  */
 export async function ensureChain(): Promise<boolean> {
-    const eth = (window as any).ethereum;
+    const eth = window.ethereum;
     if (!eth) return false;
 
     const current = await eth.request({ method: "eth_chainId" });
-    if (parseInt(current, 16) === TARGET_CHAIN_ID) return true;
+    if (parseInt(String(current), 16) === TARGET_CHAIN_ID) return true;
 
     try {
         await eth.request({
@@ -42,9 +50,9 @@ export async function ensureChain(): Promise<boolean> {
             params: [{ chainId: toHex(TARGET_CHAIN_ID) }],
         });
         return true;
-    } catch (err: any) {
+    } catch (err) {
         // 4902 = chain not added to the wallet yet.
-        if (err?.code === 4902 && CHAIN_PARAMS[TARGET_CHAIN_ID]) {
+        if ((err as { code?: number })?.code === 4902 && CHAIN_PARAMS[TARGET_CHAIN_ID]) {
             try {
                 await eth.request({
                     method: "wallet_addEthereumChain",

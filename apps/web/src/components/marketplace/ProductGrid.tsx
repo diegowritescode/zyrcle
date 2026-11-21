@@ -68,8 +68,8 @@ export function ProductGrid() {
                 const accounts = await web3.eth.getAccounts();
                 if (accounts.length === 0) return;
                 const token = new web3.eth.Contract(TOKEN_ABI, TOKEN_ADDRESS);
-                const raw = await token.methods.balanceOf(accounts[0]).call();
-                setBalance(Number(web3.utils.fromWei(raw.toString(), "ether")));
+                const raw = (await token.methods.balanceOf(accounts[0]).call()) as unknown as bigint;
+                setBalance(Number(web3.utils.fromWei(raw, "ether")));
             } catch (err) {
                 console.warn("Could not load ZYR balance:", err);
             }
@@ -143,10 +143,10 @@ export function ProductGrid() {
             const minted: string[] = [];
             for (let i = 0; i < toMint.length; i++) {
                 setStatus(`Minting certificate ${i + 1} of ${toMint.length}…`);
-                const result: any = await core.methods.purchaseCertificate(toMint[i]).send({ from: account });
-                const ev = Object.values(result.events || {}).find(
-                    (e: any) => e.event === "CertificatePurchased"
-                ) as any;
+                const result = (await core.methods.purchaseCertificate(toMint[i]).send({ from: account })) as unknown as {
+                    events?: Record<string, { event?: string; returnValues?: { certificateId?: bigint } }>;
+                };
+                const ev = Object.values(result.events ?? {}).find((e) => e.event === "CertificatePurchased");
                 if (ev?.returnValues?.certificateId != null) minted.push(ev.returnValues.certificateId.toString());
             }
 
@@ -154,10 +154,10 @@ export function ProductGrid() {
             setBalance((b) => b - totalPrice);
             setCart([]);
             setStatus(null);
-        } catch (err: any) {
+        } catch (err) {
             console.error("Checkout failed:", err);
             setStatus(
-                err?.message?.includes("Certificate not for sale")
+                err instanceof Error && err.message.includes("Certificate not for sale")
                     ? "One of the certificates is not for sale on-chain."
                     : "Checkout failed or was rejected. Any certificates already minted are in your wallet."
             );

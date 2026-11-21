@@ -49,7 +49,7 @@ export function LeafletMap({
     const mapRef = useRef<HTMLDivElement>(null);
     const leafletMapRef = useRef<L.Map | null>(null);
     const overlayRef = useRef<L.LayerGroup | null>(null);
-    const routeRef = useRef<any>(null);
+    const routeRef = useRef<L.Control | null>(null);
 
     // Create the map once.
     useEffect(() => {
@@ -114,7 +114,9 @@ export function LeafletMap({
                 ...(userLocation ? [L.latLng(userLocation.latitude, userLocation.longitude)] : []),
                 ...containers.map((c) => L.latLng(c.latitude, c.longitude)),
             ];
-            routeRef.current = (L as any).Routing.control({
+            // leaflet-routing-machine attaches itself to L at import time and ships no types.
+            const { Routing } = L as unknown as { Routing: { control: (options: object) => L.Control } };
+            routeRef.current = Routing.control({
                 waypoints,
                 show: false,
                 addWaypoints: false,

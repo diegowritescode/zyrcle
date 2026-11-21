@@ -4,7 +4,6 @@ import { ensureChain } from "@/lib/network";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { Navbar } from "@/components/layout/Navbar";
 import { useToast } from "@/components/ui/use-toast";
-import { PinataSDK } from "pinata";
 import { Footer } from "@/components/layout/Footer";
 import Web3 from "web3";
 import {
@@ -26,8 +25,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import QRCodeScanner from "./QRCodeScanner";
-import axios from "axios";
-import { configDotenv } from 'dotenv'
 import { CORE_ABI, CORE_ADDRESS } from "@/lib/contracts";
 import { loadCollected, saveCollected } from "@/lib/collectors";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogTitle } from "@radix-ui/react-alert-dialog";
@@ -102,14 +99,14 @@ export function ContainerVerification() {
                 setQrScanned(true);
                 setError(null);
 
-                // ✅ Obtener lista de contenedores
+                // Load the container this code belongs to (not a random one).
                 const listResponse = await fetch(`${API_BASE_URL}/api/rutas/quemadas`);
-                const containers = await listResponse.json();
-
-                // ✅ Elegir uno aleatorio
-                const randomIndex = Math.floor(Math.random() * containers.length);
-                const selectedContainer = containers[randomIndex];
-
+                const containers: { id: number }[] = await listResponse.json();
+                const selectedContainer = containers.find((c) => c.id === validation.container_id);
+                if (!selectedContainer) {
+                    setError("This code does not match any container on the route.");
+                    return;
+                }
                 setContainerData(selectedContainer);
             } else {
                 setError(validation.message || "Invalid QR code.");
@@ -132,24 +129,20 @@ export function ContainerVerification() {
         }
     };
 
-    const uploadToPinata = async (file: File) => {
-        const PINATA_API_KEY = import.meta.env.VITE_API_PINATA_ENV;
-        const PINATA_SECRET_API_KEY = import.meta.env.VITE_API_SECRET_ENV;
+    // Photos are pinned through the backend so the storage credential never reaches the browser.
+    const uploadEvidence = async (file: File): Promise<string | null> => {
         const formData = new FormData();
         formData.append("file", file);
         try {
             setUploading(true);
-            const response = await axios.post("https://api.pinata.cloud/pinning/pinFileToIPFS", formData, {
-                headers: {
-                    pinata_api_key: PINATA_API_KEY,
-                    pinata_secret_api_key: PINATA_SECRET_API_KEY,
-                },
-            });
-            const cid = response.data.IpfsHash;
+            const response = await fetch(`${API_BASE_URL}/api/evidence`, { method: "POST", body: formData });
+            if (!response.ok) throw new Error(`Evidence upload failed: ${response.status}`);
+            const { cid } = (await response.json()) as { cid: string };
             setContentId(cid);
             return cid;
         } catch (err) {
-            setError("Failed to upload image to Pinata.");
+            console.error(err);
+            setError("Failed to upload the photo.");
             return null;
         } finally {
             setUploading(false);
@@ -166,7 +159,7 @@ export function ContainerVerification() {
             return;
         }
 
-        const cid = await uploadToPinata(photo);
+        const cid = await uploadEvidence(photo);
         if (!cid) return;
 
         const verificationData = {
@@ -180,7 +173,8 @@ export function ContainerVerification() {
             timestamp: new Date().toISOString(),
         };
 
-        await saveToBlockchain(verificationData);
+        const saved = await saveToBlockchain(verificationData);
+        if (!saved) return; // Do not mark the stop collected if the transaction failed.
         toast({
             title: "Container Collected",
             description: "This container has been marked as collected and recorded successfully.",
@@ -198,46 +192,33 @@ export function ContainerVerification() {
 
     };
 
-    const saveToBlockchain = async (data: any) => {
+    const saveToBlockchain = async (data: { containerId: number; type: string; photoCid: string; estimatedWeight: number }): Promise<boolean> => {
         try {
             if (!window.ethereum) {
                 setError("No Ethereum provider detected. Please install MetaMask.");
-                return;
+                return false;
             }
 
-            // Solicita acceso a la cuenta
             await window.ethereum.request({ method: "eth_requestAccounts" });
             await ensureChain();
 
             const web3 = new Web3(window.ethereum);
-            const accounts = await web3.eth.getAccounts();
-            const account = accounts[0];
-
+            const [account] = await web3.eth.getAccounts();
             const contract = new web3.eth.Contract(CORE_ABI, CORE_ADDRESS);
 
-            // Asumiendo que el peso viene en kg y lo convertimos a gramos
-            const weightInGrams = Math.floor(data.estimatedWeight * 1000);
+            // Weights travel as integer grams everywhere.
+            const weightInGrams = Math.round(data.estimatedWeight * 1000);
 
-            // Ejecutar el método confirmCollection(address collector, uint256 containerId, string type, string cid, uint256 weight)
-            await contract.methods
+            // confirmCollection(address collector, uint256 containerId, string type, string cid, uint256 weightGrams)
+            const receipt = await contract.methods
                 .confirmCollection(account, data.containerId, data.type, data.photoCid, weightInGrams)
-                .send({ from: account })
-                .on("receipt", (receipt) => {
-                    console.log("Transaction receipt:", receipt);
-
-                    const event = receipt.events.CollectionConfirmed; // nombre del evento que definiste
-                    if (event) {
-                        console.log("Event data:", event.returnValues);
-                    }
-                })
-                .on("error", (error) => {
-                    console.error("Transaction failed:", error);
-                });
-
-            console.log("Collection event recorded successfully.");
+                .send({ from: account });
+            console.log("Collection recorded:", receipt.transactionHash);
+            return true;
         } catch (err) {
             console.error("Error sending transaction:", err);
             setError("Failed to save collection event on blockchain.");
+            return false;
         }
     };
 
@@ -261,14 +242,14 @@ export function ContainerVerification() {
                 setQrScanned(true);
                 setError(null);
 
-                // ✅ Obtener lista de contenedores
+                // Load the container this code belongs to (not a random one).
                 const listResponse = await fetch(`${API_BASE_URL}/api/rutas/quemadas`);
-                const containers = await listResponse.json();
-
-                // ✅ Elegir uno aleatorio
-                const randomIndex = Math.floor(Math.random() * containers.length);
-                const selectedContainer = containers[randomIndex];
-
+                const containers: { id: number }[] = await listResponse.json();
+                const selectedContainer = containers.find((c) => c.id === validation.container_id);
+                if (!selectedContainer) {
+                    setError("This code does not match any container on the route.");
+                    return;
+                }
                 setContainerData(selectedContainer);
             } else {
                 setError(validation.message || "Invalid code.");

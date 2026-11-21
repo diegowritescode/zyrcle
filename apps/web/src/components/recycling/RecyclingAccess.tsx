@@ -32,6 +32,8 @@ interface ValidationResponse {
 
 interface FinalizeResponse {
     message: string;
+    container_id: number;
+    weight_grams: number;
 }
 
 // Mock container data for details display
@@ -74,7 +76,7 @@ const mockContainerData = [
 export async function getZirBalance(address: string): Promise<number> {
     const web3 = new Web3(window.ethereum);
     const token = new web3.eth.Contract(TOKEN_ABI, TOKEN_ADDRESS);
-    const balance = await token.methods.balanceOf(address).call();
+    const balance = (await token.methods.balanceOf(address).call()) as unknown as bigint;
     return parseFloat(web3.utils.fromWei(balance, "ether"));
 }
 
@@ -191,15 +193,11 @@ export function RecyclingAccess() {
                     description: data.message || "Recycling recorded successfully! Thank you!",
                 });
 
-                // 🧠 Extraer peso en kg del mensaje
-                const weightMatch = data.message.match(/Reciclaje añadido:\s*(\d+(?:\.\d+)?)\s*kg/);
-                const weightInKg = weightMatch ? parseFloat(weightMatch[1]) : 0;
-                console.log("Peso extraído del mensaje:", weightInKg, "kg");
-
-                if (weightInKg > 0) {
-                    // Conectar wallet y llamar contrato
+                // The API returns the measured weight as integer grams; that exact value goes on chain.
+                const weightGrams = data.weight_grams;
+                if (weightGrams > 0) {
                     const { account, zyrcleCore } = await connectWallet();
-                    const tx = await depositWaste(zyrcleCore, account, 19000000000000000000000000);
+                    const tx = await depositWaste(zyrcleCore, account, weightGrams);
                     console.log("Tx confirmada:", tx.transactionHash);
                 }
             } else {
@@ -328,7 +326,7 @@ export function RecyclingAccess() {
                                 <div className="relative aspect-square max-w-md mx-auto">
                                     <Scanner
                                         onScan={handleScan}
-                                        onError={(err) => handleError(err as Error)}
+                                        onError={(err) => handleError(err instanceof Error ? err : new Error(String(err)))}
                                         constraints={{ facingMode: "environment" }}
                                         classNames={{ container: "w-full rounded-lg overflow-hidden" }}
                                     />

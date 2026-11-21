@@ -68,10 +68,10 @@ export const listenForAccountChange = (callback) => {
     }
 };
 
-export const depositWaste = async (contract, account, weightInKg) => {
+export const depositWaste = async (contract, account, weightGrams) => {
     try {
-        // Convertir a wei si el contrato espera en otra unidad, por ahora asumimos kg como uint256
-        const tx = await contract.methods.depositWaste(weightInKg).send({ from: account });
+        // Weight is an integer number of grams.
+        const tx = await contract.methods.depositWaste(weightGrams).send({ from: account });
         console.log("Transacción exitosa:", tx);
         return tx;
     } catch (error) {

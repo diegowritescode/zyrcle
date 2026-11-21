@@ -10,8 +10,15 @@ import { Button } from "@/components/ui/button";
 const ipfs = (uri: string) =>
     `https://gateway.pinata.cloud/ipfs/${uri.replace("ipfs://", "")}`;
 
+interface Certificate {
+    tokenId: number;
+    name: string;
+    description: string;
+    image: string;
+}
+
 export default function MyCertificates() {
-    const [certificates, setCertificates] = useState<any[]>([]);
+    const [certificates, setCertificates] = useState<Certificate[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -40,7 +47,7 @@ export default function MyCertificates() {
                             const response = await fetch(ipfs(uri));
                             if (!response.ok) throw new Error(`Failed to fetch: ${response.statusText}`);
                             const metadata = JSON.parse(await response.text());
-                            return { tokenId: Number(tokenId), ...metadata };
+                            return { tokenId: Number(tokenId), ...metadata } as Certificate;
                         } catch (innerErr) {
                             console.warn(`Error processing token index ${i}:`, innerErr);
                             return null;
@@ -48,7 +55,7 @@ export default function MyCertificates() {
                     })
                 );
 
-                setCertificates(results.filter((r) => r !== null));
+                setCertificates(results.filter((r): r is Certificate => r !== null));
             } catch (err) {
                 console.error("Error fetching certificates:", err);
             } finally {
