@@ -17,6 +17,11 @@ Create ZyrcleChain v2: a Subnet-EVM L1 on Fuji whose native coin is **ZYR (1 ZYR
 - The validator runs on the operator's VPS (`avalanchego` with `--partial-sync-primary-network`).
   P-Chain transactions are signed by a Fuji-only key generated on that VPS.
 - Genesis, node config and setup scripts live in `infra/l1` so the chain can be recreated.
+- EVM chain ID 20261121. Genesis supply: 100 ZYR to the admin for gas, nothing else (the CLI's
+  default 1,000,000-coin prefund is stripped).
+- The Avalanche CLI has been in maintenance mode since December 2025. It is used only to sign the
+  P-Chain transactions and initialize the validator manager; the node itself runs from a pinned
+  container image.
 
 ## Consequences
 - Residents never buy gas: the coin they are paid in is the gas token, and the backend sends most

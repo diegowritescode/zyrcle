@@ -1,0 +1,18 @@
+{
+  "network-id": "fuji",
+  "data-dir": "/data",
+  "chain-config-dir": "/config/chains",
+  "partial-sync-primary-network": true,
+  "public-ip-resolution-service": "opendns",
+  "staking-port": 9651,
+  "http-host": "0.0.0.0",
+  "http-port": 9650,
+  "http-allowed-hosts": "*",
+  "api-admin-enabled": false,
+  "api-info-enabled": true,
+  "api-metrics-enabled": true,
+  "index-enabled": false,
+  "log-level": "info",
+  "log-display-level": "info",
+  "log-format": "json"
+}

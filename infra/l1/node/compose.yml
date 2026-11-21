@@ -1,0 +1,50 @@
+# ZyrcleChain validator. Run from this folder: docker compose up -d --build
+#
+# - 9651 (P2P) is public: peers must reach it.
+# - 9650 (HTTP API) is published on 127.0.0.1 only, for the CLI on the host. Public RPC goes
+#   through Traefik on the `edge` network and only exposes the L1's /rpc and /ws paths.
+# - /data holds the node identity (staking key, TLS cert, BLS signer). Losing it means a new
+#   NodeID, which is no longer a validator. Back it up.
+name: zyrcle-l1
+
+services:
+  node:
+    build: .
+    image: zyrcle-l1-node:v1.15.3
+    restart: unless-stopped
+    ports:
+      - "9651:9651"
+      - "127.0.0.1:9650:9650"
+    volumes:
+      - node-data:/data
+      - ./node.json:/config/node.json:ro
+      - ./chains:/config/chains:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 3g
+    environment:
+      GOMEMLIMIT: 2560MiB
+    networks: [default, edge]
+    labels:
+      - traefik.enable=${RPC_PUBLIC:-false}
+      - traefik.docker.network=edge
+      - traefik.http.routers.zyrcle-rpc.rule=Host(`${RPC_HOST:-rpc.zyrcle.deviego.xyz}`) && (Path(`/ext/bc/${BLOCKCHAIN_ID:-unset}/rpc`) || Path(`/ext/bc/${BLOCKCHAIN_ID:-unset}/ws`))
+      - traefik.http.routers.zyrcle-rpc.entrypoints=websecure
+      - traefik.http.routers.zyrcle-rpc.tls.certresolver=le
+      - traefik.http.routers.zyrcle-rpc.middlewares=zyrcle-rpc-ratelimit
+      - traefik.http.middlewares.zyrcle-rpc-ratelimit.ratelimit.average=20
+      - traefik.http.middlewares.zyrcle-rpc-ratelimit.ratelimit.burst=40
+      - traefik.http.services.zyrcle-rpc.loadbalancer.server.port=9650
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "5" }
+
+volumes:
+  node-data:
+
+networks:
+  edge:
+    external: true

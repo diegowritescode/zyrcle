@@ -47,7 +47,7 @@ received.
 | `apps/api` | Backend (FastAPI + Postgres) | Domain model, deposit session state machine, settlement, ledger. Today it still holds the hackathon API. |
 | `device/` | Device protocol + simulator *planned* | Speaks the same MQTT protocol the real firmware will speak. |
 | `contracts/` | Solidity | Today: the contracts reconstructed in June 2026. Target: Treasury and Settlement (see §8). |
-| `infra/l1` | ZyrcleChain v2 *planned* | Subnet-EVM L1 on Fuji, native coin ZYR, validator on the operator's VPS. |
+| `infra/l1` | ZyrcleChain v2 (scripts ready, not yet deployed) | Subnet-EVM L1 on Fuji, native coin ZYR, validator on the operator's VPS. |
 | `infra/deploy` | Compose stack *planned* | API, worker, Postgres, MQTT broker, web, behind Traefik. |
 
 ## 5. Deposit session
@@ -114,7 +114,9 @@ A breach opens an incident for the operator. Nothing is settled from a bag with 
 - Only the Treasury contract can mint (Subnet-EVM NativeMinter allow list), and only against a
   confirmed sale or a recorded seed-capital deposit.
 - **Supply invariant:** total minted ≤ confirmed sales (COP) + seed capital (COP). Enforced in the
-  contract and covered by invariant tests.
+  contract and covered by invariant tests. The only ZYR that exists outside that rule is the
+  **genesis float**: 100 ZYR given to the L1 admin at genesis to pay gas, published in
+  `infra/l1/params.env`.
 - **Advance and settlement** (how cooperatives pay farmers):
   - On a verified deposit the resident gets an advance:
     `advance_ratio × reference_price(material) × kg`, capped per resident per day, paid from the

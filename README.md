@@ -11,9 +11,9 @@ properly. The hackathon state is preserved at tag [`v0-hackathon`](../../tree/v0
 
 | Phase | Scope | State |
 |---|---|---|
-| 0 | Monorepo, cleanup of the hackathon code, CI | in progress |
+| 0 | Monorepo, cleanup of the hackathon code, CI | done |
 | 1 | Deposit session: device simulator over MQTT, state machine, Postgres | planned |
-| 2 | ZyrcleChain v2 (own Avalanche L1, native ZYR = 1 COP), Treasury and Settlement contracts | planned |
+| 2 | ZyrcleChain v2 (own Avalanche L1, native ZYR = 1 COP), Treasury and Settlement contracts | L1 scripts tested locally |
 | 3 | Resident app (Expo) | planned |
 | 4 | Collection, sale at the collection center, bank reconciliation, mass balance | planned |
 | 5 | Route optimization, deployment, end-to-end demo scenario | planned |
@@ -29,6 +29,7 @@ the decisions behind it.
 apps/api      FastAPI backend (hackathon API, being replaced in phase 1)
 apps/web      Web app (hackathon UI; becomes the operations console)
 contracts     Solidity contracts (Hardhat)
+infra/l1      ZyrcleChain v2: genesis, validator container, setup scripts
 docs          Architecture and decision records
 ```
 
