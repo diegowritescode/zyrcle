@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 
+
 class RoutePoint(BaseModel):
     id: str
     lat: float

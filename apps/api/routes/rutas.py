@@ -1,15 +1,15 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
-from math import sqrt
-from typing import List
+
 from services.gemini import optimize_route_with_gemini
 
-
 router = APIRouter()
+
 
 class Location(BaseModel):
     latitude: float
     longitude: float
+
 
 # Mock data quemada (ahora una sola lista que comparten ambos endpoints)
 class Container(BaseModel):
@@ -22,6 +22,7 @@ class Container(BaseModel):
     lastUpdated: str
     latitude: float
     longitude: float
+
 
 # Contenedores actualizados con nuevas ubicaciones y datos
 containers_db = [
@@ -72,20 +73,21 @@ containers_db = [
 ]
 
 
-@router.get("/rutas/quemadas", response_model=List[Container])
+@router.get("/rutas/quemadas", response_model=list[Container])
 def get_mock_route():
     # Usamos el mismo array de contenedores para este endpoint
     return containers_db
 
-@router.post("/rutas/optimizar", response_model=List[Container])
+
+@router.post("/rutas/optimizar", response_model=list[Container])
 def optimize_route(user_location: Location):
     user_location_dict = user_location.model_dump()
     optimized_ids = optimize_route_with_gemini(containers_db, user_location_dict)
-    
+
     # Crear un diccionario para acceso rápido
     container_map = {c.id: c for c in containers_db}
-    
+
     # Filtrar y devolver los contenedores en el orden sugerido
     ordered = [container_map[cid] for cid in optimized_ids if cid in container_map]
-    
+
     return ordered
