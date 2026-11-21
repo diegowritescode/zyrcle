@@ -64,3 +64,16 @@ jobs:
           cache-dependency-path: contracts/package-lock.json
       - run: npm ci
       - run: npx hardhat test
+
+  infra:
+    name: Infra (L1 scripts)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: shellcheck -x infra/l1/scripts/*.sh
+      - run: python3 -m unittest discover -s infra/l1/scripts -v
+      - name: Validator image builds
+        run: docker build -q infra/l1/node
