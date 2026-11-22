@@ -14,5 +14,6 @@
   "index-enabled": false,
   "log-level": "info",
   "log-display-level": "info",
-  "log-format": "json"
+  "log-format": "json",
+  "track-subnets": "YZ1nRuEqM6LGAJoQqEkyirLvQbfxps8LutUBKFPGaYRjYSjMN"
 }
