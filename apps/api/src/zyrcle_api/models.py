@@ -11,6 +11,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    SmallInteger,
     String,
     Text,
     func,
@@ -35,8 +36,20 @@ def _now() -> Mapped[datetime]:
 
 class Residence(Base):
     __tablename__ = "residence"
+    __table_args__ = (
+        CheckConstraint(
+            "0 <= opens_hour AND opens_hour < closes_hour AND closes_hour <= 24",
+            name="residence_hours_valid",
+        ),
+        CheckConstraint("slot_capacity > 0", name="residence_slot_capacity_positive"),
+    )
     id: Mapped[uuid.UUID] = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(200))
+    # Opening hours in local time (settings.timezone), as whole hours: [opens_hour, closes_hour).
+    opens_hour: Mapped[int] = mapped_column(SmallInteger, default=0, server_default=text("0"))
+    closes_hour: Mapped[int] = mapped_column(SmallInteger, default=24, server_default=text("24"))
+    # Residents per container per hour (docs/adr/0009-time-slots.md).
+    slot_capacity: Mapped[int] = mapped_column(SmallInteger, default=20, server_default=text("20"))
     created_at: Mapped[datetime] = _now()
 
 
@@ -186,3 +199,84 @@ class Payout(Base):
     next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = _now()
     updated_at: Mapped[datetime] = _now()
+
+
+class Booking(Base):
+    """A resident's spot in one hour of one container (docs/adr/0009-time-slots.md).
+
+    A booked spot is guaranteed. A resident who arrives without one gets a walk-in spot if the hour
+    still has room, so `walk_in` rows count against the capacity like any other.
+    """
+
+    __tablename__ = "booking"
+    __table_args__ = (
+        CheckConstraint("status IN ('booked', 'cancelled')", name="booking_status_valid"),
+        # One live spot per resident per container and hour, even under concurrent requests.
+        Index(
+            "one_booking_per_resident_slot",
+            "resident_id",
+            "container_id",
+            "starts_at",
+            unique=True,
+            postgresql_where=text("status = 'booked'"),
+        ),
+        Index("booking_slot_idx", "container_id", "starts_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
+    resident_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("resident.id"), index=True)
+    container_id: Mapped[str] = mapped_column(ForeignKey("container.id"))
+    starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))  # a local hour boundary
+    status: Mapped[str] = mapped_column(String(16))
+    walk_in: Mapped[bool] = mapped_column(default=False, server_default=text("false"))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = _now()
+    updated_at: Mapped[datetime] = _now()
+
+
+class PushToken(Base):
+    """An Expo push token: one per installed app. Registering it again from another wallet moves
+    it there, since only the wallet now on that phone should get its notifications."""
+
+    __tablename__ = "push_token"
+    token: Mapped[str] = mapped_column(String(200), primary_key=True)
+    resident_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("resident.id"), index=True)
+    platform: Mapped[str] = mapped_column(String(16))
+    created_at: Mapped[datetime] = _now()
+    updated_at: Mapped[datetime] = _now()
+    # Set when Expo reports the app was uninstalled (DeviceNotRegistered). Re-registering clears it.
+    disabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+NOTIFICATION_STATUSES = ("pending", "sent", "skipped", "failed")
+
+
+class Notification(Base):
+    """Outbox for push notifications, written in the transaction that caused them
+    (docs/adr/0008-push-notifications.md). `dedupe_key` makes enqueueing idempotent."""
+
+    __tablename__ = "notification"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN (" + ", ".join(f"'{s}'" for s in NOTIFICATION_STATUSES) + ")",
+            name="notification_status_valid",
+        ),
+        Index("notification_due_idx", "status", "next_attempt_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
+    resident_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("resident.id"), index=True)
+    kind: Mapped[str] = mapped_column(String(32))
+    dedupe_key: Mapped[str] = mapped_column(String(120), unique=True)
+    title: Mapped[str] = mapped_column(String(120))
+    body: Mapped[str] = mapped_column(String(400))
+    data: Mapped[dict] = mapped_column(JSONB)
+    status: Mapped[str] = mapped_column(String(16))
+    attempts: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Expo push tickets awaiting a receipt: [{"token": ..., "id": ...}].
+    tickets: Mapped[list | None] = mapped_column(JSONB)
+    receipts_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_error: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = _now()
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

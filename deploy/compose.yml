@@ -26,6 +26,8 @@ x-api-env: &api-env
   ZYRCLE_CHAIN_RPC_URL: http://zyrcle-l1-node-1:9650/ext/bc/${BLOCKCHAIN_ID:?}/rpc
   ZYRCLE_TREASURY_ADDRESS: ${TREASURY:?}
   ZYRCLE_ORACLE_KEY_FILE: /run/secrets/oracle.key
+  # Only if "enhanced security for push notifications" is on in the Expo project (ADR 0008).
+  ZYRCLE_EXPO_ACCESS_TOKEN: ${EXPO_ACCESS_TOKEN:-}
 
 services:
   postgres:

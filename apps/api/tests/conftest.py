@@ -120,9 +120,83 @@ async def simulator_control() -> str:
     await task
 
 
+class FakeExpo:
+    """Expo's push service, as far as the API uses it. Tokens containing "gone" are rejected at
+    send time and tokens containing "uninstalled" in the receipt, both as DeviceNotRegistered."""
+
+    def __init__(self) -> None:
+        self.messages: list[dict] = []
+        self.tickets: dict[str, str] = {}
+        self.fail_next = 0
+        self.url = ""
+
+    def app(self):
+        from fastapi import FastAPI, Request
+        from fastapi.responses import JSONResponse
+
+        api = FastAPI()
+        not_registered = {"status": "error", "details": {"error": "DeviceNotRegistered"}}
+
+        @api.post("/send")
+        async def send(request: Request):
+            messages = await request.json()
+            if self.fail_next:
+                self.fail_next -= 1
+                return JSONResponse({"errors": [{"code": "INTERNAL"}]}, status_code=503)
+            tickets = []
+            for m in messages:
+                self.messages.append(m)
+                if "gone" in m["to"]:
+                    tickets.append({**not_registered, "message": "not registered"})
+                else:
+                    ticket = f"ticket-{len(self.tickets) + 1}"
+                    self.tickets[ticket] = m["to"]
+                    tickets.append({"status": "ok", "id": ticket})
+            return {"data": tickets}
+
+        @api.post("/getReceipts")
+        async def receipts(request: Request):
+            body = await request.json()
+            return {
+                "data": {
+                    i: not_registered if "uninstalled" in self.tickets[i] else {"status": "ok"}
+                    for i in body["ids"]
+                    if i in self.tickets
+                }
+            }
+
+        return api
+
+    def to(self, token: str) -> list[dict]:
+        return [m for m in self.messages if m["to"] == token]
+
+
 @pytest.fixture(scope="session")
-def settings(chain_env: dict, simulator_control: str) -> Settings:
+async def expo() -> FakeExpo:
+    import socket
+
+    import uvicorn
+
+    fake = FakeExpo()
+    sock = socket.socket()
+    sock.bind(("127.0.0.1", 0))
+    port = sock.getsockname()[1]
+    sock.close()
+    server = uvicorn.Server(uvicorn.Config(fake.app(), port=port, log_level="warning"))
+    task = asyncio.create_task(server.serve())
+    await wait_for(lambda: server.started, timeout=5)
+    fake.url = f"http://127.0.0.1:{port}"
+    yield fake
+    server.should_exit = True
+    await task
+
+
+@pytest.fixture(scope="session")
+def settings(chain_env: dict, simulator_control: str, expo: FakeExpo) -> Settings:
     return Settings(
+        expo_push_url=expo.url,
+        notification_interval_s=0.2,
+        push_receipt_delay_s=1,
         demo_simulator_url=simulator_control,
         cors_origins=DEMO_ORIGIN,
         chain_rpc_url=chain_env["rpc"],
@@ -180,7 +254,12 @@ async def client(app) -> httpx.AsyncClient:
 @pytest.fixture(scope="session")
 async def devices(client: httpx.AsyncClient, settings: Settings) -> dict[str, DeviceRunner]:
     residence = (
-        await client.post("/v1/operator/residences", json={"name": "Torres del Río"}, headers=OPS)
+        await client.post(
+            "/v1/operator/residences",
+            # Plenty of spots: every test signs in new residents, and each takes one per hour.
+            json={"name": "Torres del Río", "slot_capacity": 1000},
+            headers=OPS,
+        )
     ).json()
     runners: dict[str, DeviceRunner] = {}
     for device_id in DEVICE_IDS:

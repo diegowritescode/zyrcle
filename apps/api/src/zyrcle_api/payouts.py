@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from .chain import Chain, TxFailed
 from .models import Payout
+from .notifications import notify_payout
 
 log = logging.getLogger(__name__)
 
@@ -102,6 +103,8 @@ class PayoutWorker:
             p.status, p.last_error, p.next_attempt_at = status, error, retry_at
             p.tx_hash = tx_hash or p.tx_hash
             p.updated_at = self._now()
+            if status == "confirmed":
+                await notify_payout(db, p, p.updated_at)
             await db.commit()
         log.info("payout %s for session %s: %s %s", payout_id, session_id, status, error or tx_hash)
 
@@ -122,4 +125,6 @@ class PayoutWorker:
                     continue
                 p.status = "confirmed" if paid else "pending"
                 p.updated_at = self._now()
+                if paid:
+                    await notify_payout(db, p, p.updated_at)
             await db.commit()

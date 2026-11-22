@@ -2,7 +2,7 @@ import asyncio
 import logging
 import secrets
 import uuid
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import (
     APIRouter,
@@ -13,16 +13,27 @@ from fastapi import (
     WebSocket,
     WebSocketDisconnect,
 )
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import select, text
+from sqlalchemy.dialects.postgresql import insert
 from zyrcle_protocol import load_public_key
 
 from . import auth
+from .bookings import residence_schedule
 from .chain import WEI_PER_COP
 from .config import Settings
-from .models import Container, DepositSession, Device, MaterialPrice, Payout, Residence
+from .errors import SessionError
+from .models import (
+    Container,
+    DepositSession,
+    Device,
+    MaterialPrice,
+    Payout,
+    PushToken,
+    Residence,
+)
 from .models import Resident as ResidentRow
-from .sessions import MATERIALS, SessionError, SessionService, session_view
+from .sessions import MATERIALS, SessionService, session_view
 
 router = APIRouter()
 log = logging.getLogger(__name__)
@@ -253,10 +264,58 @@ async def me(resident: Resident, request: Request) -> dict[str, Any]:
     }
 
 
+class PushTokenIn(BaseModel):
+    token: str = Field(max_length=200, pattern=r"^Expo(nent)?PushToken\[[A-Za-z0-9_-]{8,}\]$")
+    platform: Literal["ios", "android"]
+
+
+@router.put("/v1/me/push-token", status_code=204)
+async def register_push_token(body: PushTokenIn, resident: Resident, request: Request) -> None:
+    """Where to push this resident's notifications (docs/adr/0008). The app calls it on every
+    start; a token registered by another wallet moves to this one."""
+    now = auth.utcnow()
+    async with request.app.state.maker() as db:
+        await db.execute(
+            insert(PushToken)
+            .values(
+                token=body.token,
+                resident_id=resident,
+                platform=body.platform,
+                created_at=now,
+                updated_at=now,
+            )
+            .on_conflict_do_update(
+                index_elements=["token"],
+                set_={
+                    "resident_id": resident,
+                    "platform": body.platform,
+                    "updated_at": now,
+                    "disabled_at": None,
+                },
+            )
+        )
+        await db.commit()
+
+
 # ---------------------------------------------------------------- operator
 
 
-class ResidenceIn(BaseModel):
+class ScheduleIn(BaseModel):
+    """Opening hours in local time, as whole hours [opens_hour, closes_hour), and residents per
+    container per hour (docs/adr/0009)."""
+
+    opens_hour: int = Field(default=0, ge=0, le=23)
+    closes_hour: int = Field(default=24, ge=1, le=24)
+    slot_capacity: int = Field(default=20, ge=1, le=1000)
+
+    @model_validator(mode="after")
+    def _ordered(self) -> "ScheduleIn":
+        if self.opens_hour >= self.closes_hour:
+            raise ValueError("opens_hour must be before closes_hour")
+        return self
+
+
+class ResidenceIn(ScheduleIn):
     name: str = Field(max_length=200)
 
 
@@ -281,12 +340,26 @@ class ReviewIn(BaseModel):
 
 
 @router.post("/v1/operator/residences", status_code=201)
-async def create_residence(body: ResidenceIn, _: Operator, request: Request) -> dict[str, str]:
+async def create_residence(body: ResidenceIn, _: Operator, request: Request) -> dict[str, Any]:
     async with request.app.state.maker() as db:
-        r = Residence(id=uuid.uuid4(), name=body.name)
+        r = Residence(id=uuid.uuid4(), **body.model_dump())
         db.add(r)
         await db.commit()
-    return {"id": str(r.id), "name": r.name}
+    return residence_schedule(r)
+
+
+@router.put("/v1/operator/residences/{residence_id}/schedule")
+async def set_schedule(
+    residence_id: uuid.UUID, body: ScheduleIn, _: Operator, request: Request
+) -> dict[str, Any]:
+    async with request.app.state.maker() as db:
+        r = await db.get(Residence, residence_id, with_for_update=True)
+        if r is None:
+            raise HTTPException(404, {"code": "not_found", "detail": "unknown residence"})
+        r.opens_hour, r.closes_hour = body.opens_hour, body.closes_hour
+        r.slot_capacity = body.slot_capacity
+        await db.commit()
+        return residence_schedule(r)
 
 
 @router.post("/v1/operator/devices", status_code=201)

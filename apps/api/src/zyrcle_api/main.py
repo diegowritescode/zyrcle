@@ -1,17 +1,20 @@
 import asyncio
 import logging
 from contextlib import asynccontextmanager, suppress
+from datetime import timedelta
 
 import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .api import router
+from .booking_routes import router as booking_router
 from .chain import Chain, load_account_file
 from .config import Settings, get_settings
 from .db import make_engine, make_sessionmaker
 from .live import LiveHub
 from .mqtt import MqttBridge
+from .notifications import ExpoPush, NotificationWorker
 from .payouts import PayoutWorker
 from .public import router as public_router
 from .sessions import SessionService
@@ -64,6 +67,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 _every(min(5.0, settings.code_rotation_s / 3), service.rotate_codes, "codes")
             ),
         ]
+        push_http = None
+        if settings.push_enabled:
+            push_http = httpx.AsyncClient(timeout=10)
+            notifier = NotificationWorker(
+                maker,
+                ExpoPush(push_http, settings.expo_push_url, settings.expo_access_token),
+                timedelta(seconds=settings.push_receipt_delay_s),
+            )
+            app.state.notifications = notifier
+            tasks.append(
+                asyncio.create_task(
+                    _every(settings.notification_interval_s, notifier.run_once, "notifications")
+                )
+            )
         if chain is not None:
             worker = PayoutWorker(maker, chain, load_account_file(settings.oracle_key_file))  # type: ignore[arg-type]
             app.state.payouts = worker
@@ -80,11 +97,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     await t
             if app.state.simulator is not None:
                 await app.state.simulator.aclose()
+            if push_http is not None:
+                await push_http.aclose()
             await engine.dispose()
 
     app = FastAPI(title="Zyrcle API", version="0.1.0", lifespan=lifespan)
     app.include_router(router)
     app.include_router(public_router)
+    app.include_router(booking_router)
     if settings.demo_simulator_url:
         from .demo import router as demo_router
 
@@ -93,7 +113,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.add_middleware(
             CORSMiddleware,
             allow_origins=settings.cors_origin_list,
-            allow_methods=["GET", "POST", "PUT"],
+            allow_methods=["GET", "POST", "PUT", "DELETE"],
             allow_headers=["Authorization", "Content-Type"],
         )
     return app

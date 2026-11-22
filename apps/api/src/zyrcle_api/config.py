@@ -46,6 +46,15 @@ class Settings(BaseSettings):
     max_advance_cop: int = 5_000
     payout_interval_s: float = 2.0
 
+    # Push notifications through Expo's push service (docs/adr/0008-push-notifications.md). The
+    # access token is needed only if "enhanced security for push notifications" is on in Expo.
+    push_enabled: bool = True
+    expo_push_url: str = "https://exp.host/--/api/v2/push"
+    expo_access_token: str | None = None
+    notification_interval_s: float = 2.0
+    # Expo has the delivery receipt (accepted or not by Apple/Google) about 15 minutes later.
+    push_receipt_delay_s: float = 15 * 60
+
     # Browser origins allowed to call the API (comma-separated), e.g. the demo page.
     cors_origins: str = ""
     # Demo mode: URL of the simulator's control panel. Empty disables the /v1/demo routes.

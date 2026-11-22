@@ -12,6 +12,7 @@ import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
@@ -19,9 +20,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from zyrcle_protocol import EnvelopeError, command, load_public_key, open_envelope, parse_qr
 from zyrcle_protocol.topics import parse_up_topic
 
+from . import bookings
 from .config import Settings
 from .domain.session_machine import ACTIVE, CREDITED, Event, InvalidTransition, State, transition
 from .domain.verification import MAX_BULK_DENSITY_G_PER_ML, Measurement, Outcome, Rules, verify
+from .errors import Conflict, Forbidden, Invalid, NotFound, Unavailable
 from .live import LiveHub
 from .models import (
     Container,
@@ -33,6 +36,7 @@ from .models import (
     Resident,
     SessionEvent,
 )
+from .notifications import notify_session
 from .pricing import advance_cop
 
 log = logging.getLogger(__name__)
@@ -47,35 +51,6 @@ OUTCOME_EVENT = {
 
 class DeviceLink(Protocol):
     async def send(self, device_id: str, payload: bytes) -> None: ...
-
-
-class SessionError(Exception):
-    status = 400
-    code = "bad_request"
-
-    def __init__(self, detail: str):
-        super().__init__(detail)
-        self.detail = detail
-
-
-class NotFound(SessionError):
-    status, code = 404, "not_found"
-
-
-class Forbidden(SessionError):
-    status, code = 403, "forbidden"
-
-
-class Conflict(SessionError):
-    status, code = 409, "conflict"
-
-
-class Invalid(SessionError):
-    status, code = 422, "invalid"
-
-
-class Unavailable(SessionError):
-    status, code = 503, "unavailable"
 
 
 def utcnow() -> datetime:
@@ -117,6 +92,7 @@ class SessionService:
         self._link = link
         self._hub = hub
         self._now = clock
+        self._tz = ZoneInfo(settings.timezone)
         self._keys: dict[str, Any] = {}
         self.rejected_messages = 0
 
@@ -129,7 +105,8 @@ class SessionService:
             raise Invalid(str(e)) from None
         now = self._now()
         async with self._maker() as db:
-            container = await db.get(Container, container_id)
+            # Locked so that counting the hour's spots and taking one cannot race (bookings.py).
+            container = await db.get(Container, container_id, with_for_update=True)
             if container is None:
                 raise NotFound("unknown container")
             device = await db.get(Device, container.device_id)
@@ -148,6 +125,7 @@ class SessionService:
             )
             if busy_elsewhere:
                 raise Conflict("you already have an open session")
+            spot = await bookings.claim_spot(db, resident_id, container, now, self._tz)
             session = DepositSession(
                 id=uuid.uuid4(),
                 container_id=container_id,
@@ -160,7 +138,13 @@ class SessionService:
             )
             db.add(session)
             db.add(
-                self._event(session.id, "created", None, State.AUTHORIZED, {"material": material})
+                self._event(
+                    session.id,
+                    "created",
+                    None,
+                    State.AUTHORIZED,
+                    {"material": material, "booking_id": str(spot.id), "walk_in": spot.walk_in},
+                )
             )
             try:
                 await db.commit()
@@ -455,10 +439,17 @@ class SessionService:
             session.close_reason = close_reason
         db.add(self._event(session.id, event.value, current, new, data))
         outbox.append((str(session.id), {"type": "state", **session_view(session)}))
-        if new in CREDITED:
-            await self._queue_advance(db, session)
+        advance_queued = new in CREDITED and await self._queue_advance(db, session)
+        # Push the outcomes a resident may no longer be watching (docs/adr/0008). A paid deposit is
+        # announced when its payout confirms on chain (payouts.py), not here.
+        if new == State.REVIEW:
+            await notify_session(db, session, "deposit_review", self._now())
+        elif new == State.REJECTED and current == State.REVIEW:
+            await notify_session(db, session, "deposit_rejected", self._now())
+        elif new == State.APPROVED and not advance_queued:
+            await notify_session(db, session, "deposit_approved", self._now())
 
-    async def _queue_advance(self, db: AsyncSession, session: DepositSession) -> None:
+    async def _queue_advance(self, db: AsyncSession, session: DepositSession) -> bool:
         """Queue the advance in the payout outbox, in the transaction that credits the deposit."""
         price = await db.get(MaterialPrice, session.declared_material)
         amount = advance_cop(
@@ -477,7 +468,7 @@ class SessionService:
                     {"reason": "no price" if price is None else "amount rounds to 0"},
                 )
             )
-            return
+            return False
         resident = await db.get(Resident, session.resident_id)
         assert resident is not None
         now = self._now()
@@ -494,6 +485,7 @@ class SessionService:
             )
         )
         db.add(self._event(session.id, "advance_queued", None, None, {"amount_cop": amount}))
+        return True
 
     def _flush(self, outbox: list[tuple[str, dict[str, Any]]]) -> None:
         """Publish live updates only after the transaction that produced them committed."""

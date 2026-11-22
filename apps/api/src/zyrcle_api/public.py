@@ -99,6 +99,25 @@ async def stats(request: Request) -> dict[str, Any]:
         return await _totals(db)
 
 
+@router.get("/containers")
+async def containers(request: Request) -> list[dict[str, Any]]:
+    """Every container, for the app's booking screen. No access codes."""
+    now, settings = utcnow(), request.app.state.settings
+    async with request.app.state.maker() as db:
+        rows = (
+            await db.execute(
+                select(Container, Device, Residence)
+                .join(Device, Device.id == Container.device_id)
+                .join(Residence, Residence.id == Container.residence_id)
+                .order_by(Residence.name, Container.id)
+            )
+        ).all()
+        busy = await busy_containers(db)
+    return [
+        {**_container_view(c, d, now, settings, busy), "residence_name": r.name} for c, d, r in rows
+    ]
+
+
 @router.get("/containers/{container_id}")
 async def container(container_id: str, request: Request) -> dict[str, Any]:
     """What a resident's app shows after scanning a QR: the container and what it accepts."""
