@@ -1,0 +1,54 @@
+# Zyrcle API
+
+Backend for deposit sessions: signs residents in with their wallet, talks to containers over MQTT,
+runs the session state machine and the material verification, and stores everything in Postgres.
+Design: [docs/architecture.md](../../docs/architecture.md), protocol:
+[docs/device-protocol.md](../../docs/device-protocol.md).
+
+## Layout
+
+| Module | What it does |
+|---|---|
+| `domain/session_machine.py` | Session states and allowed transitions. Pure, no I/O. |
+| `domain/verification.py` | Density, metal and camera checks into one score. Pure. |
+| `sessions.py` | Orchestration: row locks, transitions, audit events, commands after commit, timeouts, access-code rotation |
+| `mqtt.py` | Broker connection with reconnect and shared subscription |
+| `auth.py` | Sign-In with Ethereum (EIP-4361) and JWTs |
+| `api.py` | REST + WebSocket routes |
+| `models.py`, `migrations/` | Schema; one active session per container enforced by a partial unique index |
+
+## Guarantees and how they are enforced
+
+| Guarantee | Mechanism |
+|---|---|
+| One resident at a time per container | Partial unique index on active sessions; concurrent requests get 409 |
+| A container cannot act on a session the DB has not stored | Commands are sent only after commit |
+| Forged, replayed or duplicated device messages change nothing | ECDSA signature per device, strictly increasing `seq`, `(device_id, seq)` primary key |
+| A device cannot speak for another | Broker ACL plus device id check on every envelope |
+| Old QR photos are useless | Access codes rotate every 30 s; the previous one stays valid until it expires |
+| Every change is auditable | Append-only `session_event`, raw signed messages in `device_message` |
+| Live clients never see an uncommitted state | WebSocket updates are published after commit |
+| Timeouts work with several replicas | Sweeper uses `SELECT … FOR UPDATE SKIP LOCKED` |
+
+## Run locally
+
+```bash
+python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
+dev/mosquitto/make-passwd.sh                     # dev broker users, password "dev-password"
+docker compose -f dev/compose.yml up -d          # Postgres + Mosquitto with the ACL
+.venv/bin/alembic upgrade head
+cp .env.example .env                             # fill in the two secrets
+.venv/bin/zyrcle-api serve                       # http://127.0.0.1:8000/docs
+.venv/bin/python dev/demo.py                     # PET, stone and walk-away scenarios
+```
+
+## Tests
+
+```bash
+.venv/bin/pytest -q
+```
+
+Unit tests cover the state machine (including random event sequences with Hypothesis) and the
+verification rules. End-to-end tests run the real app against Postgres and Mosquitto with simulated
+containers: PET verified, stone to review, walk-away credited, empty deposit, busy container, bad
+codes, replayed and forged messages, broker ACL, SIWE nonce reuse, and the live WebSocket.

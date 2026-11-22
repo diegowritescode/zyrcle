@@ -1,0 +1,23 @@
+# Local development dependencies: docker compose -f dev/compose.yml up -d
+name: zyrcle-dev
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: zyrcle
+      POSTGRES_PASSWORD: zyrcle
+      POSTGRES_DB: zyrcle
+    ports: ["127.0.0.1:5432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zyrcle"]
+      interval: 2s
+      retries: 30
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    ports: ["127.0.0.1:1883:1883"]
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./mosquitto/acl:/mosquitto/config/acl:ro
+      - ./mosquitto/passwd:/mosquitto/config/passwd:ro

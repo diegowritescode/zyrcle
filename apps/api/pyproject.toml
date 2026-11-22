@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "zyrcle-api"
+version = "0.1.0"
+description = "Zyrcle backend: deposit sessions, device link, verification."
+requires-python = ">=3.13"
+dependencies = [
+  "fastapi>=0.165",
+  "uvicorn[standard]>=0.54",
+  "sqlalchemy[asyncio]>=2.1",
+  "asyncpg>=0.32",
+  "alembic>=1.20",
+  "aiomqtt>=2.5",
+  "pydantic-settings>=2.16",
+  "eth-account>=0.14",
+  "pyjwt>=2.15",
+  "zyrcle-protocol",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3", "pytest-asyncio>=1.5", "httpx>=0.28", "asgi-lifespan>=2.1", "hypothesis>=6.120", "ruff>=0.8"]
+
+[project.scripts]
+zyrcle-api = "zyrcle_api.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Header"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+markers = ["integration: needs Postgres and Mosquitto (docker compose -f dev/compose.yml up -d)"]
