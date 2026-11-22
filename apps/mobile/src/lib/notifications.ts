@@ -49,16 +49,25 @@ export function pushSupport(): PushSupport {
   return "ok";
 }
 
-/** Android channels, one per kind, so the resident can mute reminders and keep payments. Android
- * 13+ only shows the permission prompt once a channel exists. The API names them (notifications.py). */
+/** Android channels, one per kind, so the resident can mute reminders and keep payments. The API
+ * names them (notifications.py).
+ *
+ * Never throws: Expo Go on Android rejects every channel call (its build lacks the native channel
+ * provider, a NullPointerException). Notifications still show there, in expo-notifications'
+ * fallback channel, so a failure here must not stop the permission request. */
 export async function setUpChannels(): Promise<void> {
   if (Platform.OS !== "android") return;
   const { HIGH, DEFAULT } = AndroidImportance;
-  await Promise.all([
+  const results = await Promise.allSettled([
     Notifications.setNotificationChannelAsync("payments", { name: "Pagos", importance: HIGH, lightColor: "#10B981" }),
     Notifications.setNotificationChannelAsync("deposits", { name: "Depósitos en revisión", importance: DEFAULT }),
     Notifications.setNotificationChannelAsync("turns", { name: "Recordatorios de turno", importance: HIGH }),
+    Notifications.setNotificationChannelAsync("account", { name: "Seguridad de tu cuenta", importance: HIGH }),
   ]);
+  const failed = results.find((r) => r.status === "rejected");
+  if (failed && Constants.executionEnvironment !== ExecutionEnvironment.StoreClient) {
+    console.log("could not create notification channels", failed.reason);
+  }
 }
 
 function toPermission(p: Notifications.NotificationPermissionsStatus): Permission {
