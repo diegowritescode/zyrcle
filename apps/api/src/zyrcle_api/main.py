@@ -5,10 +5,12 @@ from contextlib import asynccontextmanager, suppress
 from fastapi import FastAPI
 
 from .api import router
+from .chain import Chain, load_account_file
 from .config import Settings, get_settings
 from .db import make_engine, make_sessionmaker
 from .live import LiveHub
 from .mqtt import MqttBridge
+from .payouts import PayoutWorker
 from .sessions import SessionService
 
 log = logging.getLogger(__name__)
@@ -42,6 +44,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.settings, app.state.maker, app.state.hub = settings, maker, hub
         app.state.bridge, app.state.sessions = bridge, service
 
+        chain = None
+        if settings.chain_enabled:
+            chain = Chain(settings.chain_rpc_url, settings.treasury_address)  # type: ignore[arg-type]
+        app.state.chain = chain
+
         tasks = [
             asyncio.create_task(bridge.run(), name="mqtt"),
             asyncio.create_task(_every(settings.sweep_interval_s, service.sweep, "sweep")),
@@ -49,6 +56,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 _every(min(5.0, settings.code_rotation_s / 3), service.rotate_codes, "codes")
             ),
         ]
+        if chain is not None:
+            worker = PayoutWorker(maker, chain, load_account_file(settings.oracle_key_file))  # type: ignore[arg-type]
+            app.state.payouts = worker
+            tasks.append(
+                asyncio.create_task(_every(settings.payout_interval_s, worker.run_once, "payouts"))
+            )
         try:
             yield
         finally:

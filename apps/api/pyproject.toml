@@ -17,6 +17,7 @@ dependencies = [
   "pydantic-settings>=2.16",
   "eth-account>=0.14",
   "pyjwt>=2.15",
+  "web3>=8.0",
   "zyrcle-protocol",
 ]
 
@@ -28,6 +29,9 @@ zyrcle-api = "zyrcle_api.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+zyrcle_api = ["contracts/*.json"]
 
 [tool.ruff]
 line-length = 100
@@ -44,4 +48,5 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "session"
 asyncio_default_test_loop_scope = "session"
+filterwarnings = ["ignore:enable_cleanup_closed ignored:DeprecationWarning:aiohttp"]
 markers = ["integration: needs Postgres and Mosquitto (docker compose -f dev/compose.yml up -d)"]

@@ -20,10 +20,20 @@ from zyrcle_protocol import EnvelopeError, command, load_public_key, open_envelo
 from zyrcle_protocol.topics import parse_up_topic
 
 from .config import Settings
-from .domain.session_machine import ACTIVE, Event, InvalidTransition, State, transition
+from .domain.session_machine import ACTIVE, CREDITED, Event, InvalidTransition, State, transition
 from .domain.verification import MAX_BULK_DENSITY_G_PER_ML, Measurement, Outcome, Rules, verify
 from .live import LiveHub
-from .models import Container, DepositSession, Device, DeviceMessage, SessionEvent
+from .models import (
+    Container,
+    DepositSession,
+    Device,
+    DeviceMessage,
+    MaterialPrice,
+    Payout,
+    Resident,
+    SessionEvent,
+)
+from .pricing import advance_cop
 
 log = logging.getLogger(__name__)
 
@@ -443,6 +453,45 @@ class SessionService:
             session.close_reason = close_reason
         db.add(self._event(session.id, event.value, current, new, data))
         outbox.append((str(session.id), {"type": "state", **session_view(session)}))
+        if new in CREDITED:
+            await self._queue_advance(db, session)
+
+    async def _queue_advance(self, db: AsyncSession, session: DepositSession) -> None:
+        """Queue the advance in the payout outbox, in the transaction that credits the deposit."""
+        price = await db.get(MaterialPrice, session.declared_material)
+        amount = advance_cop(
+            session.deposited_g or 0,
+            price.cop_per_kg if price else 0,
+            self._s.advance_ratio_bps,
+            self._s.max_advance_cop,
+        )
+        if amount <= 0:
+            db.add(
+                self._event(
+                    session.id,
+                    "no_advance",
+                    None,
+                    None,
+                    {"reason": "no price" if price is None else "amount rounds to 0"},
+                )
+            )
+            return
+        resident = await db.get(Resident, session.resident_id)
+        assert resident is not None
+        now = self._now()
+        db.add(
+            Payout(
+                id=uuid.uuid4(),
+                session_id=session.id,
+                kind="advance",
+                resident_address=resident.address,
+                amount_cop=amount,
+                status="pending",
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        db.add(self._event(session.id, "advance_queued", None, None, {"amount_cop": amount}))
 
     def _flush(self, outbox: list[tuple[str, dict[str, Any]]]) -> None:
         """Publish live updates only after the transaction that produced them committed."""

@@ -35,6 +35,19 @@ class Settings(BaseSettings):
     # A reading this far from the tare (g) means material is going in.
     weight_change_g: int = 10
 
+    # ZyrcleChain. Payouts stay pending until all three are configured.
+    chain_rpc_url: str | None = None
+    treasury_address: str | None = None
+    oracle_key_file: str | None = None  # hex private key of the Treasury's ORACLE_ROLE
+    # Advance = ratio x reference price x kg, capped like the contract (docs/adr/0003).
+    advance_ratio_bps: int = 5_000
+    max_advance_cop: int = 5_000
+    payout_interval_s: float = 2.0
+
+    @property
+    def chain_enabled(self) -> bool:
+        return bool(self.chain_rpc_url and self.treasury_address and self.oracle_key_file)
+
 
 @lru_cache
 def get_settings() -> Settings:

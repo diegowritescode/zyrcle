@@ -2,6 +2,7 @@ import asyncio
 import os
 import subprocess
 import sys
+import time
 
 import httpx
 import pytest
@@ -20,9 +21,87 @@ DB_URL = os.environ.get(
 DEVICE_IDS = ["ctr-0001", "ctr-0002", "ctr-0003"]
 
 
+ANVIL_KEYS = {  # anvil's well-known development accounts
+    "admin": "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+    "operator": "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d",
+    "oracle": "0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a",
+}
+SEED_COP = 1_000_000
+
+
 @pytest.fixture(scope="session")
-def settings() -> Settings:
+def anvil() -> str:
+    """A local EVM chain with ZyrcleChain's chain id. The NativeMinter mock is installed later."""
+    import shutil
+    import socket
+
+    if shutil.which("anvil") is None:
+        pytest.skip("anvil (Foundry) is not installed")
+    sock = socket.socket()
+    sock.bind(("127.0.0.1", 0))
+    port = sock.getsockname()[1]
+    sock.close()
+    proc = subprocess.Popen(
+        ["anvil", "--port", str(port), "--chain-id", "20261121", "--silent"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    url = f"http://127.0.0.1:{port}"
+    try:
+        _wait_for_rpc(url)
+    except BaseException:
+        proc.terminate()
+        raise
+    yield url
+    proc.terminate()
+    proc.wait(5)
+
+
+def _wait_for_rpc(url: str) -> None:
+    import json
+    import urllib.request
+
+    for _ in range(100):
+        try:
+            body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "eth_chainId"}).encode()
+            req = urllib.request.Request(url, body, {"content-type": "application/json"})
+            urllib.request.urlopen(req, timeout=1)
+            return
+        except OSError:
+            time.sleep(0.1)
+    raise RuntimeError(f"anvil did not start at {url}")
+
+
+@pytest.fixture(scope="session")
+async def chain_env(anvil: str, tmp_path_factory) -> dict:
+    """Deploy the Treasury with the backend's own code, enable minting, record seed capital."""
+    import json
+    import pathlib
+
+    from zyrcle_api.chain import NATIVE_MINTER, Chain, load_account
+
+    mock = json.loads(
+        (pathlib.Path(__file__).parent / "fixtures" / "AnvilNativeMinter.json").read_text()
+    )
+    chain = Chain(anvil)
+    await chain.w3.provider.make_request("anvil_setCode", [NATIVE_MINTER, mock["deployedBytecode"]])
+    await chain.w3.provider.make_request("anvil_setBalance", [NATIVE_MINTER, hex(10**30)])
+    admin, operator, oracle = (load_account(ANVIL_KEYS[k]) for k in ("admin", "operator", "oracle"))
+    address = await chain.deploy_treasury(admin, operator.address, oracle.address)
+    await chain.enable_minting(admin)
+    await chain.record_seed_capital(operator, "test-seed", SEED_COP)
+    key_file = tmp_path_factory.mktemp("keys") / "oracle.key"
+    key_file.write_text(ANVIL_KEYS["oracle"])
+    return {"rpc": anvil, "treasury": address, "oracle_key_file": str(key_file), "chain": chain}
+
+
+@pytest.fixture(scope="session")
+def settings(chain_env: dict) -> Settings:
     return Settings(
+        chain_rpc_url=chain_env["rpc"],
+        treasury_address=chain_env["treasury"],
+        oracle_key_file=chain_env["oracle_key_file"],
+        payout_interval_s=0.2,
         database_url=DB_URL,
         mqtt_host=os.environ.get("ZYRCLE_TEST_MQTT_HOST", "localhost"),
         mqtt_password="dev-password",
@@ -110,6 +189,12 @@ async def devices(client: httpx.AsyncClient, settings: Settings) -> dict[str, De
     for r in runners.values():
         await asyncio.wait_for(r.connected.wait(), 10)
     await wait_for(lambda: all(r.c.code for r in runners.values()), timeout=10)
+    # Reference prices for advances (test values, not market data).
+    for material, price in (("pet", 1_000), ("metal", 4_000), ("glass", 200)):
+        r = await client.put(
+            f"/v1/operator/prices/{material}", headers=OPS, json={"cop_per_kg": price}
+        )
+        assert r.status_code == 200, r.text
     yield runners
     for t in tasks:
         t.cancel()

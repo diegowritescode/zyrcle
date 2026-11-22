@@ -13,12 +13,14 @@ from fastapi import (
     WebSocketDisconnect,
 )
 from pydantic import BaseModel, Field
-from sqlalchemy import text
+from sqlalchemy import select, text
 from zyrcle_protocol import load_public_key
 
 from . import auth
+from .chain import WEI_PER_COP
 from .config import Settings
-from .models import Container, Device, Residence
+from .models import Container, Device, MaterialPrice, Payout, Residence
+from .models import Resident as ResidentRow
 from .sessions import MATERIALS, SessionError, SessionService, session_view
 
 router = APIRouter()
@@ -189,6 +191,41 @@ async def live(websocket: WebSocket, session_id: uuid.UUID) -> None:
         app.state.hub.unsubscribe(str(session_id), queue)
 
 
+@router.get("/v1/me")
+async def me(resident: Resident, request: Request) -> dict[str, Any]:
+    """The resident's wallet, on-chain ZYR balance (shown as pesos) and payouts."""
+    async with request.app.state.maker() as db:
+        row = await db.get(ResidentRow, resident)
+        if row is None:
+            raise HTTPException(404, "unknown resident")
+        payouts = list(
+            await db.scalars(
+                select(Payout)
+                .where(Payout.resident_address == row.address)
+                .order_by(Payout.created_at.desc())
+                .limit(50)
+            )
+        )
+    chain = request.app.state.chain
+    balance = await chain.balance_wei(row.address) if chain else None
+    return {
+        "resident_id": str(row.id),
+        "address": row.address,
+        "balance_cop": None if balance is None else balance / WEI_PER_COP,
+        "payouts": [
+            {
+                "session_id": str(p.session_id),
+                "kind": p.kind,
+                "amount_cop": p.amount_cop,
+                "status": p.status,
+                "tx_hash": p.tx_hash,
+                "created_at": p.created_at.isoformat(),
+            }
+            for p in payouts
+        ],
+    }
+
+
 # ---------------------------------------------------------------- operator
 
 
@@ -264,3 +301,32 @@ async def review(
     except SessionError as e:
         _raise(e)
         raise
+
+
+class PriceIn(BaseModel):
+    cop_per_kg: int = Field(ge=0, le=1_000_000)
+
+
+@router.put("/v1/operator/prices/{material}")
+async def set_price(material: str, body: PriceIn, _: Operator, request: Request) -> dict[str, Any]:
+    if material not in MATERIALS:
+        raise HTTPException(422, f"unknown material {material!r}")
+    async with request.app.state.maker() as db:
+        price = await db.get(MaterialPrice, material)
+        if price is None:
+            price = MaterialPrice(material=material, cop_per_kg=body.cop_per_kg, source="manual")
+            db.add(price)
+        else:
+            price.cop_per_kg, price.source = body.cop_per_kg, "manual"
+            price.updated_at = auth.utcnow()
+        await db.commit()
+    return {"material": material, "cop_per_kg": body.cop_per_kg, "source": "manual"}
+
+
+@router.get("/v1/operator/treasury")
+async def treasury(_: Operator, request: Request) -> dict[str, Any]:
+    chain = request.app.state.chain
+    if chain is None:
+        raise HTTPException(503, "chain is not configured")
+    state = await chain.state()
+    return {"address": chain.treasury.address, **state.__dict__}

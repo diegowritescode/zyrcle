@@ -16,6 +16,7 @@ Design: [docs/architecture.md](../../docs/architecture.md), protocol:
 | `auth.py` | Sign-In with Ethereum (EIP-4361) and JWTs |
 | `api.py` | REST + WebSocket routes |
 | `models.py`, `migrations/` | Schema; one active session per container enforced by a partial unique index |
+| `pricing.py`, `payouts.py`, `chain.py` | Advance sizing, the payout outbox worker, and the Treasury client (web3.py) |
 
 ## Guarantees and how they are enforced
 
@@ -29,6 +30,7 @@ Design: [docs/architecture.md](../../docs/architecture.md), protocol:
 | Every change is auditable | Append-only `session_event`, raw signed messages in `device_message` |
 | Live clients never see an uncommitted state | WebSocket updates are published after commit |
 | Timeouts work with several replicas | Sweeper uses `SELECT … FOR UPDATE SKIP LOCKED` |
+| A credited deposit is always paid, exactly once | Payout written in the crediting transaction (outbox); worker checks `advanceOf` before resending; the contract refuses a second advance |
 
 ## Run locally
 
@@ -51,4 +53,7 @@ cp .env.example .env                             # fill in the two secrets
 Unit tests cover the state machine (including random event sequences with Hypothesis) and the
 verification rules. End-to-end tests run the real app against Postgres and Mosquitto with simulated
 containers: PET verified, stone to review, walk-away credited, empty deposit, busy container, bad
-codes, replayed and forged messages, broker ACL, SIWE nonce reuse, and the live WebSocket.
+codes, replayed and forged messages, broker ACL, SIWE nonce reuse, and the live WebSocket. Chain
+end-to-end tests deploy the Treasury on anvil with the backend's own code and check that verified
+or approved deposits land as ZYR in the resident's wallet, capped, and never twice (needs Foundry's
+`anvil` on the PATH; skipped otherwise).
