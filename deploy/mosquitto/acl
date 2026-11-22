@@ -1,0 +1,10 @@
+# The API reads every device's uplink and writes every device's commands.
+user api
+topic read $share/zyrcle-api/zyrcle/v1/devices/+/up/+
+topic read zyrcle/v1/devices/+/up/+
+topic write zyrcle/v1/devices/+/cmd
+
+# Every other user is a device whose username is its device id: it may only publish its own
+# uplink and read its own commands.
+pattern write zyrcle/v1/devices/%u/up/+
+pattern read zyrcle/v1/devices/%u/cmd

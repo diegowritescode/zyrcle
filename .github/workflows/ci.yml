@@ -104,6 +104,47 @@ jobs:
           python3 export-artifacts.py
           git diff --exit-code -- ../apps/api/src/zyrcle_api/contracts ../apps/api/tests/fixtures
 
+  demo:
+    name: Demo page (typecheck + build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/demo
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/demo/package-lock.json
+      - run: npm ci
+      - run: npm run build
+
+  images:
+    name: Docker images build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -q -f apps/api/Dockerfile .
+      - run: docker build -q apps/demo
+      - run: docker compose -f deploy/compose.yml config -q
+        env:
+          ZYRCLE_API_TAG: "0000000000000000000000000000000000000000"
+          ZYRCLE_DEMO_TAG: "0000000000000000000000000000000000000000"
+          API_HOST: api.example
+          DEMO_HOST: demo.example
+          BLOCKCHAIN_ID: x
+          TREASURY: "0x0"
+          ORACLE_KEY_PATH: /dev/null
+          POSTGRES_PASSWORD: x
+          JWT_SECRET: x
+          OPERATOR_TOKEN: x
+          MQTT_API_PASSWORD: x
+          MQTT_CTR_0001_PASSWORD: x
+          MQTT_CTR_0002_PASSWORD: x
+          MQTT_CTR_0003_PASSWORD: x
+          MQTT_CTR_0004_PASSWORD: x
+
   web:
     name: Web (typecheck + lint + build)
     runs-on: ubuntu-latest
@@ -146,7 +187,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
-      - run: shellcheck -x infra/l1/scripts/*.sh
+      - run: shellcheck -x infra/l1/scripts/*.sh deploy/*.sh
       - run: python3 -m unittest discover -s infra/l1/scripts -v
       - name: Validator image builds
         run: docker build -q infra/l1/node

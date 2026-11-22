@@ -4,6 +4,9 @@ Verifiable recycling traceability: material is weighed at the container where a 
 followed to the collection center that buys it, and the household is paid out of what the buyer
 actually paid.
 
+**Live demo: https://zyrcle.deviego.xyz** (simulated containers, real backend, real L1 on Avalanche
+Fuji; ZYR has no real value on testnet).
+
 Zyrcle started as a one-day hackathon project (May 2025, first place). It is now being rebuilt
 properly. The hackathon state is preserved at tag [`v0-hackathon`](../../tree/v0-hackathon).
 
@@ -16,7 +19,7 @@ properly. The hackathon state is preserved at tag [`v0-hackathon`](../../tree/v0
 | 2 | ZyrcleChain v2 (own Avalanche L1, native ZYR = 1 COP), Treasury and Settlement contracts | ZyrcleChain v2 live on Fuji; Treasury built and tested |
 | 3 | Resident app (Expo) | planned |
 | 4 | Collection, sale at the collection center, bank reconciliation, mass balance | planned |
-| 5 | Route optimization, deployment, end-to-end demo scenario | planned |
+| 5 | Deployment and live demo | in progress; route optimization moves after phase 4 |
 
 The deposit flow is rebuilt (phase 1): a signed device protocol, a container simulator with all
 its sensors, and a backend that runs the session state machine and the anti-cheating checks. The
@@ -35,6 +38,8 @@ device/simulator  Simulated container: scale, distance, metal, camera, lock
 contracts     Solidity contracts (Hardhat)
 infra/l1      ZyrcleChain v2: genesis, validator container, setup scripts
 chain         Treasury contract (Foundry)
+apps/demo     Live demo page (React + viem): throwaway wallet, simulated containers
+deploy        Production compose stack and deploy script
 docs          Architecture and decision records
 ```
 
