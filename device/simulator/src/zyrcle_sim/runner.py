@@ -29,12 +29,14 @@ class DeviceRunner:
         reading_interval_s: float = 0.5,
         settle_s: float = 0.2,
         seq_start: int | None = None,
+        heartbeat_s: float = 30.0,
     ):
         self.c = container
         self._key = key
         self._host, self._port, self._password = host, port, password
         self._interval = reading_interval_s
         self._settle = settle_s
+        self._heartbeat = heartbeat_s
         # Firmware keeps the counter in flash. Starting from the clock keeps it increasing across
         # simulator restarts without storage.
         self._seq = seq_start if seq_start is not None else time.time_ns() // 1000
@@ -62,15 +64,25 @@ class DeviceRunner:
         ) as client:
             self._client = client
             await client.subscribe(command_topic(self.c.device_id), qos=1)
-            await self.publish("hello", {"fw": "zyrcle-sim/0.1", "area_mm2": self.c.area_mm2})
+            await self._hello()
             self.connected.set()
-            readings = asyncio.create_task(self._readings())
+            background = [asyncio.create_task(self._readings()), asyncio.create_task(self._beat())]
             try:
                 async for message in client.messages:
                     await self._on_command(bytes(message.payload))
             finally:
-                readings.cancel()
+                for task in background:
+                    task.cancel()
                 self.connected.clear()
+
+    async def _hello(self) -> None:
+        await self.publish("hello", {"fw": "zyrcle-sim/0.1", "area_mm2": self.c.area_mm2})
+
+    async def _beat(self) -> None:
+        """Heartbeat: lets the backend know the container is alive between sessions."""
+        while True:
+            await asyncio.sleep(self._heartbeat)
+            await self._hello()
 
     async def _readings(self) -> None:
         while True:

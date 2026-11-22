@@ -45,7 +45,7 @@ registered (`POST /v1/operator/devices`).
 
 | type | when | body |
 |---|---|---|
-| `hello` | on every (re)connect | `fw`, `area_mm2` |
+| `hello` | on every (re)connect and every 30 s as a heartbeat | `fw`, `area_mm2` |
 | `event` | lid opened, lid closing | `name` (`lock_opened`, `lock_closing`), `session_id`; `lock_opened` also carries the tare: `weight_g`, `fill_mm` |
 | `reading` | about every 500 ms while the lid is open | `session_id`, `weight_g`, `fill_mm`, `metal` |
 | `measurement` | once, after the lid closed and the scale settled | `session_id`, `tare_g`, `final_g`, `fill_before_mm`, `fill_after_mm`, `metal`, `camera_label` |

@@ -10,7 +10,8 @@ requires-python = ">=3.13"
 dependencies = ["zyrcle-protocol", "aiomqtt>=2.5"]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.3", "ruff>=0.8"]
+control = ["fastapi>=0.165", "uvicorn>=0.54"]
+dev = ["pytest>=8.3", "ruff>=0.8", "fastapi>=0.165", "httpx>=0.28"]
 
 [project.scripts]
 zyrcle-sim = "zyrcle_sim.cli:main"
