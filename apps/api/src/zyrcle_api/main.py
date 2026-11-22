@@ -7,16 +7,19 @@ import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from .account_routes import router as account_router
 from .api import router
 from .booking_routes import router as booking_router
 from .chain import Chain, load_account_file
 from .config import Settings, get_settings
 from .db import make_engine, make_sessionmaker
 from .live import LiveHub
+from .mail import EmailWorker, LogMail, ResendMail
 from .mqtt import MqttBridge
 from .notifications import ExpoPush, NotificationWorker
 from .payouts import PayoutWorker
 from .public import router as public_router
+from .recovery import RecoveryWorker
 from .sessions import SessionService
 
 log = logging.getLogger(__name__)
@@ -52,7 +55,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
         chain = None
         if settings.chain_enabled:
-            chain = Chain(settings.chain_rpc_url, settings.treasury_address)  # type: ignore[arg-type]
+            chain = Chain(
+                settings.chain_rpc_url,  # type: ignore[arg-type]
+                settings.treasury_address,
+                settings.account_factory_address,
+            )
         app.state.chain = chain
         app.state.simulator = (
             httpx.AsyncClient(base_url=settings.demo_simulator_url, timeout=5)
@@ -87,6 +94,29 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             tasks.append(
                 asyncio.create_task(_every(settings.payout_interval_s, worker.run_once, "payouts"))
             )
+        if chain is not None and settings.accounts_enabled:
+            guardian = load_account_file(settings.guardian_key_file or settings.oracle_key_file)  # type: ignore[arg-type]
+            recoveries = RecoveryWorker(maker, chain, guardian, settings)
+            app.state.recoveries = recoveries
+            tasks.append(
+                asyncio.create_task(
+                    _every(settings.recovery_interval_s, recoveries.run_once, "recoveries")
+                )
+            )
+        mail_http = None
+        if settings.email_enabled:
+            if settings.resend_api_key:
+                mail_http = httpx.AsyncClient(timeout=15)
+                mailer = ResendMail(
+                    mail_http, settings.resend_api_url, settings.resend_api_key, settings.email_from
+                )
+            else:
+                mailer = LogMail()
+            emails = EmailWorker(maker, mailer)
+            app.state.emails = emails
+            tasks.append(
+                asyncio.create_task(_every(settings.email_interval_s, emails.run_once, "emails"))
+            )
         try:
             yield
         finally:
@@ -99,12 +129,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 await app.state.simulator.aclose()
             if push_http is not None:
                 await push_http.aclose()
+            if mail_http is not None:
+                await mail_http.aclose()
             await engine.dispose()
 
     app = FastAPI(title="Zyrcle API", version="0.1.0", lifespan=lifespan)
     app.include_router(router)
     app.include_router(public_router)
     app.include_router(booking_router)
+    app.include_router(account_router)
     if settings.demo_simulator_url:
         from .demo import router as demo_router
 

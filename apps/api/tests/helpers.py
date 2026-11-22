@@ -17,19 +17,26 @@ OPERATOR_TOKEN = "operator-" + "x" * 32
 OPS = {"Authorization": f"Bearer {OPERATOR_TOKEN}"}
 
 
-async def sign_in(client: httpx.AsyncClient, settings: Settings) -> dict[str, str]:
-    """Sign in a fresh wallet with SIWE. Returns auth headers plus address and resident id."""
-    account = Account.create()
+async def siwe(client: httpx.AsyncClient, settings: Settings, account) -> httpx.Response:
+    """POST /v1/auth/verify for `account` (an eth_account key)."""
     nonce = (await client.post("/v1/auth/nonce")).json()["nonce"]
     message = build_siwe(
         settings.siwe_domain, account.address, settings.chain_id, nonce, datetime.now(UTC)
     )
     signature = account.sign_message(encode_defunct(text=message)).signature.hex()
-    r = await client.post("/v1/auth/verify", json={"message": message, "signature": signature})
+    return await client.post("/v1/auth/verify", json={"message": message, "signature": signature})
+
+
+async def sign_in(client: httpx.AsyncClient, settings: Settings, account=None) -> dict:
+    """Sign in a phone key (a fresh one by default) with SIWE. Returns auth headers, the
+    resident's account address (where their ZYR lives), the key, and the resident id."""
+    account = account or Account.create()
+    r = await siwe(client, settings, account)
     assert r.status_code == 200, r.text
     return {
         "Authorization": f"Bearer {r.json()['token']}",
-        "address": account.address,
+        "address": r.json()["address"],
+        "key": account,
         "id": r.json()["resident_id"],
     }
 
@@ -46,7 +53,7 @@ async def wait_for(predicate: Callable[[], bool | Awaitable[bool]], timeout: flo
     raise AssertionError("condition not met in time")
 
 
-def headers(resident: dict[str, str]) -> dict[str, str]:
+def headers(resident: dict) -> dict[str, str]:
     return {"Authorization": resident["Authorization"]}
 
 

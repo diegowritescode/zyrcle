@@ -29,10 +29,12 @@ from .errors import (
     Forbidden,
     Invalid,
     NotFound,
+    RecoveryPending,
     SlotFull,
     TooManyBookings,
 )
 from .models import Booking, Container, Residence
+from .recovery import recovery_pending
 
 
 def hours_of(residence: Residence) -> Hours:
@@ -121,6 +123,8 @@ async def book(
 ) -> Booking:
     if starts_at.tzinfo is None:
         raise Invalid("starts_at needs a time zone offset")
+    if await recovery_pending(db, resident_id):
+        raise RecoveryPending("this phone is waiting to recover an account")
     container, residence = await _locked_container(db, container_id)
     if not is_slot_start(starts_at, tz):
         raise Invalid("a slot starts on the hour")

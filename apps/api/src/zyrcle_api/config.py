@@ -55,6 +55,23 @@ class Settings(BaseSettings):
     # Expo has the delivery receipt (accepted or not by Apple/Google) about 15 minutes later.
     push_receipt_delay_s: float = 15 * 60
 
+    # Residents' smart accounts and lost-phone recovery (docs/adr/0010). Without a factory, a
+    # resident's ZYR goes straight to their phone key, as before.
+    account_factory_address: str | None = None
+    # The key that starts and cancels recoveries (the factory's guardian). Defaults to the oracle
+    # key; production should give it its own.
+    guardian_key_file: str | None = None
+    recovery_interval_s: float = 5.0
+
+    # Email through Resend's HTTP API (https://resend.com/docs/api-reference/emails/send-email):
+    # verification codes and recovery alerts. No key, no email (and no recovery).
+    resend_api_key: str | None = None
+    resend_api_url: str = "https://api.resend.com"
+    email_from: str = "Zyrcle <no-reply@zyrcle.deviego.xyz>"
+    email_interval_s: float = 1.0
+    # Local development only: write emails to the log instead of sending them.
+    email_log_only: bool = False
+
     # Browser origins allowed to call the API (comma-separated), e.g. the demo page.
     cors_origins: str = ""
     # Demo mode: URL of the simulator's control panel. Empty disables the /v1/demo routes.
@@ -67,6 +84,18 @@ class Settings(BaseSettings):
     @property
     def chain_enabled(self) -> bool:
         return bool(self.chain_rpc_url and self.treasury_address and self.oracle_key_file)
+
+    @property
+    def accounts_enabled(self) -> bool:
+        return self.chain_enabled and bool(self.account_factory_address)
+
+    @property
+    def email_enabled(self) -> bool:
+        return bool(self.resend_api_key) or self.email_log_only
+
+    @property
+    def recovery_enabled(self) -> bool:
+        return self.accounts_enabled and self.email_enabled
 
 
 @lru_cache

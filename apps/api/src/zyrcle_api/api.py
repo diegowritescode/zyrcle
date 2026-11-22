@@ -53,14 +53,24 @@ def _bearer(authorization: str | None) -> str:
     return authorization.removeprefix("Bearer ")
 
 
-def resident_dep(
+async def resident_dep(
+    request: Request,
     settings: Annotated[Settings, Depends(settings_dep)],
     authorization: Annotated[str | None, Header()] = None,
 ) -> uuid.UUID:
     try:
-        return auth.read_token(settings, _bearer(authorization))
+        resident_id, key = auth.read_claims(settings, _bearer(authorization))
     except auth.AuthError as e:
         raise HTTPException(401, str(e)) from None
+    # The key must still own the account: a recovery ends the old phone's session right away, and
+    # a resident folded into an account (the new phone's) no longer exists.
+    async with request.app.state.maker() as db:
+        owner = await db.scalar(
+            select(ResidentRow.owner_address).where(ResidentRow.id == resident_id)
+        )
+    if owner is None or (key is not None and key != owner):
+        raise HTTPException(401, "session ended: sign in again")
+    return resident_id
 
 
 def operator_dep(
@@ -114,12 +124,16 @@ async def verify(
     async with request.app.state.maker() as db:
         try:
             resident = await auth.verify_siwe(db, settings, body.message, body.signature, now)
+        except auth.KeyRetired as e:
+            raise HTTPException(403, {"code": "key_retired", "detail": str(e)}) from None
         except auth.AuthError as e:
             raise HTTPException(401, str(e)) from None
     return {
         "token": auth.issue_token(settings, resident, now),
         "resident_id": str(resident.id),
+        # Where the resident's ZYR lives (their account) and the key that controls it.
         "address": resident.address,
+        "owner": resident.owner_address,
     }
 
 
@@ -214,7 +228,8 @@ async def me(resident: Resident, request: Request) -> dict[str, Any]:
         payouts = list(
             await db.scalars(
                 select(Payout)
-                .where(Payout.resident_address == row.address)
+                .join(DepositSession, DepositSession.id == Payout.session_id)
+                .where(DepositSession.resident_id == resident)
                 .order_by(Payout.created_at.desc())
                 .limit(50)
             )
@@ -239,6 +254,8 @@ async def me(resident: Resident, request: Request) -> dict[str, Any]:
     return {
         "resident_id": str(row.id),
         "address": row.address,
+        "owner": row.owner_address,
+        "email": row.email,
         "balance_cop": None if balance is None else balance / WEI_PER_COP,
         "payouts": [
             {

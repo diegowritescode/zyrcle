@@ -34,6 +34,9 @@ CHANNEL = {
     "deposit_approved": "payments",
     "deposit_review": "deposits",
     "deposit_rejected": "deposits",
+    "recovery_started": "account",
+    "recovery_done": "account",
+    "recovery_cancelled": "account",
 }
 MATERIAL_NAMES = {
     "pet": "PET",

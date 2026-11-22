@@ -1,4 +1,5 @@
-"""Turn a local anvil into a ZyrcleChain stand-in: NativeMinter mock, Treasury, seed capital.
+"""Turn a local anvil into a ZyrcleChain stand-in: NativeMinter mock, Treasury, seed capital, and
+the account factory (guardian = the oracle key).
 
     anvil --chain-id 20261121 &
     python dev/local_chain.py            # prints the ZYRCLE_* variables for the API
@@ -33,6 +34,7 @@ async def main() -> None:
     address = await chain.deploy_treasury(admin, operator.address, oracle.address)
     await chain.enable_minting(admin)
     await chain.record_seed_capital(operator, "local-seed", 1_000_000)
+    factory = await chain.deploy_account_factory(admin, oracle.address)
     key_file = HERE / ".local" / "oracle.key"
     key_file.parent.mkdir(exist_ok=True)
     key_file.write_text(KEYS["oracle"])
@@ -40,6 +42,8 @@ async def main() -> None:
     print(f"ZYRCLE_CHAIN_RPC_URL={RPC}")
     print(f"ZYRCLE_TREASURY_ADDRESS={address}")
     print(f"ZYRCLE_ORACLE_KEY_FILE={key_file}")
+    print(f"ZYRCLE_ACCOUNT_FACTORY_ADDRESS={factory}")
+    print("ZYRCLE_EMAIL_LOG_ONLY=true")
 
 
 if __name__ == "__main__":

@@ -24,7 +24,7 @@ from . import bookings
 from .config import Settings
 from .domain.session_machine import ACTIVE, CREDITED, Event, InvalidTransition, State, transition
 from .domain.verification import MAX_BULK_DENSITY_G_PER_ML, Measurement, Outcome, Rules, verify
-from .errors import Conflict, Forbidden, Invalid, NotFound, Unavailable
+from .errors import Conflict, Forbidden, Invalid, NotFound, RecoveryPending, Unavailable
 from .live import LiveHub
 from .models import (
     Container,
@@ -38,6 +38,7 @@ from .models import (
 )
 from .notifications import notify_session
 from .pricing import advance_cop
+from .recovery import recovery_pending
 
 log = logging.getLogger(__name__)
 
@@ -105,6 +106,8 @@ class SessionService:
             raise Invalid(str(e)) from None
         now = self._now()
         async with self._maker() as db:
+            if await recovery_pending(db, resident_id):
+                raise RecoveryPending("this phone is waiting to recover an account")
             # Locked so that counting the hour's spots and taking one cannot race (bookings.py).
             container = await db.get(Container, container_id, with_for_update=True)
             if container is None:

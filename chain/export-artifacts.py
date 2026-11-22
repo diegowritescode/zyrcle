@@ -12,6 +12,8 @@ HERE = pathlib.Path(__file__).resolve().parent
 API = HERE.parent / "apps" / "api"
 TARGETS = {
     ("Treasury.sol", "Treasury"): API / "src" / "zyrcle_api" / "contracts" / "Treasury.json",
+    ("AccountFactory.sol", "AccountFactory"): API / "src" / "zyrcle_api" / "contracts" / "AccountFactory.json",
+    ("ZyrcleAccount.sol", "ZyrcleAccount"): API / "src" / "zyrcle_api" / "contracts" / "ZyrcleAccount.json",
     ("AnvilNativeMinter.sol", "AnvilNativeMinter"): API / "tests" / "fixtures" / "AnvilNativeMinter.json",
 }
 

@@ -90,9 +90,17 @@ async def chain_env(anvil: str, tmp_path_factory) -> dict:
     address = await chain.deploy_treasury(admin, operator.address, oracle.address)
     await chain.enable_minting(admin)
     await chain.record_seed_capital(operator, "test-seed", SEED_COP)
+    # Residents' accounts; the oracle key doubles as the recovery guardian, as in local dev.
+    factory = await chain.deploy_account_factory(admin, oracle.address)
     key_file = tmp_path_factory.mktemp("keys") / "oracle.key"
     key_file.write_text(ANVIL_KEYS["oracle"])
-    return {"rpc": anvil, "treasury": address, "oracle_key_file": str(key_file), "chain": chain}
+    return {
+        "rpc": anvil,
+        "treasury": address,
+        "factory": factory,
+        "oracle_key_file": str(key_file),
+        "chain": chain,
+    }
 
 
 SIM_RUNNERS: dict = {}  # filled by the devices fixture, served by the simulator control panel
@@ -191,9 +199,88 @@ async def expo() -> FakeExpo:
     await task
 
 
+class FakeResend:
+    """Resend's send-email endpoint. Addresses containing "bounce" are refused for good
+    (validation_error); `fail_next` answers 503 that many times. Idempotency keys are honoured."""
+
+    def __init__(self) -> None:
+        self.emails: list[dict] = []
+        self.by_key: dict[str, str] = {}
+        self.fail_next = 0
+        self.url = ""
+
+    def app(self):
+        from fastapi import FastAPI, Request
+        from fastapi.responses import JSONResponse
+
+        api = FastAPI()
+
+        @api.post("/emails")
+        async def send(request: Request):
+            if request.headers.get("authorization") != "Bearer re_test_key":
+                return JSONResponse({"name": "validation_error"}, status_code=401)
+            if not request.headers.get("user-agent"):
+                return JSONResponse({"name": "missing_user_agent"}, status_code=403)
+            if self.fail_next:
+                self.fail_next -= 1
+                return JSONResponse({"name": "service_unavailable"}, status_code=503)
+            body = await request.json()
+            if any("bounce" in to for to in body["to"]):
+                return JSONResponse(
+                    {"name": "validation_error", "message": "Invalid `to` field."},
+                    status_code=422,
+                )
+            key = request.headers.get("idempotency-key", "")
+            if key not in self.by_key:
+                self.by_key[key] = f"email-{len(self.by_key) + 1}"
+                self.emails.append(body)
+            return {"id": self.by_key[key]}
+
+        return api
+
+    def to(self, address: str) -> list[dict]:
+        return [e for e in self.emails if address in e["to"]]
+
+    def last_code(self, address: str) -> str:
+        import re
+
+        mails = self.to(address)
+        assert mails, f"no email to {address}"
+        match = re.search(r"\b(\d{6})\b", mails[-1]["text"])
+        assert match, mails[-1]["text"]
+        return match.group(1)
+
+
 @pytest.fixture(scope="session")
-def settings(chain_env: dict, simulator_control: str, expo: FakeExpo) -> Settings:
+async def resend() -> FakeResend:
+    import socket
+
+    import uvicorn
+
+    fake = FakeResend()
+    sock = socket.socket()
+    sock.bind(("127.0.0.1", 0))
+    port = sock.getsockname()[1]
+    sock.close()
+    server = uvicorn.Server(uvicorn.Config(fake.app(), port=port, log_level="warning"))
+    task = asyncio.create_task(server.serve())
+    await wait_for(lambda: server.started, timeout=5)
+    fake.url = f"http://127.0.0.1:{port}"
+    yield fake
+    server.should_exit = True
+    await task
+
+
+@pytest.fixture(scope="session")
+def settings(
+    chain_env: dict, simulator_control: str, expo: FakeExpo, resend: FakeResend
+) -> Settings:
     return Settings(
+        account_factory_address=chain_env["factory"],
+        resend_api_url=resend.url,
+        resend_api_key="re_test_key",
+        email_interval_s=0.2,
+        recovery_interval_s=0.2,
         expo_push_url=expo.url,
         notification_interval_s=0.2,
         push_receipt_delay_s=1,

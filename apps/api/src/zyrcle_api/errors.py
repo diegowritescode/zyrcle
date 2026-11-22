@@ -48,3 +48,53 @@ class AlreadyBooked(Conflict):
 
 class TooManyBookings(Conflict):
     code = "too_many_bookings"
+
+
+class RateLimited(SessionError):
+    status, code = 429, "rate_limited"
+
+
+class TooSoon(RateLimited):
+    """A code was sent less than a minute ago."""
+
+    code = "too_soon"
+
+
+class TooManyCodes(RateLimited):
+    code = "too_many_codes"
+
+
+class CodeInvalid(Invalid):
+    """Wrong, expired, already used or never requested."""
+
+    code = "code_invalid"
+
+
+class EmailTaken(Conflict):
+    code = "email_taken"
+
+
+class PhoneInUse(Conflict):
+    """The phone asking to recover an account already has deposits or turns of its own."""
+
+    code = "phone_in_use"
+
+
+class RecoveryPending(Conflict):
+    """This phone is waiting for an account; it cannot deposit or book until then."""
+
+    code = "recovery_pending"
+
+
+class RecoveryUnavailable(Unavailable):
+    code = "recovery_unavailable"
+
+
+class InvalidEmail(Invalid):
+    code = "invalid_email"
+
+
+class RecoveryInProgress(Conflict):
+    """This phone is already waiting for another account."""
+
+    code = "recovery_in_progress"

@@ -82,9 +82,21 @@ class Container(Base):
 
 
 class Resident(Base):
+    """A resident is their account, not their phone (docs/adr/0010-smart-accounts-and-recovery.md).
+
+    `address` is where their ZYR lives and never changes: their smart account on ZyrcleChain.
+    `owner_address` is the phone key that signs in and controls the account; a recovery replaces
+    it. Both are lowercase 0x addresses. Residents from before smart accounts have both equal (the
+    phone key held the ZYR itself) until they next sign in.
+    """
+
     __tablename__ = "resident"
     id: Mapped[uuid.UUID] = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
-    address: Mapped[str] = mapped_column(String(42), unique=True)  # lowercase 0x address
+    address: Mapped[str] = mapped_column(String(42), unique=True)
+    owner_address: Mapped[str] = mapped_column(String(42), unique=True)
+    # Verified recovery email, lowercase. Set only after the resident typed the code sent to it.
+    email: Mapped[str | None] = mapped_column(String(254), unique=True)
+    email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = _now()
 
 
@@ -277,6 +289,118 @@ class Notification(Base):
     # Expo push tickets awaiting a receipt: [{"token": ..., "id": ...}].
     tickets: Mapped[list | None] = mapped_column(JSONB)
     receipts_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_error: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = _now()
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class EmailCode(Base):
+    """A six-digit code sent by email: to verify a recovery email or to recover an account. Only
+    an HMAC of the code is stored. Bound to the resident who asked, so a code is useless on
+    another phone."""
+
+    __tablename__ = "email_code"
+    __table_args__ = (
+        CheckConstraint("purpose IN ('verify', 'recover')", name="email_code_purpose_valid"),
+        Index("email_code_lookup_idx", "email", "purpose", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
+    purpose: Mapped[str] = mapped_column(String(16))
+    email: Mapped[str] = mapped_column(String(254))
+    resident_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("resident.id", ondelete="CASCADE"), index=True
+    )
+    code_hash: Mapped[str] = mapped_column(String(64))
+    attempts: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = _now()
+
+
+RECOVERY_STATUSES = ("starting", "waiting", "cancelling", "done", "cancelled", "failed")
+RECOVERY_LIVE = ("starting", "waiting", "cancelling")
+_LIVE_SQL = ", ".join(f"'{s}'" for s in RECOVERY_LIVE)
+
+
+class AccountRecovery(Base):
+    """Handing an account to a new phone key (docs/adr/0010). The new phone signed in as a
+    resident of its own (`new_resident_id`), which is folded into the account when it is done.
+
+    starting   -> the guardian must call startRecovery on chain
+    waiting    -> on chain; finishRecovery once `ready_at` passes
+    cancelling -> the guardian must call cancelRecovery on chain
+    done | cancelled | failed
+    """
+
+    __tablename__ = "account_recovery"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN (" + ", ".join(f"'{s}'" for s in RECOVERY_STATUSES) + ")",
+            name="account_recovery_status_valid",
+        ),
+        Index(
+            "one_live_recovery_per_account",
+            "resident_id",
+            unique=True,
+            postgresql_where=text(f"status IN ({_LIVE_SQL})"),
+        ),
+        Index(
+            "one_live_recovery_per_new_phone",
+            "new_resident_id",
+            unique=True,
+            postgresql_where=text(f"status IN ({_LIVE_SQL})"),
+        ),
+        Index("account_recovery_due_idx", "status", "next_attempt_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
+    resident_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("resident.id"), index=True)
+    new_resident_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("resident.id", ondelete="SET NULL")
+    )
+    account_address: Mapped[str] = mapped_column(String(42))
+    new_owner: Mapped[str] = mapped_column(String(42))
+    status: Mapped[str] = mapped_column(String(16))
+    ready_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    cancelled_by: Mapped[str | None] = mapped_column(String(16))  # owner | new_phone | chain
+    start_tx: Mapped[str | None] = mapped_column(String(66))
+    finish_tx: Mapped[str | None] = mapped_column(String(66))
+    cancel_tx: Mapped[str | None] = mapped_column(String(66))
+    attempts: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    next_attempt_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    last_error: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = _now()
+    updated_at: Mapped[datetime] = _now()
+
+
+EMAIL_STATUSES = ("pending", "sent", "failed")
+
+
+class EmailMessage(Base):
+    """Outbox for email, written in the transaction that caused it and sent by a worker through
+    Resend. The bodies of code emails are cleared once sent or given up on."""
+
+    __tablename__ = "email_message"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN (" + ", ".join(f"'{s}'" for s in EMAIL_STATUSES) + ")",
+            name="email_message_status_valid",
+        ),
+        Index("email_message_due_idx", "status", "next_attempt_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
+    kind: Mapped[str] = mapped_column(String(32))
+    dedupe_key: Mapped[str] = mapped_column(String(120), unique=True)
+    to: Mapped[str] = mapped_column(String(254))
+    subject: Mapped[str] = mapped_column(String(200))
+    text_body: Mapped[str] = mapped_column(Text)
+    html_body: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(16))
+    attempts: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    provider_id: Mapped[str | None] = mapped_column(String(64))
     last_error: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = _now()
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

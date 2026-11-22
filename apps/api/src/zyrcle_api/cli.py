@@ -4,10 +4,14 @@
   zyrcle-api chain deploy --admin-key-file F --operator 0x.. --oracle 0x..   deploy + enable minting
   zyrcle-api chain seed --operator-key-file F --amount-cop N --ref TEXT      record seed capital
   zyrcle-api chain state                                                     backing, minted, ...
+  zyrcle-api chain accounts-deploy --admin-key-file F --guardian 0x..         account factory
+  zyrcle-api chain accounts-guardian --admin-key-file F --guardian 0x..       replace guardian
   zyrcle-api demo seed --keys-dir DIR --devices ctr-0001,ctr-0002            register demo bins
 
-Chain commands use ZYRCLE_CHAIN_RPC_URL and, except deploy, ZYRCLE_TREASURY_ADDRESS. Keys are read
-from files so they never appear in process arguments.
+Chain commands use ZYRCLE_CHAIN_RPC_URL and, except deploy, ZYRCLE_TREASURY_ADDRESS;
+accounts-guardian also ZYRCLE_ACCOUNT_FACTORY_ADDRESS. The admin key is the precompile admin's: it
+also puts the guardian on the deployer allow list. Keys are read from files so they never appear in
+process arguments.
 """
 
 import argparse
@@ -38,6 +42,24 @@ async def _chain(args: argparse.Namespace) -> None:
         )
         await chain.enable_minting(admin)
         print(f"Treasury deployed at {address} and enabled on the NativeMinter")
+        return
+    if args.action == "accounts-deploy":
+        chain = Chain(rpc)
+        admin = load_account_file(args.admin_key_file)
+        address = await chain.deploy_account_factory(admin, args.guardian)
+        await chain.allow_deployer(admin, args.guardian)
+        print(f"AccountFactory deployed at {address}; guardian {args.guardian} may deploy accounts")
+        print(f"ZYRCLE_ACCOUNT_FACTORY_ADDRESS={address}")
+        return
+    if args.action == "accounts-guardian":
+        factory = os.environ.get("ZYRCLE_ACCOUNT_FACTORY_ADDRESS")
+        if not factory:
+            raise SystemExit("set ZYRCLE_ACCOUNT_FACTORY_ADDRESS")
+        chain = Chain(rpc, factory_address=factory)
+        admin = load_account_file(args.admin_key_file)
+        await chain.allow_deployer(admin, args.guardian)
+        tx = await chain.set_guardian(admin, args.guardian)
+        print(f"guardian is now {args.guardian}: {tx}")
         return
     if not treasury:
         raise SystemExit("set ZYRCLE_TREASURY_ADDRESS")
@@ -71,6 +93,10 @@ def main() -> None:
     seed.add_argument("--amount-cop", type=int, required=True)
     seed.add_argument("--ref", required=True, help="e.g. the bank transfer reference")
     chain.add_parser("state")
+    for name in ("accounts-deploy", "accounts-guardian"):
+        accounts = chain.add_parser(name)
+        accounts.add_argument("--admin-key-file", required=True)
+        accounts.add_argument("--guardian", required=True, help="address of the guardian key")
 
     demo = sub.add_parser("demo").add_subparsers(dest="action", required=True)
     demo_seed = demo.add_parser("seed")

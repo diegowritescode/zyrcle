@@ -2,6 +2,11 @@
 
 The resident app's embedded wallet signs a SIWE message containing a single-use nonce. The backend
 recovers the signer, checks domain, chain, nonce and time, and issues a short JWT.
+
+The signer is the phone key, the account's owner. A resident is found by that key; a key seen for
+the first time gets a new resident whose ZYR goes to the smart account it will control
+(docs/adr/0010-smart-accounts-and-recovery.md). The token names the key, so a phone whose key no
+longer owns the account loses its session at once.
 """
 
 import re
@@ -16,6 +21,7 @@ from eth_account.messages import encode_defunct
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .chain import account_address
 from .config import Settings
 from .models import AuthNonce, Resident
 
@@ -28,6 +34,10 @@ _ADDRESS = re.compile(r"^0x[0-9a-fA-F]{40}$")
 
 class AuthError(Exception):
     pass
+
+
+class KeyRetired(AuthError):
+    """This key's account was handed to another phone (a recovery). It cannot sign in again."""
 
 
 @dataclass(frozen=True)
@@ -135,11 +145,22 @@ async def verify_siwe(
     if used.rowcount != 1:
         raise AuthError("unknown, expired or already used nonce")
 
-    address = msg.address.lower()
-    resident = await db.scalar(select(Resident).where(Resident.address == address))
+    key = msg.address.lower()
+    factory = settings.account_factory_address if settings.accounts_enabled else None
+    resident = await db.scalar(select(Resident).where(Resident.owner_address == key))
     if resident is None:
-        resident = Resident(id=uuid.uuid4(), address=address)
+        address = account_address(factory, key) if factory else key
+        taken = await db.scalar(select(Resident.id).where(Resident.address == address))
+        if taken is not None:
+            # The account this key was first given now obeys another key.
+            await db.commit()
+            raise KeyRetired("this phone's account was moved to another phone")
+        resident = Resident(id=uuid.uuid4(), address=address, owner_address=key)
         db.add(resident)
+    elif factory and resident.address == resident.owner_address:
+        # First sign-in since smart accounts: from now on their ZYR goes to their account. What the
+        # key itself holds, the app moves there (apps/mobile/src/lib/chain.ts).
+        resident.address = account_address(factory, key)
     await db.commit()
     return resident
 
@@ -148,6 +169,7 @@ def issue_token(settings: Settings, resident: Resident, now: datetime) -> str:
     claims = {
         "sub": str(resident.id),
         "addr": resident.address,
+        "key": resident.owner_address,
         "role": "resident",
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(minutes=settings.jwt_ttl_minutes)).timestamp()),
@@ -155,7 +177,8 @@ def issue_token(settings: Settings, resident: Resident, now: datetime) -> str:
     return jwt.encode(claims, settings.jwt_secret, algorithm="HS256")
 
 
-def read_token(settings: Settings, token: str) -> uuid.UUID:
+def read_claims(settings: Settings, token: str) -> tuple[uuid.UUID, str | None]:
+    """The resident id and the key that signed in (None in tokens from before smart accounts)."""
     try:
         claims = jwt.decode(
             token, settings.jwt_secret, algorithms=["HS256"], options={"require": ["exp", "sub"]}
@@ -164,7 +187,11 @@ def read_token(settings: Settings, token: str) -> uuid.UUID:
         raise AuthError("invalid token") from e
     if claims.get("role") != "resident":
         raise AuthError("invalid token")
-    return uuid.UUID(claims["sub"])
+    return uuid.UUID(claims["sub"]), claims.get("key")
+
+
+def read_token(settings: Settings, token: str) -> uuid.UUID:
+    return read_claims(settings, token)[0]
 
 
 def utcnow() -> datetime:
