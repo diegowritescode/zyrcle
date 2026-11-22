@@ -72,6 +72,9 @@ jobs:
             -v "$PWD/dev/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro" \
             -v "$PWD/dev/mosquitto/acl:/mosquitto/config/acl:ro" \
             -v "$PWD/dev/mosquitto/passwd:/mosquitto/config/passwd:ro" eclipse-mosquitto:2
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.5.1
       - run: pip install -r requirements-dev.txt
       - run: ruff check .
       - run: ruff format --check .
@@ -80,6 +83,26 @@ jobs:
           alembic upgrade head
           alembic check
       - run: pytest -q
+
+  chain:
+    name: Treasury (Foundry tests + ABI drift)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: chain
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.5.1
+      - run: forge soldeer install
+      - run: forge fmt --check
+      - run: forge build --sizes
+      - run: forge test -vv
+      - name: The backend uses exactly the compiled contract
+        run: |
+          python3 export-artifacts.py
+          git diff --exit-code -- ../apps/api/src/zyrcle_api/contracts ../apps/api/tests/fixtures
 
   web:
     name: Web (typecheck + lint + build)
