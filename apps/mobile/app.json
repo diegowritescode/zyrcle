@@ -2,6 +2,7 @@
   "expo": {
     "name": "Zyrcle",
     "slug": "zyrcle",
+    "owner": "diegowritescode",
     "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -57,6 +58,11 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "49ad94cb-7485-405b-94a8-cf2b99bee335"
+      }
     }
   }
 }
