@@ -2,7 +2,9 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager, suppress
 
+import httpx
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from .api import router
 from .chain import Chain, load_account_file
@@ -48,6 +50,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if settings.chain_enabled:
             chain = Chain(settings.chain_rpc_url, settings.treasury_address)  # type: ignore[arg-type]
         app.state.chain = chain
+        app.state.simulator = (
+            httpx.AsyncClient(base_url=settings.demo_simulator_url, timeout=5)
+            if settings.demo_simulator_url
+            else None
+        )
 
         tasks = [
             asyncio.create_task(bridge.run(), name="mqtt"),
@@ -70,8 +77,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             for t in tasks:
                 with suppress(asyncio.CancelledError):
                     await t
+            if app.state.simulator is not None:
+                await app.state.simulator.aclose()
             await engine.dispose()
 
     app = FastAPI(title="Zyrcle API", version="0.1.0", lifespan=lifespan)
     app.include_router(router)
+    if settings.demo_simulator_url:
+        from .demo import router as demo_router
+
+        app.include_router(demo_router)
+    if settings.cors_origin_list:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=settings.cors_origin_list,
+            allow_methods=["GET", "POST", "PUT"],
+            allow_headers=["Authorization", "Content-Type"],
+        )
     return app

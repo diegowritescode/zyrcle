@@ -44,6 +44,15 @@ class Settings(BaseSettings):
     max_advance_cop: int = 5_000
     payout_interval_s: float = 2.0
 
+    # Browser origins allowed to call the API (comma-separated), e.g. the demo page.
+    cors_origins: str = ""
+    # Demo mode: URL of the simulator's control panel. Empty disables the /v1/demo routes.
+    demo_simulator_url: str | None = None
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
     @property
     def chain_enabled(self) -> bool:
         return bool(self.chain_rpc_url and self.treasury_address and self.oracle_key_file)

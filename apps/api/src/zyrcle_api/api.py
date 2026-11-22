@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import secrets
 import uuid
 from typing import Annotated, Any
@@ -24,6 +25,7 @@ from .models import Resident as ResidentRow
 from .sessions import MATERIALS, SessionError, SessionService, session_view
 
 router = APIRouter()
+log = logging.getLogger(__name__)
 
 
 def settings_dep(request: Request) -> Settings:
@@ -207,7 +209,12 @@ async def me(resident: Resident, request: Request) -> dict[str, Any]:
             )
         )
     chain = request.app.state.chain
-    balance = await chain.balance_wei(row.address) if chain else None
+    balance = None
+    if chain is not None:
+        try:
+            balance = await chain.balance_wei(row.address)
+        except Exception as e:  # the chain being unreachable must not break the resident's page
+            log.warning("could not read balance of %s: %s", row.address, e)
     return {
         "resident_id": str(row.id),
         "address": row.address,

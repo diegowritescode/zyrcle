@@ -4,6 +4,7 @@
   zyrcle-api chain deploy --admin-key-file F --operator 0x.. --oracle 0x..   deploy + enable minting
   zyrcle-api chain seed --operator-key-file F --amount-cop N --ref TEXT      record seed capital
   zyrcle-api chain state                                                     backing, minted, ...
+  zyrcle-api demo seed --keys-dir DIR --devices ctr-0001,ctr-0002            register demo bins
 
 Chain commands use ZYRCLE_CHAIN_RPC_URL and, except deploy, ZYRCLE_TREASURY_ADDRESS. Keys are read
 from files so they never appear in process arguments.
@@ -71,9 +72,28 @@ def main() -> None:
     seed.add_argument("--ref", required=True, help="e.g. the bank transfer reference")
     chain.add_parser("state")
 
+    demo = sub.add_parser("demo").add_subparsers(dest="action", required=True)
+    demo_seed = demo.add_parser("seed")
+    demo_seed.add_argument("--keys-dir", required=True)
+    demo_seed.add_argument("--devices", required=True)
+
     args = parser.parse_args()
     if args.cmd == "serve":
-        uvicorn.run(create_app(), host=args.host, port=args.port, proxy_headers=True)
+        uvicorn.run(
+            create_app(),
+            host=args.host,
+            port=args.port,
+            proxy_headers=True,
+            forwarded_allow_ips="*",
+        )
+    elif args.cmd == "demo":
+        import pathlib
+
+        from .demo_seed import seed
+
+        devices = [d.strip() for d in args.devices.split(",") if d.strip()]
+        for line in asyncio.run(seed(pathlib.Path(args.keys_dir), devices)) or ["nothing to do"]:
+            print(line)
     else:
         asyncio.run(_chain(args))
 

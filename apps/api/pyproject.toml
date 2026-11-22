@@ -18,6 +18,7 @@ dependencies = [
   "eth-account>=0.14",
   "pyjwt>=2.15",
   "web3>=8.0",
+  "httpx>=0.28",
   "zyrcle-protocol",
 ]
 

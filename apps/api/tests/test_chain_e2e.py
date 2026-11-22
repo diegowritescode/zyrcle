@@ -117,3 +117,12 @@ async def test_treasury_books_match_the_payouts(app, client, devices):
     assert state["seed_capital_cop"] == SEED_COP
     assert state["minted_cop"] == confirmed
     assert state["minted_cop"] <= state["backing_cop"]
+
+
+async def test_me_still_answers_when_the_chain_is_unreachable(app, client, resident, monkeypatch):
+    async def down(address):
+        raise ConnectionError("rpc unreachable")
+
+    monkeypatch.setattr(app.state.chain, "balance_wei", down)
+    r = await client.get("/v1/me", headers=headers(resident))
+    assert r.status_code == 200 and r.json()["balance_cop"] is None

@@ -95,9 +95,36 @@ async def chain_env(anvil: str, tmp_path_factory) -> dict:
     return {"rpc": anvil, "treasury": address, "oracle_key_file": str(key_file), "chain": chain}
 
 
+SIM_RUNNERS: dict = {}  # filled by the devices fixture, served by the simulator control panel
+DEMO_ORIGIN = "https://demo.zyrcle.test"
+
+
 @pytest.fixture(scope="session")
-def settings(chain_env: dict) -> Settings:
+async def simulator_control() -> str:
+    import socket
+
+    import uvicorn
+    from zyrcle_sim.control import create_control_app
+
+    sock = socket.socket()
+    sock.bind(("127.0.0.1", 0))
+    port = sock.getsockname()[1]
+    sock.close()
+    server = uvicorn.Server(
+        uvicorn.Config(create_control_app(SIM_RUNNERS), port=port, log_level="warning")
+    )
+    task = asyncio.create_task(server.serve())
+    await wait_for(lambda: server.started, timeout=5)
+    yield f"http://127.0.0.1:{port}"
+    server.should_exit = True
+    await task
+
+
+@pytest.fixture(scope="session")
+def settings(chain_env: dict, simulator_control: str) -> Settings:
     return Settings(
+        demo_simulator_url=simulator_control,
+        cors_origins=DEMO_ORIGIN,
         chain_rpc_url=chain_env["rpc"],
         treasury_address=chain_env["treasury"],
         oracle_key_file=chain_env["oracle_key_file"],
@@ -185,6 +212,7 @@ async def devices(client: httpx.AsyncClient, settings: Settings) -> dict[str, De
             password="dev-password",
             reading_interval_s=0.1,
         )
+    SIM_RUNNERS.update(runners)
     tasks = [asyncio.create_task(r.run()) for r in runners.values()]
     for r in runners.values():
         await asyncio.wait_for(r.connected.wait(), 10)
