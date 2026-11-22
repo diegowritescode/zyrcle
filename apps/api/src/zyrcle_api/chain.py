@@ -15,6 +15,7 @@ from eth_account.signers.local import LocalAccount
 from eth_utils import keccak, to_checksum_address
 from web3 import AsyncHTTPProvider, AsyncWeb3
 from web3.exceptions import ContractCustomError, ContractLogicError
+from web3.middleware import ExtraDataToPOAMiddleware
 
 WEI_PER_COP = 10**18
 NATIVE_MINTER = "0x0200000000000000000000000000000000000001"
@@ -76,6 +77,11 @@ class TreasuryState:
 class Chain:
     def __init__(self, rpc_url: str, treasury_address: str | None = None):
         self.w3 = AsyncWeb3(AsyncHTTPProvider(rpc_url, request_kwargs={"timeout": 20}))
+        # Subnet-EVM block headers carry 80+ bytes of extraData (fee window); web3.py rejects
+        # anything over 32 unless this middleware strips it.
+        self.w3.middleware_onion.inject(
+            ExtraDataToPOAMiddleware, name="subnet_evm_extradata", layer=0
+        )
         artifact = treasury_artifact()
         self._abi = artifact["abi"]
         self._bytecode = artifact["bytecode"]
