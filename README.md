@@ -12,22 +12,26 @@ properly. The hackathon state is preserved at tag [`v0-hackathon`](../../tree/v0
 | Phase | Scope | State |
 |---|---|---|
 | 0 | Monorepo, cleanup of the hackathon code, CI | done |
-| 1 | Deposit session: device simulator over MQTT, state machine, Postgres | planned |
+| 1 | Deposit session: device simulator over MQTT, state machine, Postgres | done |
 | 2 | ZyrcleChain v2 (own Avalanche L1, native ZYR = 1 COP), Treasury and Settlement contracts | ZyrcleChain v2 live on Fuji; contracts planned |
 | 3 | Resident app (Expo) | planned |
 | 4 | Collection, sale at the collection center, bank reconciliation, mass balance | planned |
 | 5 | Route optimization, deployment, end-to-end demo scenario | planned |
 
-What exists today is still the hackathon product: the deposit and collection flows are simulated
-in the API and the frontend talks to contracts on Avalanche Fuji C-Chain. See
+The deposit flow is rebuilt (phase 1): a signed device protocol, a container simulator with all
+its sensors, and a backend that runs the session state machine and the anti-cheating checks. The
+web app is still the hackathon UI and talks to the old API in `apps/api-legacy`. See
 [docs/architecture.md](docs/architecture.md) for the target design and [docs/adr](docs/adr) for
 the decisions behind it.
 
 ## Layout
 
 ```
-apps/api      FastAPI backend (hackathon API, being replaced in phase 1)
-apps/web      Web app (hackathon UI; becomes the operations console)
+apps/api          Backend: deposit sessions, device link, verification (phase 1)
+apps/api-legacy   Hackathon API, kept until the web app is rewritten
+apps/web          Web app (hackathon UI; becomes the operations console)
+packages/protocol Device protocol shared by the API and the simulator
+device/simulator  Simulated container: scale, distance, metal, camera, lock
 contracts     Solidity contracts (Hardhat)
 infra/l1      ZyrcleChain v2: genesis, validator container, setup scripts
 docs          Architecture and decision records
@@ -35,14 +39,14 @@ docs          Architecture and decision records
 
 ## Run locally
 
-API:
+Backend, broker, database and simulated containers: see [apps/api/README.md](apps/api/README.md).
+The short version:
 
 ```bash
 cd apps/api
 python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
-cp .env.example .env
-.venv/bin/uvicorn main:app --reload --port 8000
-.venv/bin/pytest
+dev/mosquitto/make-passwd.sh && docker compose -f dev/compose.yml up -d
+.venv/bin/alembic upgrade head && .venv/bin/pytest -q
 ```
 
 Web:

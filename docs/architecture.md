@@ -44,8 +44,8 @@ received.
 |---|---|---|
 | `apps/mobile` | Resident app (Expo) *planned* | Scans the container's rotating QR, shows the live session, balance in COP. Embedded wallet: key in device secure storage, no seed phrase shown. |
 | `apps/web` | Operations console + landing | Containers, sessions under review, collections, sales, reconciliation, treasury. Today it still holds the hackathon UI. |
-| `apps/api` | Backend (FastAPI + Postgres) | Domain model, deposit session state machine, settlement, ledger. Today it still holds the hackathon API. |
-| `device/` | Device protocol + simulator *planned* | Speaks the same MQTT protocol the real firmware will speak. |
+| `apps/api` | Backend (FastAPI + Postgres) | Deposit sessions, device link, verification (built). Settlement and ledger come in phase 2. |
+| `device/simulator`, `packages/protocol` | Device protocol + simulator (built) | Signed MQTT protocol ([spec](device-protocol.md)); the simulator speaks it exactly as firmware will. |
 | `contracts/` | Solidity | Today: the contracts reconstructed in June 2026. Target: Treasury and Settlement (see §8). |
 | `infra/l1` | ZyrcleChain v2 (live on Fuji) | Subnet-EVM L1 on Fuji, native coin ZYR, validator on the operator's VPS. |
 | `infra/deploy` | Compose stack *planned* | API, worker, Postgres, MQTT broker, web, behind Traefik. |
