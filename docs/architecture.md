@@ -47,7 +47,7 @@ received.
 | `apps/api` | Backend (FastAPI + Postgres) | Domain model, deposit session state machine, settlement, ledger. Today it still holds the hackathon API. |
 | `device/` | Device protocol + simulator *planned* | Speaks the same MQTT protocol the real firmware will speak. |
 | `contracts/` | Solidity | Today: the contracts reconstructed in June 2026. Target: Treasury and Settlement (see §8). |
-| `infra/l1` | ZyrcleChain v2 (scripts ready, not yet deployed) | Subnet-EVM L1 on Fuji, native coin ZYR, validator on the operator's VPS. |
+| `infra/l1` | ZyrcleChain v2 (live on Fuji) | Subnet-EVM L1 on Fuji, native coin ZYR, validator on the operator's VPS. |
 | `infra/deploy` | Compose stack *planned* | API, worker, Postgres, MQTT broker, web, behind Traefik. |
 
 ## 5. Deposit session

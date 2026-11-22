@@ -13,7 +13,7 @@ properly. The hackathon state is preserved at tag [`v0-hackathon`](../../tree/v0
 |---|---|---|
 | 0 | Monorepo, cleanup of the hackathon code, CI | done |
 | 1 | Deposit session: device simulator over MQTT, state machine, Postgres | planned |
-| 2 | ZyrcleChain v2 (own Avalanche L1, native ZYR = 1 COP), Treasury and Settlement contracts | L1 scripts tested locally |
+| 2 | ZyrcleChain v2 (own Avalanche L1, native ZYR = 1 COP), Treasury and Settlement contracts | ZyrcleChain v2 live on Fuji; contracts planned |
 | 3 | Resident app (Expo) | planned |
 | 4 | Collection, sale at the collection center, bank reconciliation, mass balance | planned |
 | 5 | Route optimization, deployment, end-to-end demo scenario | planned |

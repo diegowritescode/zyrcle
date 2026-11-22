@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Check a running ZyrcleChain against its design rules (docs/adr/0002-own-avalanche-l1.md).
 #
-# Usage: ADMIN_PRIVATE_KEY=0x... smoke-test.sh <rpc-url>
+# Usage: ADMIN_PRIVATE_KEY=0x... smoke-test.sh <rpc-url>   full mode
+#        ADMIN_ADDRESS=0x...     smoke-test.sh <rpc-url>   read-only mode, no key needed
 # The admin key never goes on the command line, so it stays out of shell history.
 # Needs Foundry's `cast`. Permission checks run as eth_call simulations, so nothing is minted and
 # no contract is deployed. The only transaction is a 0-ZYR self-transfer from the admin to prove
@@ -9,7 +10,8 @@
 set -euo pipefail
 
 rpc="${1:?rpc url required}"
-: "${ADMIN_PRIVATE_KEY:?ADMIN_PRIVATE_KEY must be set}"
+: "${ADMIN_PRIVATE_KEY:=}"
+[ -n "$ADMIN_PRIVATE_KEY" ] || [ -n "${ADMIN_ADDRESS:-}" ] || { echo "set ADMIN_PRIVATE_KEY or ADMIN_ADDRESS" >&2; exit 2; }
 here="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck source-path=SCRIPTDIR/.. source=params.env
 source "$here/params.env"
@@ -27,7 +29,11 @@ fail() { printf '  FAIL %s\n' "$1"; exit 1; }
 expect() { local d=$1; shift; if "$@"; then pass "$d"; else fail "$d"; fi; }
 refuse() { local d=$1; shift; if "$@"; then fail "$d"; else pass "$d"; fi; }
 
-admin=$(cast wallet address --private-key "$ADMIN_PRIVATE_KEY")
+if [ -n "$ADMIN_PRIVATE_KEY" ]; then
+  admin=$(cast wallet address --private-key "$ADMIN_PRIVATE_KEY")
+else
+  admin="$ADMIN_ADDRESS"
+fi
 outsider_key=$(cast wallet new --json | python3 -c 'import sys,json;print(json.load(sys.stdin)[0]["private_key"])')
 outsider=$(cast wallet address --private-key "$outsider_key")
 echo "admin    $admin"
@@ -57,11 +63,16 @@ initcode=0x600160008160ff8253f3
 expect "admin can deploy contracts" allowed "$admin" --create "$initcode"
 refuse "outsider cannot deploy contracts" allowed "$outsider" --create "$initcode"
 
-# One real transaction proves the chain produces blocks.
-before=$(cast block-number --rpc-url "$rpc")
-cast send -q --rpc-url "$rpc" --private-key "$ADMIN_PRIVATE_KEY" "$admin" --value 0
-after=$(cast block-number --rpc-url "$rpc")
-expect "blocks are produced (height $before -> $after)" [ "$after" -gt "$before" ]
+if [ -n "$ADMIN_PRIVATE_KEY" ]; then
+  # One real transaction proves the chain produces blocks.
+  before=$(cast block-number --rpc-url "$rpc")
+  cast send -q --rpc-url "$rpc" --private-key "$ADMIN_PRIVATE_KEY" "$admin" --value 0
+  after=$(cast block-number --rpc-url "$rpc")
+  expect "blocks are produced (height $before -> $after)" [ "$after" -gt "$before" ]
+else
+  height=$(cast block-number --rpc-url "$rpc")
+  expect "chain has produced blocks (height $height)" [ "$height" -gt 0 ]
+fi
 
 if [ "${SMOKE_MINT:-0}" = "1" ]; then
   cast send -q --rpc-url "$rpc" --private-key "$ADMIN_PRIVATE_KEY" "$NATIVE_MINTER" \
