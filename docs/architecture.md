@@ -46,7 +46,7 @@ received.
 | `apps/web` | Operations console + landing | Containers, sessions under review, collections, sales, reconciliation, treasury. Today it still holds the hackathon UI. |
 | `apps/api` | Backend (FastAPI + Postgres) | Deposit sessions, device link, verification (built). Settlement and ledger come in phase 2. |
 | `device/simulator`, `packages/protocol` | Device protocol + simulator (built) | Signed MQTT protocol ([spec](device-protocol.md)); the simulator speaks it exactly as firmware will. |
-| `chain/` | Treasury contract (built) | Mints ZYR only against recorded pesos; advances and settlements ([ADR 0007](adr/0007-on-chain-treasury.md)). `contracts/` keeps the hackathon reconstruction for the legacy web app. |
+| `chain/` | Treasury contract (built) | Mints ZYR only against recorded pesos; advances and settlements ([ADR 0007](adr/0007-on-chain-treasury.md)). |
 | `infra/l1` | ZyrcleChain v2 (live on Fuji) | Subnet-EVM L1 on Fuji, native coin ZYR, validator on the operator's VPS. |
 | `infra/deploy` | Compose stack *planned* | API, worker, Postgres, MQTT broker, web, behind Traefik. |
 

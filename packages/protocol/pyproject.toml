@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=75"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,6 +7,7 @@ name = "zyrcle-protocol"
 version = "0.1.0"
 description = "Zyrcle device protocol: signed envelopes, topics and commands shared by the API and the device simulator."
 requires-python = ">=3.13"
+license = "LicenseRef-Proprietary"
 dependencies = ["cryptography>=44"]
 
 [project.optional-dependencies]

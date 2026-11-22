@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=75"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,6 +7,7 @@ name = "zyrcle-sim"
 version = "0.1.0"
 description = "Simulated Zyrcle container: scale, distance, metal and camera sensors, lock, signed MQTT protocol."
 requires-python = ">=3.13"
+license = "LicenseRef-Proprietary"
 dependencies = ["zyrcle-protocol", "aiomqtt>=2.5"]
 
 [project.optional-dependencies]

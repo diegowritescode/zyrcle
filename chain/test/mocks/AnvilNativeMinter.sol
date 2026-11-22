@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.30;
 
 /// @dev NativeMinter stand-in for anvil, used by the backend's end-to-end tests. Anvil has no

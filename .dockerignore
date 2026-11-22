@@ -9,7 +9,6 @@
 **/*.egg-info
 **/.env
 apps/web
-contracts
 chain/out
 chain/cache
 chain/dependencies

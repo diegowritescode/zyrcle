@@ -43,7 +43,6 @@ chain             Treasury contract (Foundry)
 infra/l1          ZyrcleChain v2: genesis, validator container, setup scripts
 deploy            Production compose stack and deploy script
 docs              Architecture and decision records
-contracts         Hackathon contracts (Hardhat), superseded by chain/; kept for reference
 ```
 
 ## Run locally
@@ -61,10 +60,14 @@ dev/mosquitto/make-passwd.sh && docker compose -f dev/compose.yml up -d
 Web, against a full local stack (anvil as the chain, the simulator, the API): see
 [apps/web/README.md](apps/web/README.md).
 
-Contracts:
+Treasury contract:
 
 ```bash
-cd contracts
-npm ci
-npx hardhat test
+cd chain
+forge soldeer install && forge test
 ```
+
+## License
+
+Proprietary, all rights reserved. The code is public to be read and evaluated, not reused: see
+[LICENSE](LICENSE). Third-party libraries keep their own licenses.
