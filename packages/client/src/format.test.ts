@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { grams, kg, pesos, shortHex } from "./format";
+import { dayLabel, grams, hourLabel, kg, pesos, shortHex, slotLabel } from "./format";
 
 describe("format", () => {
   it("shows ZYR as Colombian pesos", () => {
@@ -18,5 +18,19 @@ describe("format", () => {
 
   it("shortens addresses and hashes", () => {
     expect(shortHex("0x52908400098527886E0F7030069857D2E4169EE7")).toBe("0x5290…9EE7");
+  });
+
+  it("says hours the Colombian way", () => {
+    expect(hourLabel(0)).toBe("12:00 a. m.");
+    expect(hourLabel(7)).toBe("7:00 a. m.");
+    expect(hourLabel(12)).toBe("12:00 m.");
+    expect(hourLabel(15)).toBe("3:00 p. m.");
+    expect(slotLabel(23)).toBe("11:00 p. m. – 12:00 a. m.");
+  });
+
+  it("names nearby days", () => {
+    expect(dayLabel("2026-11-22", "2026-11-22")).toBe("Hoy");
+    expect(dayLabel("2026-11-23", "2026-11-22")).toBe("Mañana");
+    expect(dayLabel("2026-11-26", "2026-11-22")).toMatch(/^jue 26 nov$/);
   });
 });

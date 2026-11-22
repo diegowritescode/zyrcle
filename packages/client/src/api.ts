@@ -1,4 +1,5 @@
 /** Typed client for the Zyrcle API (apps/api), shared by the web app and the mobile app. */
+import { hourLabel } from "./format";
 
 export interface Totals {
   containers: number;
@@ -93,6 +94,51 @@ export interface Me {
   sessions: HistoryEntry[];
 }
 
+/** A container in the booking list (GET /v1/containers). */
+export interface ContainerSummary extends ContainerInfo {
+  residence_name: string;
+}
+
+/** One hour of one container. `state` is relative to now. */
+export interface Slot {
+  starts_at: string;
+  ends_at: string;
+  hour: number;
+  taken: number;
+  capacity: number;
+  mine: boolean;
+  state: "past" | "now" | "future";
+  available: boolean;
+}
+
+export interface DaySlots {
+  container_id: string;
+  container_name: string;
+  residence_name: string;
+  timezone: string;
+  opens_hour: number;
+  closes_hour: number;
+  capacity: number;
+  /** The bookable days (today first), as YYYY-MM-DD in the residence's time zone. */
+  days: string[];
+  day: string;
+  slots: Slot[];
+}
+
+export interface Booking {
+  id: string;
+  container_id: string;
+  container_name: string;
+  residence_name: string;
+  starts_at: string;
+  ends_at: string;
+  /** YYYY-MM-DD and hour of day, in the residence's time zone. */
+  day: string;
+  hour: number;
+  state: "upcoming" | "now" | "used" | "missed" | "cancelled";
+  walk_in: boolean;
+}
+
 export type LiveEvent =
   | ({ type: "state" } & Partial<Session>)
   | { type: "reading"; weight_g: number; fill_mm: number | null };
@@ -152,12 +198,27 @@ export function createApi(baseUrl: string) {
     dashboard: (residenceId: string, days = 14) =>
       call<Dashboard>(`/v1/residences/${residenceId}/dashboard?days=${days}`),
     container: (id: string) => call<ContainerInfo>(`/v1/containers/${encodeURIComponent(id)}`),
+    containers: () => call<ContainerSummary[]>("/v1/containers"),
 
     start: (token: string, qr: string, material: string) =>
       call<Session>("/v1/sessions", post({ qr, material }), token),
     finish: (token: string, id: string) => call<Session>(`/v1/sessions/${id}/finish`, post(), token),
     session: (token: string, id: string) => call<Session>(`/v1/sessions/${id}`, {}, token),
     me: (token: string) => call<Me>("/v1/me", {}, token),
+    registerPushToken: (token: string, pushToken: string, platform: "ios" | "android") =>
+      call<void>("/v1/me/push-token", { method: "PUT", body: JSON.stringify({ token: pushToken, platform }) }, token),
+
+    slots: (token: string, containerId: string, day?: string) =>
+      call<DaySlots>(
+        `/v1/containers/${encodeURIComponent(containerId)}/slots${day ? `?day=${day}` : ""}`,
+        {},
+        token,
+      ),
+    bookings: (token: string) => call<Booking[]>("/v1/bookings", {}, token),
+    book: (token: string, containerId: string, startsAt: string) =>
+      call<Booking>("/v1/bookings", post({ container_id: containerId, starts_at: startsAt }), token),
+    cancelBooking: (token: string, id: string) =>
+      call<Booking>(`/v1/bookings/${id}`, { method: "DELETE" }, token),
 
     demo: {
       containers: () => call<DemoContainer[]>("/v1/demo/containers"),
@@ -177,11 +238,28 @@ export function createApi(baseUrl: string) {
 
 export type Api = ReturnType<typeof createApi>["api"];
 
+/** "the container is open from 06:00 to 22:00" -> "de 6:00 a. m. a 10:00 p. m.". */
+function openingHours(detail: string): string | null {
+  const m = /from (\d{2}):00 to (\d{2}):00/.exec(detail);
+  if (!m) return null;
+  const until = Number(m[2]) === 24 ? "medianoche" : hourLabel(Number(m[2]));
+  return `de ${hourLabel(Number(m[1]))} a ${until}`;
+}
+
+/** Close a sentence without doubling the period of "p. m.". */
+const end = (s: string) => (s.endsWith(".") ? s : `${s}.`);
+
 /** Spanish message for a failed attempt to open a container. */
 export function startErrorMessage(e: unknown): string {
   if (!(e instanceof ApiError)) return "Algo salió mal. Intenta de nuevo.";
   const d = e.message;
   if (e.status === 0) return d;
+  if (e.code === "closed") {
+    const hours = openingHours(d);
+    return hours ? `El contenedor está cerrado a esta hora. Abre ${end(hours)}` : "El contenedor está cerrado a esta hora.";
+  }
+  if (e.code === "slot_full")
+    return "Todos los cupos de esta hora están reservados en este contenedor. Reserva otra hora o prueba en otro contenedor.";
   if (/invalid or expired/.test(d)) return "El código del QR ya cambió. Escanéalo de nuevo.";
   if (/offline/.test(d)) return "El contenedor está sin conexión.";
   if (/busy/.test(d)) return "Otra persona está usando este contenedor. Espera un momento.";
@@ -189,4 +267,26 @@ export function startErrorMessage(e: unknown): string {
   if (/could not reach/.test(d)) return "No pudimos comunicarnos con el contenedor. Intenta de nuevo.";
   if (/unknown container/.test(d)) return "Ese contenedor no existe.";
   return d;
+}
+
+/** Spanish message for a failed booking or cancellation. */
+export function bookingErrorMessage(e: unknown): string {
+  if (!(e instanceof ApiError)) return "Algo salió mal. Intenta de nuevo.";
+  switch (e.code) {
+    case "slot_full":
+      return "Esa hora se acaba de llenar. Elige otra.";
+    case "already_booked":
+      return "Ya tienes esa hora reservada.";
+    case "too_many_bookings":
+      return "Puedes tener hasta 3 turnos por delante. Cancela uno para reservar otro.";
+    case "closed": {
+      const hours = openingHours(e.message);
+      return hours ? `A esa hora está cerrado. Abre ${end(hours)}` : "A esa hora está cerrado.";
+    }
+    case "forbidden":
+      return "Ese turno ya se usó.";
+    default:
+      if (/over/.test(e.message)) return "Esa hora ya pasó.";
+      return e.status === 0 ? e.message : "No pudimos guardar el turno. Intenta de nuevo.";
+  }
 }
