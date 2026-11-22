@@ -1,8 +1,6 @@
 import { CheckCircle, Clock, Info, Loader2, RotateCcw, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { PayoutInfo, Session } from "@/lib/api";
-import { grams, pesos, shortHex } from "@/lib/format";
-import { CREDITED, MATERIALS, PAYOUT_STATUS, STATES } from "@/lib/labels";
+import { type PayoutInfo, type Session, grams, pesos, shortHex, CREDITED, MATERIALS, PAYOUT_STATUS, STATES } from "@zyrcle/client";
 
 /** What the verification said about the deposit and where its payment is. */
 export function ResultPanel({ session, payout, onAgain }: { session: Session; payout: PayoutInfo | null; onAgain: () => void }) {

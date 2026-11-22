@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { BookOpen, ChevronUp, Coins, Github, Landmark, Network } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CHAIN_ID, REPO_URL, TREASURY_ADDRESS, docUrl } from "@/lib/config";
-import { shortHex } from "@/lib/format";
+import { shortHex } from "@zyrcle/client";
 
 const PLATFORM = [
     { to: "/recycling", label: "Reciclar" },

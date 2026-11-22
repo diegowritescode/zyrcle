@@ -18,9 +18,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { Tooltip as UITooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { StatusPill } from "@/components/recycling/StatusPill";
-import type { Dashboard, DashboardContainer } from "@/lib/api";
-import { dateTime, kg, pesos, shortDay } from "@/lib/format";
-import { FAMILIES, FAMILY_OF, MATERIALS, familyOf, type Family } from "@/lib/labels";
+import { type Dashboard, type DashboardContainer, dateTime, kg, pesos, shortDay, FAMILIES, FAMILY_OF, MATERIALS, familyOf, type Family } from "@zyrcle/client";
 
 const tooltipStyle = {
     backgroundColor: "#fff",

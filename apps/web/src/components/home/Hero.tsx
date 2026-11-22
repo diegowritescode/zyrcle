@@ -2,8 +2,8 @@ import { ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { kg, pesos } from "@zyrcle/client";
 import { api } from "@/lib/api";
-import { kg, pesos } from "@/lib/format";
 import { unsplash } from "@/lib/images";
 
 function impact(kgVerified: number) {

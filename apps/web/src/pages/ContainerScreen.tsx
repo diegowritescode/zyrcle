@@ -3,9 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Loader2, Recycle, WifiOff } from "lucide-react";
 import { ContainerQr } from "@/components/recycling/ContainerQr";
 import { StatusPill } from "@/components/recycling/StatusPill";
+import { MATERIALS, familyOf, manualCode, parseContainerQr } from "@zyrcle/client";
 import { api } from "@/lib/api";
-import { MATERIALS, familyOf } from "@/lib/labels";
-import { manualCode, parseContainerQr } from "@/lib/qr";
 
 /**
  * What the container's own screen shows: a QR whose code rotates every 30 s, so only someone

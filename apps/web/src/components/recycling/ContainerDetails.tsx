@@ -1,7 +1,6 @@
 import { MapPin, Recycle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import type { ContainerInfo } from "@/lib/api";
-import { MATERIALS, familyOf } from "@/lib/labels";
+import { type ContainerInfo, MATERIALS, familyOf } from "@zyrcle/client";
 import { StatusPill } from "./StatusPill";
 
 export function ContainerDetails({ container }: { container: ContainerInfo }) {

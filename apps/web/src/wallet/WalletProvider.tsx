@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createWalletClient, custom, getAddress, type Address } from "viem";
 import { toast } from "sonner";
+import { buildSiweMessage } from "@zyrcle/client";
 import { api } from "@/lib/api";
 import {
   addChainToWallet,
@@ -11,7 +12,6 @@ import {
   resetEmbeddedAccount,
 } from "@/lib/chain";
 import { CHAIN_ID, SIWE_DOMAIN } from "@/lib/config";
-import { buildSiweMessage } from "@/lib/siwe";
 import { WalletContext, type Wallet, type WalletKind } from "./context";
 import { cacheToken, cachedToken, forgetToken } from "./token";
 

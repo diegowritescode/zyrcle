@@ -10,7 +10,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { pesos, shortHex } from "@/lib/format";
+import { pesos, shortHex } from "@zyrcle/client";
 import { useWallet } from "@/wallet/context";
 
 /** The hackathon's wallet button, now backed by the embedded wallet or the visitor's own. */

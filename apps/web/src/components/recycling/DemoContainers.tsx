@@ -3,8 +3,8 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { MATERIALS, familyOf } from "@zyrcle/client";
 import { api } from "@/lib/api";
-import { MATERIALS, familyOf } from "@/lib/labels";
 import { ContainerQr } from "./ContainerQr";
 import { StatusPill } from "./StatusPill";
 

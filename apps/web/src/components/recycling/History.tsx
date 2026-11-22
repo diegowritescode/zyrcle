@@ -1,9 +1,8 @@
 import { History as HistoryIcon, Recycle } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { dateTime, grams, pesos, CREDITED, MATERIALS, PAYOUT_STATUS, STATES, familyOf } from "@zyrcle/client";
 import { api } from "@/lib/api";
-import { dateTime, grams, pesos } from "@/lib/format";
-import { CREDITED, MATERIALS, PAYOUT_STATUS, STATES, familyOf } from "@/lib/labels";
 
 /** The resident's own deposits and what each one paid. */
 export function History({ token }: { token: string | null }) {

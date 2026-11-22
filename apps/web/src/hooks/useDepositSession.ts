@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, liveUrl, type LiveEvent, type PayoutInfo, type Session } from "@/lib/api";
-import { ACTIVE, CREDITED } from "@/lib/labels";
+import { type LiveEvent, type PayoutInfo, type Session, ACTIVE, CREDITED } from "@zyrcle/client";
+import { api, liveUrl } from "@/lib/api";
 
 const STORE = "zyrcle:session";
 const SETTLED = new Set(["confirmed", "failed", "deferred"]);

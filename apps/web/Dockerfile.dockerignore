@@ -1,0 +1,8 @@
+# Used instead of the root .dockerignore when building with -f apps/web/Dockerfile.
+*
+!apps/web
+!packages/client
+**/node_modules
+apps/web/dist
+**/.env
+**/.env.*

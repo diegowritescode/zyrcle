@@ -92,7 +92,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: docker build -q -f apps/api/Dockerfile .
-      - run: docker build -q apps/web
+      - run: docker build -q -f apps/web/Dockerfile .
       - run: docker compose -f deploy/compose.yml config -q
         env:
           ZYRCLE_API_TAG: "0000000000000000000000000000000000000000"
@@ -111,8 +111,25 @@ jobs:
           MQTT_CTR_0003_PASSWORD: x
           MQTT_CTR_0004_PASSWORD: x
 
+  client:
+    name: Shared TS client (typecheck + tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/client
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: packages/client/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
   web:
-    name: Web (typecheck + lint + tests + build)
+    name: Web (typecheck + lint + build)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -127,7 +144,6 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npx eslint .
-      - run: npm test
       - run: npm run build
 
   infra:

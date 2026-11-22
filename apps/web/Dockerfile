@@ -1,10 +1,12 @@
 # The Zyrcle web app (the hackathon UI wired to the new API), served by unprivileged nginx on :8080.
-# Build context: apps/web.
+# Build context: the repository root (the app imports packages/client):
+#   docker build -f apps/web/Dockerfile .
 FROM node:22-alpine AS build
-WORKDIR /src
-COPY package.json package-lock.json ./
+WORKDIR /repo/apps/web
+COPY packages/client /repo/packages/client
+COPY apps/web/package.json apps/web/package-lock.json ./
 RUN npm ci --no-audit --no-fund
-COPY . .
+COPY apps/web ./
 ARG VITE_API_URL=https://zyrcle-backend.deviego.xyz
 ARG VITE_SIWE_DOMAIN=zyrcle.deviego.xyz
 ARG VITE_CHAIN_ID=20261121
@@ -15,7 +17,7 @@ ENV VITE_API_URL=$VITE_API_URL VITE_SIWE_DOMAIN=$VITE_SIWE_DOMAIN VITE_CHAIN_ID=
 RUN npm run build
 
 FROM nginxinc/nginx-unprivileged:1.29-alpine
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-COPY security-headers.conf /etc/nginx/snippets/security-headers.conf
-COPY --from=build /src/dist /usr/share/nginx/html
+COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
+COPY apps/web/security-headers.conf /etc/nginx/snippets/security-headers.conf
+COPY --from=build /repo/apps/web/dist /usr/share/nginx/html
 EXPOSE 8080

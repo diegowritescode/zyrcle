@@ -1,20 +1,12 @@
 /** API session tokens, cached per address for this tab so a reload does not ask to sign again. */
-const key = (address: string) => `zyrcle:token:${address.toLowerCase()}`;
+import { isFresh } from "@zyrcle/client";
 
-/** The JWT's `exp` in ms (0 if unreadable). Not verified: the API is the judge, this only avoids reusing a stale token. */
-export function expiresAt(token: string): number {
-  try {
-    const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
-    return typeof payload.exp === "number" ? payload.exp * 1000 : 0;
-  } catch {
-    return 0;
-  }
-}
+const key = (address: string) => `zyrcle:token:${address.toLowerCase()}`;
 
 export function cachedToken(address: string, now = Date.now()): string | null {
   try {
     const token = sessionStorage.getItem(key(address));
-    return token && expiresAt(token) - now > 60_000 ? token : null;
+    return token && isFresh(token, now) ? token : null;
   } catch {
     return null;
   }

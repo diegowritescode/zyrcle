@@ -2,9 +2,8 @@ import { CheckCircle, Loader2, Recycle, Weight } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Tooltip as UITooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { api, type ContainerInfo, type Session } from "@/lib/api";
-import { grams } from "@/lib/format";
-import { ITEMS, LID_OPEN, MATERIALS, STATES } from "@/lib/labels";
+import { type ContainerInfo, type Session, grams, ITEMS, LID_OPEN, MATERIALS, STATES } from "@zyrcle/client";
+import { api } from "@/lib/api";
 
 interface Props {
     session: Session;

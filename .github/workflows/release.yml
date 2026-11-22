@@ -42,7 +42,8 @@ jobs:
       - name: Web app image
         uses: docker/build-push-action@v6
         with:
-          context: apps/web
+          context: .
+          file: apps/web/Dockerfile
           push: true
           tags: ghcr.io/diegowritescode/zyrcle-web:${{ env.SHA }}
           labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}

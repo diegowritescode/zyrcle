@@ -8,10 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Tooltip as UITooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useDepositSession } from "@/hooks/useDepositSession";
-import { api, ApiError, type ContainerInfo } from "@/lib/api";
-import { pesos } from "@/lib/format";
-import { ACTIVE, MATERIALS } from "@/lib/labels";
-import { containerQr, parseContainerQr, parseManualCode } from "@/lib/qr";
+import { ACTIVE, ApiError, MATERIALS, containerQr, parseContainerQr, parseManualCode, pesos, startErrorMessage, type ContainerInfo } from "@zyrcle/client";
+import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useWallet } from "@/wallet/context";
 import { ContainerDetails } from "./ContainerDetails";
@@ -19,19 +17,6 @@ import { DemoContainers } from "./DemoContainers";
 import { QrScanner } from "./QrScanner";
 import { ResultPanel } from "./ResultPanel";
 import { SessionPanel } from "./SessionPanel";
-
-function startError(e: unknown): string {
-    if (!(e instanceof ApiError)) return "Algo salió mal. Intenta de nuevo.";
-    const d = e.message;
-    if (e.status === 0) return d;
-    if (/invalid or expired/.test(d)) return "El código del QR ya cambió. Escanéalo de nuevo.";
-    if (/offline/.test(d)) return "El contenedor está sin conexión.";
-    if (/busy/.test(d)) return "Otra persona está usando este contenedor. Espera un momento.";
-    if (/does not accept/.test(d)) return "Este contenedor no recibe ese material.";
-    if (/could not reach/.test(d)) return "No pudimos comunicarnos con el contenedor. Intenta de nuevo.";
-    if (/unknown container/.test(d)) return "Ese contenedor no existe.";
-    return d;
-}
 
 /**
  * The resident's side of a deposit, in the hackathon's design: scan the container, choose the
@@ -79,7 +64,7 @@ export function RecyclingAccess() {
         try {
             await fn();
         } catch (e) {
-            setError(startError(e));
+            setError(startErrorMessage(e));
         } finally {
             setBusy(false);
         }
@@ -119,7 +104,7 @@ export function RecyclingAccess() {
     // Drops do not block the page: a resident throws several items in a row.
     const drop = (item: string) => {
         if (!token || !session) return;
-        api.demo.drop(token, session.id, item).catch((e) => setError(startError(e)));
+        api.demo.drop(token, session.id, item).catch((e) => setError(startErrorMessage(e)));
     };
 
     const finish = () =>
