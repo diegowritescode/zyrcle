@@ -85,9 +85,41 @@ export async function requestPermission(): Promise<Permission> {
   return toPermission(await Notifications.requestPermissionsAsync());
 }
 
-/** This installation's Expo push token, which the API sends to. */
-export async function expoPushToken(): Promise<string> {
-  return (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+/**
+ * Keeps the API told where to push this installation: once now, and again only when the OS hands
+ * the app a different device token. Returns the unsubscribe function.
+ *
+ * Every successful native token fetch also fires the push token listeners, with the same token
+ * (expo-notifications 58, PushTokenModule.kt: `promise.resolve(token); onNewToken(token)`), and
+ * getExpoPushTokenAsync fetches it unless given one. Fetching again from the listener therefore
+ * loops forever: the first APK sent ten registrations a second, enough to queue the app's other
+ * requests behind them. So only the first call fetches, the listener passes the token it got, and
+ * a token already registered is skipped.
+ */
+export function keepPushTokenRegistered(
+  send: (expoToken: string) => Promise<unknown>,
+): () => void {
+  let registered: string | null = null;
+  let stopped = false;
+  const register = async (device?: Notifications.DevicePushToken) => {
+    try {
+      const token = device ?? (await Notifications.getDevicePushTokenAsync());
+      const key = typeof token.data === "string" ? token.data : JSON.stringify(token.data);
+      if (stopped || key === registered) return;
+      registered = key;
+      const expo = await Notifications.getExpoPushTokenAsync({ projectId, devicePushToken: token });
+      if (!stopped) await send(expo.data);
+    } catch (e) {
+      registered = null;
+      console.warn("push registration failed", e);
+    }
+  };
+  const sub = Notifications.addPushTokenListener((token) => void register(token));
+  void register();
+  return () => {
+    stopped = true;
+    sub.remove();
+  };
 }
 
 /**

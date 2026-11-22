@@ -6,8 +6,8 @@ import { AppState, Platform } from "react-native";
 import { api } from "@/lib/api";
 import {
   NOTIFICATION_ROUTES,
-  expoPushToken,
   getPermission,
+  keepPushTokenRegistered,
   pushSupport,
   requestPermission,
   setUpChannels,
@@ -52,13 +52,9 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   // Tell the API where to push, once per wallet and whenever the OS rotates the token.
   useEffect(() => {
     if (push !== "ok" || permission !== "granted" || !token) return;
-    const register = () =>
-      expoPushToken()
-        .then((pushToken) => api.registerPushToken(token, pushToken, Platform.OS as "ios" | "android"))
-        .catch((e) => console.warn("push registration failed", e));
-    register();
-    const sub = Notifications.addPushTokenListener(register);
-    return () => sub.remove();
+    return keepPushTokenRegistered((pushToken) =>
+      api.registerPushToken(token, pushToken, Platform.OS as "ios" | "android"),
+    );
   }, [permission, token]);
 
   const bookings = useQuery({
