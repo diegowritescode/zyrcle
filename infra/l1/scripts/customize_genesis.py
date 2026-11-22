@@ -6,7 +6,9 @@ be backed by confirmed sales (docs/architecture.md, section 8), so this script:
 
 - drops every funded account without code except the admin, which gets a small gas float;
 - keeps the predeployed contracts (validator manager, proxy, proxy admin);
-- enables the precompiles described in docs/adr/0002-own-avalanche-l1.md.
+- enables the precompiles described in docs/adr/0002-own-avalanche-l1.md;
+- lets the L1's own validators sign P-Chain Warp messages (requirePrimaryNetworkSigners: false), so
+  initializing the validator manager does not depend on collecting Fuji primary-network signatures.
 
 Usage: customize_genesis.py <cli-genesis.json> <admin-address> <admin-float-zyr> <out.json>
 """
@@ -41,6 +43,7 @@ def customize(genesis: dict, admin: str, admin_float_zyr: int) -> dict:
         genesis["config"][name] = {"blockTimestamp": 0, "adminAddresses": admins}
     if "warpConfig" not in genesis["config"]:
         raise ValueError("warpConfig missing: create the chain with --warp")
+    genesis["config"]["warpConfig"]["requirePrimaryNetworkSigners"] = False
     return genesis
 
 
@@ -53,6 +56,7 @@ def check(genesis: dict, admin: str, admin_float_zyr: int) -> None:
     assert funded == {admin.lower().removeprefix("0x"): admin_float_zyr * WEI_PER_ZYR}, funded
     for name in PRECOMPILES:
         assert genesis["config"][name]["adminAddresses"] == [admin.lower()], name
+    assert genesis["config"]["warpConfig"]["requirePrimaryNetworkSigners"] is False
 
 
 def main() -> None:

@@ -25,7 +25,7 @@
     "warpConfig": {
       "blockTimestamp": 1795301979,
       "quorumNumerator": 67,
-      "requirePrimaryNetworkSigners": true
+      "requirePrimaryNetworkSigners": false
     },
     "contractNativeMinterConfig": {
       "blockTimestamp": 0,
