@@ -6,6 +6,11 @@ describe("format", () => {
     expect(pesos(1500).replace(/\s/g, " ")).toMatch(/^\$ ?1\.500$/);
   });
 
+  it("keeps small totals precise and large ones short", () => {
+    expect(kg(0.84)).toBe("0,84 kg");
+    expect(kg(1234.56)).toBe("1.234,6 kg");
+  });
+
   it("switches grams to kilos past 1 kg", () => {
     expect(grams(250)).toBe("250 g");
     expect(grams(1250)).toBe(kg(1.25, 2));

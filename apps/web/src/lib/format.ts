@@ -7,7 +7,8 @@ export const pesos = (n: number, digits = 0) =>
     maximumFractionDigits: digits,
   });
 
-export const kg = (n: number, digits = 1) =>
+/** Kilos with two decimals below 10 kg (a demo deposit weighs grams) and one above. */
+export const kg = (n: number, digits = Math.abs(n) < 10 ? 2 : 1) =>
   `${n.toLocaleString("es-CO", { minimumFractionDigits: digits, maximumFractionDigits: digits })} kg`;
 
 export const grams = (g: number) => (g >= 1000 ? kg(g / 1000, 2) : `${g} g`);
