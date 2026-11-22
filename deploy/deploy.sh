@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # Deploy (or first-time set up) the Zyrcle stack on the VPS. Idempotent.
 #
-#   deploy/deploy.sh <api-image-sha> <demo-image-sha>
+#   deploy/deploy.sh <api-image-sha> <web-image-sha>
 #
 # Tags must be FULL 40-character commit SHAs: images are published per commit by the release
 # workflow, and a SHA expanded by hand from a short one will not exist.
 set -euo pipefail
 cd "$(dirname "$0")"
 
-api_tag="${1:?usage: deploy.sh <api-sha> <demo-sha>}"
-demo_tag="${2:?usage: deploy.sh <api-sha> <demo-sha>}"
-for t in "$api_tag" "$demo_tag"; do
+api_tag="${1:?usage: deploy.sh <api-sha> <web-sha>}"
+web_tag="${2:?usage: deploy.sh <api-sha> <web-sha>}"
+for t in "$api_tag" "$web_tag"; do
   [[ "$t" =~ ^[0-9a-f]{40}$ ]] || { echo "not a full commit SHA: $t" >&2; exit 1; }
 done
 
@@ -32,8 +32,10 @@ if [ ! -f .env ]; then
       .env.example > .env
   echo "created deploy/.env with fresh secrets"
 fi
+# The web app replaced the minimal demo page (same domain): carry over an older .env.
+sed -i.bak -e "s|^ZYRCLE_DEMO_TAG=|ZYRCLE_WEB_TAG=|" -e "s|^DEMO_HOST=|WEB_HOST=|" .env && rm -f .env.bak
 sed -i.bak -e "s|^ZYRCLE_API_TAG=.*|ZYRCLE_API_TAG=$api_tag|" \
-  -e "s|^ZYRCLE_DEMO_TAG=.*|ZYRCLE_DEMO_TAG=$demo_tag|" .env && rm -f .env.bak
+  -e "s|^ZYRCLE_WEB_TAG=.*|ZYRCLE_WEB_TAG=$web_tag|" .env && rm -f .env.bak
 set -a
 # shellcheck source=/dev/null
 . ./.env
@@ -64,6 +66,6 @@ done
 docker compose run --rm --no-deps -v zyrcle_sim-keys:/simkeys:ro api \
   zyrcle-api demo seed --keys-dir /simkeys --devices ctr-0001,ctr-0002,ctr-0003,ctr-0004
 
-# 5. API and demo page.
-docker compose up -d api demo sim mosquitto
+# 5. API and web app. --remove-orphans drops services no longer in compose.yml (the old demo page).
+docker compose up -d --remove-orphans api web sim mosquitto postgres
 docker compose ps --format 'table {{.Service}}\t{{.Status}}'

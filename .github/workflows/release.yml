@@ -1,6 +1,6 @@
 name: Release images
 
-# Publishes the backend and demo images for every commit on main that passed CI, tagged with the
+# Publishes the backend and web images for every commit on main that passed CI, tagged with the
 # full commit SHA. Deploying is a separate, manual step: deploy/deploy.sh <sha> <sha> on the VPS.
 on:
   workflow_run:
@@ -39,15 +39,15 @@ jobs:
           labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
           cache-from: type=gha,scope=api
           cache-to: type=gha,scope=api,mode=max
-      - name: Demo page image
+      - name: Web app image
         uses: docker/build-push-action@v6
         with:
-          context: apps/demo
+          context: apps/web
           push: true
-          tags: ghcr.io/diegowritescode/zyrcle-demo:${{ env.SHA }}
+          tags: ghcr.io/diegowritescode/zyrcle-web:${{ env.SHA }}
           labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
-          cache-from: type=gha,scope=demo
-          cache-to: type=gha,scope=demo,mode=max
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,scope=web,mode=max
       - run: |
           echo "### Images for ${SHA}" >> "$GITHUB_STEP_SUMMARY"
           echo "Deploy on the VPS: \`deploy/deploy.sh ${SHA} ${SHA}\`" >> "$GITHUB_STEP_SUMMARY"

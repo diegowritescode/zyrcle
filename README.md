@@ -5,7 +5,9 @@ followed to the collection center that buys it, and the household is paid out of
 actually paid.
 
 **Live demo: https://zyrcle.deviego.xyz** (simulated containers, real backend, real L1 on Avalanche
-Fuji; ZYR has no real value on testnet).
+Fuji; ZYR has no real value on testnet). Scan a container, drop items, tap "Terminé" and the advance
+lands in your wallet in a few seconds. Open a container's screen (`/container/ctr-0001`) on one
+device and scan it with the phone from another to see the real flow.
 
 Zyrcle started as a one-day hackathon project (May 2025, first place). It is now being rebuilt
 properly. The hackathon state is preserved at tag [`v0-hackathon`](../../tree/v0-hackathon).
@@ -16,31 +18,32 @@ properly. The hackathon state is preserved at tag [`v0-hackathon`](../../tree/v0
 |---|---|---|
 | 0 | Monorepo, cleanup of the hackathon code, CI | done |
 | 1 | Deposit session: device simulator over MQTT, state machine, Postgres | done |
-| 2 | ZyrcleChain v2 (own Avalanche L1, native ZYR = 1 COP), Treasury and Settlement contracts | ZyrcleChain v2 live on Fuji; Treasury built and tested |
+| 2 | ZyrcleChain v2 (own Avalanche L1, native ZYR = 1 COP), Treasury contract, payouts | done: live on Fuji, advances paid on chain |
 | 3 | Resident app (Expo) | planned |
 | 4 | Collection, sale at the collection center, bank reconciliation, mass balance | planned |
-| 5 | Deployment and live demo | in progress; route optimization moves after phase 4 |
+| 5 | Deployment and live demo | done: the hackathon web app, wired to the new backend |
 
-The deposit flow is rebuilt (phase 1): a signed device protocol, a container simulator with all
-its sensors, and a backend that runs the session state machine and the anti-cheating checks. The
-web app is still the hackathon UI and talks to the old API in `apps/api-legacy`. See
-[docs/architecture.md](docs/architecture.md) for the target design and [docs/adr](docs/adr) for
-the decisions behind it.
+The deposit cycle works end to end: a signed device protocol, a container simulator with all its
+sensors, a backend that runs the session state machine and the anti-cheating checks, and a Treasury
+on the project's own L1 that pays the advance in ZYR. The web app keeps the hackathon design and
+now runs on real data: live platform totals, the resident flow (QR scan, live weight, verdict,
+payment) with an embedded wallet or MetaMask/Core, and the residence dashboard. Collectors and
+sales (phase 4) are marked as coming next. Route optimization comes after phase 4. See
+[docs/architecture.md](docs/architecture.md) for the design and [docs/adr](docs/adr) for the
+decisions behind it.
 
 ## Layout
 
 ```
-apps/api          Backend: deposit sessions, device link, verification (phase 1)
-apps/api-legacy   Hackathon API, kept until the web app is rewritten
-apps/web          Web app (hackathon UI; becomes the operations console)
+apps/api          Backend: deposit sessions, device link, verification, payouts, public views
+apps/web          Web app: the hackathon design on the new API (React, viem, Tailwind, shadcn/ui)
 packages/protocol Device protocol shared by the API and the simulator
 device/simulator  Simulated container: scale, distance, metal, camera, lock
-contracts     Solidity contracts (Hardhat)
-infra/l1      ZyrcleChain v2: genesis, validator container, setup scripts
-chain         Treasury contract (Foundry)
-apps/demo     Live demo page (React + viem): throwaway wallet, simulated containers
-deploy        Production compose stack and deploy script
-docs          Architecture and decision records
+chain             Treasury contract (Foundry)
+infra/l1          ZyrcleChain v2: genesis, validator container, setup scripts
+deploy            Production compose stack and deploy script
+docs              Architecture and decision records
+contracts         Hackathon contracts (Hardhat), superseded by chain/; kept for reference
 ```
 
 ## Run locally
@@ -55,14 +58,8 @@ dev/mosquitto/make-passwd.sh && docker compose -f dev/compose.yml up -d
 .venv/bin/alembic upgrade head && .venv/bin/pytest -q
 ```
 
-Web:
-
-```bash
-cd apps/web
-npm ci
-cp .env.example .env
-npm run dev   # http://localhost:8080
-```
+Web, against a full local stack (anvil as the chain, the simulator, the API): see
+[apps/web/README.md](apps/web/README.md).
 
 Contracts:
 

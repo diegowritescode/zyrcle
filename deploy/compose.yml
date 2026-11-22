@@ -20,8 +20,8 @@ x-api-env: &api-env
   ZYRCLE_MQTT_PASSWORD: ${MQTT_API_PASSWORD:?}
   ZYRCLE_JWT_SECRET: ${JWT_SECRET:?}
   ZYRCLE_OPERATOR_TOKEN: ${OPERATOR_TOKEN:?}
-  ZYRCLE_SIWE_DOMAIN: ${DEMO_HOST:?}
-  ZYRCLE_CORS_ORIGINS: https://${DEMO_HOST}
+  ZYRCLE_SIWE_DOMAIN: ${WEB_HOST:?}
+  ZYRCLE_CORS_ORIGINS: https://${WEB_HOST}
   ZYRCLE_DEMO_SIMULATOR_URL: http://sim:8090
   ZYRCLE_CHAIN_RPC_URL: http://zyrcle-l1-node-1:9650/ext/bc/${BLOCKCHAIN_ID:?}/rpc
   ZYRCLE_TREASURY_ADDRESS: ${TREASURY:?}
@@ -116,8 +116,8 @@ services:
     logging: *logging
     networks: [internal]
 
-  demo:
-    image: ghcr.io/diegowritescode/zyrcle-demo:${ZYRCLE_DEMO_TAG:?set ZYRCLE_DEMO_TAG in deploy/.env}
+  web:
+    image: ghcr.io/diegowritescode/zyrcle-web:${ZYRCLE_WEB_TAG:?set ZYRCLE_WEB_TAG in deploy/.env}
     restart: unless-stopped
     <<: *hardened
     tmpfs: [/tmp, /var/cache/nginx]
@@ -127,10 +127,10 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=edge
-      - traefik.http.routers.zyrcle-demo.rule=Host(`${DEMO_HOST}`)
-      - traefik.http.routers.zyrcle-demo.entrypoints=websecure
-      - traefik.http.routers.zyrcle-demo.tls.certresolver=le
-      - traefik.http.services.zyrcle-demo.loadbalancer.server.port=8080
+      - traefik.http.routers.zyrcle-web.rule=Host(`${WEB_HOST}`)
+      - traefik.http.routers.zyrcle-web.entrypoints=websecure
+      - traefik.http.routers.zyrcle-web.tls.certresolver=le
+      - traefik.http.services.zyrcle-web.loadbalancer.server.port=8080
 
 volumes:
   pgdata:

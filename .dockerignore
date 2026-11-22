@@ -9,8 +9,6 @@
 **/*.egg-info
 **/.env
 apps/web
-apps/demo/dist
-apps/api-legacy
 contracts
 chain/out
 chain/cache
