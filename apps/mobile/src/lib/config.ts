@@ -6,5 +6,9 @@ export const RPC_URL =
 export const CHAIN_ID = Number(process.env.EXPO_PUBLIC_CHAIN_ID || 20261121);
 /** The domain residents sign in to (SIWE): the same as the web app's, checked by the API. */
 export const SIWE_DOMAIN = process.env.EXPO_PUBLIC_SIWE_DOMAIN || "zyrcle.deviego.xyz";
+/** AccountFactory on ZyrcleChain (docs/adr/0010). Lets the app check, on its own, that the account
+ * the API names really belongs to this phone's key before moving coins there. Empty: no check, no
+ * move. */
+export const ACCOUNT_FACTORY = process.env.EXPO_PUBLIC_ACCOUNT_FACTORY || "";
 export const WEB_URL = process.env.EXPO_PUBLIC_WEB_URL || "https://zyrcle.deviego.xyz";
 export const REPO_URL = "https://github.com/diegowritescode/zyrcle";

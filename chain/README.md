@@ -6,6 +6,8 @@ Foundry project for the contracts that run on ZyrcleChain. Design and reasons:
 | Contract | Purpose |
 |---|---|
 | `src/Treasury.sol` | Mints ZYR (native coin, 1 ZYR = 1 COP) only against recorded seed capital and confirmed sales; pays advances and settlements |
+| `src/ZyrcleAccount.sol` | A resident's account: holds their ZYR, obeys their phone key, and moves to a new key after a 48-hour guardian recovery the owner can cancel ([ADR 0010](../docs/adr/0010-smart-accounts-and-recovery.md)) |
+| `src/AccountFactory.sol` | Creates accounts as CREATE2 clones whose address depends only on the first owner key; names the guardian of every account |
 
 The older Hardhat contracts in `../contracts` are the hackathon reconstruction, still used by the
 legacy web app.
@@ -39,6 +41,15 @@ ZYRCLE_CHAIN_RPC_URL=... .venv/bin/zyrcle-api chain deploy \
   --admin-key-file <precompile admin key> --operator 0x... --oracle 0x...
 ZYRCLE_CHAIN_RPC_URL=... ZYRCLE_TREASURY_ADDRESS=0x... .venv/bin/zyrcle-api chain seed \
   --operator-key-file <operator key> --amount-cop 1000000 --ref "bank transfer 123"
+```
+
+The account factory takes the precompile admin key too: it deploys the factory and puts the
+guardian on the ContractDeployerAllowList, since accounts are deployed in the guardian's
+transactions. Then set `ACCOUNT_FACTORY` in `deploy/.env`.
+
+```bash
+ZYRCLE_CHAIN_RPC_URL=... .venv/bin/zyrcle-api chain accounts-deploy \
+  --admin-key-file <precompile admin key> --guardian <oracle or guardian address>
 ```
 
 Note: Foundry scripts cannot call Subnet-EVM precompiles. Their placeholder code (`0x01`) runs as an

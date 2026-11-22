@@ -2,8 +2,10 @@ import { useQuery } from "@tanstack/react-query";
 import { ACTIVE, dayLabel, kg, localDay, pesos, shortHex, slotLabel } from "@zyrcle/client";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { BellRing, CalendarClock, ChevronRight, CircleDollarSign, QrCode, Recycle, ShieldCheck } from "lucide-react-native";
+import { BellRing, CalendarClock, ChevronRight, CircleDollarSign, Mail, QrCode, Recycle, ShieldCheck } from "lucide-react-native";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { RecoveryAlerts } from "@/account/RecoveryAlerts";
+import { useAccount } from "@/account/useAccount";
 import { DepositRow } from "@/features/DepositRow";
 import { api } from "@/lib/api";
 import { useNotifications } from "@/notifications/context";
@@ -34,6 +36,10 @@ export default function Home() {
     refetchInterval: 60_000,
   });
   const notifications = useNotifications();
+  const account = useAccount();
+  // Someone with money and no recovery email loses it with the phone: say so once there is money.
+  const unprotected =
+    account.data?.email_available && account.data.email === null && !account.data.outgoing && (wallet.balance ?? 0) > 0;
   const nextTurn = bookings.data?.find((b) => b.state === "now" || b.state === "upcoming");
   const open = me.data?.sessions.find((s) => ACTIVE.has(s.state));
   const recent = me.data?.sessions.slice(0, 3) ?? [];
@@ -65,6 +71,8 @@ export default function Home() {
           en ZYR · 1 ZYR = 1 peso{wallet.address ? ` · ${shortHex(wallet.address)}` : ""}
         </Text>
       </GradientCard>
+
+      <RecoveryAlerts />
 
       {open && (
         <Card style={{ gap: space(3), borderColor: colors.emerald }}>
@@ -100,6 +108,17 @@ export default function Home() {
         loading={!wallet.token && wallet.signingIn}
         style={{ minHeight: 58 }}
       />
+
+      {unprotected && (
+        <Card style={{ gap: space(3) }}>
+          <View style={styles.step}>
+            <Mail color={colors.emerald} size={22} />
+            <Heading style={{ flex: 1 }}>Protege tu saldo</Heading>
+          </View>
+          <Body>Agrega un correo de recuperación: si pierdes el teléfono, con él recuperas tu cuenta en otro.</Body>
+          <Button title="Agregar correo" variant="outline" onPress={() => router.push("/account")} />
+        </Card>
+      )}
 
       {notifications.permission === "undetermined" && (
         <Card style={{ gap: space(3) }}>

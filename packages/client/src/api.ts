@@ -89,9 +89,55 @@ export interface HistoryEntry extends Session {
 
 export interface Me {
   resident_id: string;
+  /** The resident's account: where their ZYR lives. */
   address: string;
+  /** The phone key that controls the account. */
+  owner: string;
+  email: string | null;
   balance_cop: number | null;
   sessions: HistoryEntry[];
+}
+
+export interface SignIn {
+  token: string;
+  resident_id: string;
+  address: string;
+  owner: string;
+}
+
+/** A lost-phone recovery (docs/adr/0010-smart-accounts-and-recovery.md). */
+export interface Recovery {
+  id: string;
+  status: "starting" | "waiting" | "cancelling" | "done" | "cancelled" | "failed";
+  ready_at: string;
+  /** "sábado 28 de noviembre, 3:15 p. m." in the API's time zone. */
+  ready_label: string;
+  cancelled_by: "owner" | "new_phone" | "chain" | "replaced" | null;
+  created_at: string;
+}
+
+/** GET /v1/me/account: recovery email and recoveries this resident is part of. */
+export interface AccountSecurity {
+  address: string;
+  owner: string;
+  email: string | null;
+  email_verified_at: string | null;
+  email_available: boolean;
+  recovery_available: boolean;
+  /** Whether this phone may recover an older account (it has no history of its own). */
+  can_recover: boolean;
+  /** Someone is moving this account to another phone. */
+  incoming: Recovery | null;
+  /** This phone is waiting for an older account (or its request recently ended). */
+  outgoing: Recovery | null;
+  /** Set during the day after this account arrived on this phone. */
+  recovered_at: string | null;
+}
+
+export interface CodeSent {
+  sent_to: string;
+  expires_in_s: number;
+  resend_in_s: number;
 }
 
 /** A container in the booking list (GET /v1/containers). */
@@ -187,11 +233,7 @@ export function createApi(baseUrl: string) {
 
   const api = {
     nonce: () => call<{ nonce: string }>("/v1/auth/nonce", post()),
-    verify: (message: string, signature: string) =>
-      call<{ token: string; resident_id: string; address: string }>(
-        "/v1/auth/verify",
-        post({ message, signature }),
-      ),
+    verify: (message: string, signature: string) => call<SignIn>("/v1/auth/verify", post({ message, signature })),
 
     stats: () => call<Totals>("/v1/stats"),
     residences: () => call<ResidenceSummary[]>("/v1/residences"),
@@ -207,6 +249,15 @@ export function createApi(baseUrl: string) {
     me: (token: string) => call<Me>("/v1/me", {}, token),
     registerPushToken: (token: string, pushToken: string, platform: "ios" | "android") =>
       call<void>("/v1/me/push-token", { method: "PUT", body: JSON.stringify({ token: pushToken, platform }) }, token),
+
+    account: (token: string) => call<AccountSecurity>("/v1/me/account", {}, token),
+    sendEmailCode: (token: string, email: string) => call<CodeSent>("/v1/me/email", post({ email }), token),
+    verifyEmail: (token: string, email: string, code: string) =>
+      call<{ email: string; email_verified_at: string }>("/v1/me/email/verify", post({ email, code }), token),
+    sendRecoveryCode: (token: string, email: string) => call<CodeSent>("/v1/recovery/code", post({ email }), token),
+    startRecovery: (token: string, email: string, code: string) =>
+      call<Recovery>("/v1/recovery", post({ email, code }), token),
+    cancelRecovery: (token: string, id: string) => call<Recovery>(`/v1/recovery/${id}`, { method: "DELETE" }, token),
 
     slots: (token: string, containerId: string, day?: string) =>
       call<DaySlots>(
@@ -260,6 +311,7 @@ export function startErrorMessage(e: unknown): string {
   }
   if (e.code === "slot_full")
     return "Todos los cupos de esta hora están reservados en este contenedor. Reserva otra hora o prueba en otro contenedor.";
+  if (e.code === "recovery_pending") return RECOVERY_PENDING;
   if (/invalid or expired/.test(d)) return "El código del QR ya cambió. Escanéalo de nuevo.";
   if (/offline/.test(d)) return "El contenedor está sin conexión.";
   if (/busy/.test(d)) return "Otra persona está usando este contenedor. Espera un momento.";
@@ -285,8 +337,44 @@ export function bookingErrorMessage(e: unknown): string {
     }
     case "forbidden":
       return "Ese turno ya se usó.";
+    case "recovery_pending":
+      return RECOVERY_PENDING;
     default:
       if (/over/.test(e.message)) return "Esa hora ya pasó.";
       return e.status === 0 ? e.message : "No pudimos guardar el turno. Intenta de nuevo.";
+  }
+}
+
+const RECOVERY_PENDING =
+  "Este teléfono está esperando tu cuenta anterior. Podrás depositar y reservar cuando termine la recuperación.";
+
+/** Spanish message for a failed step with the recovery email or a recovery. */
+export function accountErrorMessage(e: unknown): string {
+  if (!(e instanceof ApiError)) return "Algo salió mal. Intenta de nuevo.";
+  switch (e.code) {
+    case "invalid_email":
+      return "Ese correo no parece válido. Revísalo.";
+    case "too_soon": {
+      const s = /wait (\d+) seconds/.exec(e.message)?.[1];
+      return s ? `Espera ${s} segundos para pedir otro código.` : "Espera un minuto para pedir otro código.";
+    }
+    case "too_many_codes":
+      return "Pediste demasiados códigos hoy. Intenta mañana.";
+    case "code_invalid": {
+      const left = /(\d+) attempts left/.exec(e.message)?.[1];
+      if (left === "0") return "Ese código ya no sirve. Pide uno nuevo.";
+      if (left) return `El código no es correcto. Te quedan ${left} ${left === "1" ? "intento" : "intentos"}.`;
+      return "El código no es válido o ya venció. Pide uno nuevo.";
+    }
+    case "email_taken":
+      return "Otra cuenta de Zyrcle ya usa ese correo.";
+    case "phone_in_use":
+      return "Esta app ya tiene depósitos, turnos o un correo propios, así que no puede recibir otra cuenta.";
+    case "recovery_in_progress":
+      return "Este teléfono ya está recuperando otra cuenta. Cancela esa primero.";
+    case "recovery_unavailable":
+      return "La recuperación de cuentas todavía no está activa en el servidor.";
+    default:
+      return e.status === 0 ? e.message : "No pudimos completar el paso. Intenta de nuevo.";
   }
 }

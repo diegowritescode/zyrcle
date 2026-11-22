@@ -3,6 +3,7 @@ import "@/lib/polyfills";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { RetiredGate } from "@/account/RetiredGate";
 import { colors } from "@/ui/theme";
 import { NotificationsProvider } from "@/notifications/NotificationsProvider";
 import { WalletProvider } from "@/wallet/WalletProvider";
@@ -17,6 +18,7 @@ export default function RootLayout() {
       <WalletProvider>
         <NotificationsProvider>
           <StatusBar style="dark" />
+          <RetiredGate>
           <Stack
             screenOptions={{
               headerTintColor: colors.forest,
@@ -31,7 +33,9 @@ export default function RootLayout() {
             <Stack.Screen name="scan" options={{ title: "Escanear contenedor", presentation: "modal" }} />
             <Stack.Screen name="deposit" options={{ title: "Reciclar" }} />
             <Stack.Screen name="c/[containerId]" options={{ headerShown: false }} />
+            <Stack.Screen name="recover" options={{ title: "Recuperar tu cuenta" }} />
           </Stack>
+          </RetiredGate>
         </NotificationsProvider>
       </WalletProvider>
     </QueryClientProvider>

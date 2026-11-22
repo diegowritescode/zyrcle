@@ -124,4 +124,4 @@ export async function syncTurnReminders(bookings: Booking[]): Promise<void> {
 }
 
 /** Screens a notification may open (its `data.url`). */
-export const NOTIFICATION_ROUTES = new Set(["/history", "/turns", "/"]);
+export const NOTIFICATION_ROUTES = new Set(["/history", "/turns", "/account", "/"]);

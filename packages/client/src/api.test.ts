@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ApiError, bookingErrorMessage, startErrorMessage } from "./api";
+import { accountErrorMessage, ApiError, bookingErrorMessage, startErrorMessage } from "./api";
 
 describe("error messages", () => {
   it("explains a closed container with its hours", () => {
@@ -19,5 +19,33 @@ describe("error messages", () => {
   it("covers the booking limits", () => {
     expect(bookingErrorMessage(new ApiError(409, "x", "too_many_bookings"))).toMatch(/hasta 3/);
     expect(bookingErrorMessage(new ApiError(422, "that hour is over", "invalid"))).toBe("Esa hora ya pasó.");
+  });
+});
+
+describe("account error messages", () => {
+  it("counts the attempts left on a wrong code", () => {
+    expect(accountErrorMessage(new ApiError(422, "wrong code, 3 attempts left", "code_invalid"))).toBe(
+      "El código no es correcto. Te quedan 3 intentos.",
+    );
+    expect(accountErrorMessage(new ApiError(422, "wrong code, 1 attempts left", "code_invalid"))).toBe(
+      "El código no es correcto. Te quedan 1 intento.",
+    );
+    expect(accountErrorMessage(new ApiError(422, "wrong code, 0 attempts left", "code_invalid"))).toBe(
+      "Ese código ya no sirve. Pide uno nuevo.",
+    );
+    expect(accountErrorMessage(new ApiError(422, "the code expired or was never requested", "code_invalid"))).toBe(
+      "El código no es válido o ya venció. Pide uno nuevo.",
+    );
+  });
+
+  it("says how long to wait for another code", () => {
+    const e = new ApiError(429, "wait 42 seconds before asking for another code", "too_soon");
+    expect(accountErrorMessage(e)).toBe("Espera 42 segundos para pedir otro código.");
+  });
+
+  it("explains why a phone waiting for an account cannot deposit or book", () => {
+    const e = new ApiError(409, "this phone is waiting to recover an account", "recovery_pending");
+    expect(startErrorMessage(e)).toMatch(/esperando tu cuenta anterior/);
+    expect(bookingErrorMessage(e)).toMatch(/esperando tu cuenta anterior/);
   });
 });

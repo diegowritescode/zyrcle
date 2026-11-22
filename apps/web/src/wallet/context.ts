@@ -5,7 +5,10 @@ export type WalletKind = "embedded" | "injected";
 
 export interface Wallet {
   kind: WalletKind;
+  /** The key that signs in. */
   address: Address;
+  /** Where the resident's ZYR lives: their account once signed in, else the key's address. */
+  account: Address;
   /** Browser wallet extension available (MetaMask, Core). */
   hasInjected: boolean;
   /** ZYR balance in pesos; null while loading or if the chain is unreachable. */

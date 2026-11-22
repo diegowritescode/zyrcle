@@ -28,6 +28,10 @@ x-api-env: &api-env
   ZYRCLE_ORACLE_KEY_FILE: /run/secrets/oracle.key
   # Only if "enhanced security for push notifications" is on in the Expo project (ADR 0008).
   ZYRCLE_EXPO_ACCESS_TOKEN: ${EXPO_ACCESS_TOKEN:-}
+  # Smart accounts and lost-phone recovery (ADR 0010). Empty: both stay off.
+  ZYRCLE_ACCOUNT_FACTORY_ADDRESS: ${ACCOUNT_FACTORY:-}
+  ZYRCLE_RESEND_API_KEY: ${RESEND_API_KEY:-}
+  ZYRCLE_EMAIL_FROM: ${EMAIL_FROM:-Zyrcle <no-reply@zyrcle.deviego.xyz>}
 
 services:
   postgres:

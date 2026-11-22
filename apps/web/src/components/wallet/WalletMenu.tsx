@@ -20,7 +20,7 @@ export function WalletMenu({ compact = false }: { compact?: boolean }) {
 
     const copy = async () => {
         try {
-            await navigator.clipboard.writeText(wallet.address);
+            await navigator.clipboard.writeText(wallet.account);
             setCopied(true);
             setTimeout(() => setCopied(false), 1500);
         } catch {
@@ -56,7 +56,7 @@ export function WalletMenu({ compact = false }: { compact?: boolean }) {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onSelect={(e) => { e.preventDefault(); copy(); }} className="text-eco-forest">
                     {copied ? <Check className="h-4 w-4 mr-2 text-eco-emerald" /> : <Copy className="h-4 w-4 mr-2" />}
-                    <code className="text-xs">{shortHex(wallet.address)}</code>
+                    <code className="text-xs" title="Tu cuenta: aquí llegan tus ZYR">{shortHex(wallet.account)}</code>
                     <span className="ml-auto text-xs text-eco-forest/60">{copied ? "Copiada" : "Copiar"}</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => wallet.refreshBalance()} className="text-eco-forest">

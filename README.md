@@ -19,7 +19,7 @@ properly. The hackathon state is preserved at tag [`v0-hackathon`](../../tree/v0
 | 0 | Monorepo, cleanup of the hackathon code, CI | done |
 | 1 | Deposit session: device simulator over MQTT, state machine, Postgres | done |
 | 2 | ZyrcleChain v2 (own Avalanche L1, native ZYR = 1 COP), Treasury contract, payouts | done: live on Fuji, advances paid on chain |
-| 3 | Resident app (Expo) | in progress: deposit flow, wallet, history, hourly turns and push notifications working; key recovery next |
+| 3 | Resident app (Expo) | in progress: deposit flow, wallet, history, hourly turns, push notifications, and lost-phone recovery (smart accounts, recovery email) working |
 | 4 | Collection, sale at the collection center, bank reconciliation, mass balance | planned |
 | 5 | Deployment and live demo | done: the hackathon web app, wired to the new backend |
 

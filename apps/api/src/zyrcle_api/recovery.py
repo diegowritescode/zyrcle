@@ -416,10 +416,8 @@ async def start_recovery(
         kind="recovery_started",
         dedupe_key=f"recovery_started:{rec.id}",
         title="¿Estás cambiando de teléfono?",
-        body=(
-            "Pidieron pasar tu cuenta a otro teléfono. "
-            f"Si no fuiste tú, cancélalo antes del {when}."
-        ),
+        # `when` ends in "a. m." or "p. m.": no period after it.
+        body=f"Tu cuenta pasará a otro teléfono el {when} Si no fuiste tú, cancélalo ya.",
         data={"url": "/account", "recovery_id": str(rec.id)},
         now=now,
     )
@@ -530,11 +528,13 @@ async def account_view(
         .order_by(AccountRecovery.created_at.desc())
         .limit(1)
     )
+    # A recovery that ended in the last day, so the new phone can say it worked.
     recovered = await db.scalar(
         select(func.max(AccountRecovery.updated_at)).where(
             AccountRecovery.resident_id == resident_id,
             AccountRecovery.status == "done",
             AccountRecovery.new_owner == resident.owner_address,
+            AccountRecovery.updated_at > now - DAY,
         )
     )
     live_outgoing = outgoing is not None and outgoing.status in RECOVERY_LIVE

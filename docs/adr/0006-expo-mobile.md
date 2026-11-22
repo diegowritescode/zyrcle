@@ -12,4 +12,5 @@ storage. The resident sees balances in COP and never handles a seed phrase.
 
 ## Consequences
 - Native capabilities without a separate Swift/Kotlin codebase.
-- Key recovery needs a design of its own before launch.
+- Key recovery needs a design of its own before launch: smart accounts with guardian recovery,
+  [ADR 0010](0010-smart-accounts-and-recovery.md).

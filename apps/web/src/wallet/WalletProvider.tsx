@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createWalletClient, custom, getAddress, type Address } from "viem";
 import { toast } from "sonner";
-import { buildSiweMessage } from "@zyrcle/client";
+import { accountOf, buildSiweMessage } from "@zyrcle/client";
 import { api } from "@/lib/api";
 import {
   addChainToWallet,
@@ -120,9 +120,13 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     return promise;
   }, [address, sign]);
 
+  // ZYR goes to the resident's account, which the session names (docs/adr/0010). Before signing in,
+  // or on an API without smart accounts, that is the key's own address.
+  const account = ((token && accountOf(token)) || address) as Address;
+
   const balance = useQuery({
-    queryKey: ["balance", address],
-    queryFn: () => balancePesos(address),
+    queryKey: ["balance", account],
+    queryFn: () => balancePesos(account),
     refetchInterval: 15_000,
     retry: 1,
   });
@@ -169,13 +173,14 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   }, [provider]);
 
   const refreshBalance = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ["balance", address] });
-  }, [queryClient, address]);
+    queryClient.invalidateQueries({ queryKey: ["balance", account] });
+  }, [queryClient, account]);
 
   const value = useMemo<Wallet>(
     () => ({
       kind: kind === "injected" && injectedAddress ? "injected" : "embedded",
       address,
+      account,
       hasInjected: provider !== null,
       balance: balance.data ?? null,
       ensureToken,
@@ -187,7 +192,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       addChain,
       refreshBalance,
     }),
-    [kind, injectedAddress, address, provider, balance.data, ensureToken, signingIn, token, connectInjected, switchToEmbedded, newEmbedded, addChain, refreshBalance],
+    [kind, injectedAddress, address, account, provider, balance.data, ensureToken, signingIn, token, connectInjected, switchToEmbedded, newEmbedded, addChain, refreshBalance],
   );
 
   return <WalletContext.Provider value={value}>{children}</WalletContext.Provider>;

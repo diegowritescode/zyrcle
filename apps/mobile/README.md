@@ -11,14 +11,26 @@ SIWE message through [`@zyrcle/client`](../../packages/client).
 | Escanear | Camera QR scanning (`expo-camera`), typed code fallback, the demo's simulated containers |
 | Reciclar | Choose the material, open the lid, live weight over the WebSocket, "Terminé", verdict and the advance paid on chain |
 | Depósitos | The resident's last 20 deposits and their payments |
-| Cuenta | The wallet address, notifications, network, links, and (testnet) a new wallet |
+| Cuenta | The account address, the recovery email, "¿Perdiste tu teléfono anterior?", notifications, network, links, and (testnet) a new account |
+| Recuperar tu cuenta | Bring an older account to this phone with the code sent to its recovery email ([ADR 0010](../../docs/adr/0010-smart-accounts-and-recovery.md)) |
 
-## Wallet
+## Wallet and account
 
 A key generated on the phone (`expo-crypto` randomness, viem) and kept in the OS keychain or
 keystore through `expo-secure-store`, readable only while the phone is unlocked and never copied
 to another device. The resident never sees a seed phrase. Signing in is silent: the app signs the
-SIWE message with the local key. Key recovery needs its own design before a real launch.
+SIWE message with the local key.
+
+The ZYR does not live at that key: it lives in the resident's smart account on ZyrcleChain, which
+the key controls ([ADR 0010](../../docs/adr/0010-smart-accounts-and-recovery.md)). If the phone is
+lost, the resident proves their recovery email on a new phone, the current phone is warned by push
+and email, and after 48 hours the account obeys the new phone's key. The new phone cannot deposit
+or book during the wait. A phone whose account moved away shows "Esta cuenta ya está en otro
+teléfono" and can only start a new account.
+
+Wallets from before smart accounts were paid to the key. After signing in, the app moves that
+balance into the account, but only if `EXPO_PUBLIC_ACCOUNT_FACTORY` is set and the account the API
+names is the one this key's address predicts (`predictAccount` in `src/lib/chain.ts`).
 
 ## Notifications
 

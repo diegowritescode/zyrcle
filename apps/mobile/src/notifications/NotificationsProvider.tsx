@@ -91,6 +91,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     if (!native) return;
     const sub = Notifications.addNotificationReceivedListener(() => {
       queryClient.invalidateQueries({ queryKey: ["me"] });
+      queryClient.invalidateQueries({ queryKey: ["account"] });
       queryClient.invalidateQueries({ queryKey: ["balance", address] });
     });
     return () => sub.remove();

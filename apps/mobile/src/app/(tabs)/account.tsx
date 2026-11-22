@@ -7,6 +7,8 @@ import { useState } from "react";
 import { Linking, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { CHAIN_ID, REPO_URL, WEB_URL } from "@/lib/config";
 import { REMINDER_MINUTES, type PushSupport } from "@/lib/notifications";
+import { RecoveryAlerts } from "@/account/RecoveryAlerts";
+import { RecoverCard, RecoveryEmailCard } from "@/account/RecoveryEmailCard";
 import { useNotifications } from "@/notifications/context";
 import { confirm } from "@/ui/confirm";
 import { Body, Button, Card, Heading, Muted, Title } from "@/ui/kit";
@@ -37,8 +39,8 @@ export default function Account() {
 
   const reset = async () => {
     const ok = await confirm(
-      "¿Crear otra wallet de prueba?",
-      "Es una red de prueba: la wallet actual y su saldo se pierden en este teléfono.",
+      "¿Crear otra cuenta de prueba?",
+      "Es una red de prueba: esta cuenta y su saldo se pierden en este teléfono, salvo que tengas un correo de recuperación.",
       "Crear otra",
       { destructive: true },
     );
@@ -48,12 +50,13 @@ export default function Account() {
   return (
     <Screen>
       <Title>Cuenta</Title>
+      <RecoveryAlerts />
 
       <Card style={{ gap: space(3) }}>
-        <Heading>Tu wallet</Heading>
+        <Heading>Tu cuenta</Heading>
         <Body>
-          Vive solo en este teléfono, guardada en su almacenamiento seguro. No tienes que anotar frases
-          ni contraseñas: con ella recibes tus pagos.
+          Tu saldo vive en tu cuenta de Zyrcle, en la cadena. Este teléfono guarda la llave que la controla, en
+          su almacenamiento seguro: no tienes que anotar frases ni contraseñas.
         </Body>
         <Pressable accessibilityRole="button" accessibilityLabel="Copiar dirección" onPress={copy} style={styles.address}>
           <Text style={styles.addressText} selectable>
@@ -63,6 +66,9 @@ export default function Account() {
         </Pressable>
         <Muted>Saldo: {wallet.balance === null ? "—" : pesos(wallet.balance)} en ZYR</Muted>
       </Card>
+
+      <RecoveryEmailCard />
+      <RecoverCard />
 
       {Platform.OS !== "web" && <NotificationsCard />}
 
@@ -78,7 +84,7 @@ export default function Account() {
         <LinkRow icon={<BookOpen color={colors.emerald} size={20} />} label="Cómo funciona por dentro" url={`${REPO_URL}/blob/main/docs/architecture.md`} />
       </Card>
 
-      <Button title="Crear otra wallet de prueba" variant="outline" icon={<KeyRound color={colors.forest} size={18} />} onPress={reset} />
+      <Button title="Crear otra cuenta de prueba" variant="outline" icon={<KeyRound color={colors.forest} size={18} />} onPress={reset} />
       <Muted style={{ textAlign: "center" }}>Zyrcle {Constants.expoConfig?.version ?? ""}</Muted>
     </Screen>
   );
