@@ -42,7 +42,7 @@ received.
 
 | Path | Component | Notes |
 |---|---|---|
-| `apps/mobile` | Resident app (Expo) *planned* | Scans the container's rotating QR, shows the live session, balance in COP. Embedded wallet: key in device secure storage, no seed phrase shown. |
+| `apps/mobile` | Resident app (Expo, built) | Scans the container's rotating QR, shows the live session, balance in COP, hourly turns, push notifications ([ADR 0008](adr/0008-push-notifications.md)). Embedded wallet: key in device secure storage, no seed phrase shown. |
 | `apps/web` | Operations console + landing | Containers, sessions under review, collections, sales, reconciliation, treasury. Today it still holds the hackathon UI. |
 | `apps/api` | Backend (FastAPI + Postgres) | Deposit sessions, device link, verification (built). Settlement and ledger come in phase 2. |
 | `device/simulator`, `packages/protocol` | Device protocol + simulator (built) | Signed MQTT protocol ([spec](device-protocol.md)); the simulator speaks it exactly as firmware will. |
@@ -52,8 +52,10 @@ received.
 
 ## 5. Deposit session
 
-One session per container at a time. That lock is what the original "time slots" were for; slot
-booking stays as an optional layer on top.
+One session per container at a time, enforced by the database. On top of that lock, hourly turns
+spread residents over the day ([ADR 0009](adr/0009-time-slots.md)): each container takes a set
+number of residents per hour, a booked spot is guaranteed, and residents without one get in while
+the hour has room.
 
 ```
 IDLE ─scan─► AUTHORIZED ─unlock─► OPEN ─first reading─► DEPOSITING ─"done" / idle timeout─► CLOSING
