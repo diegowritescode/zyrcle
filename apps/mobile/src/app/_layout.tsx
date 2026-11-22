@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { colors } from "@/ui/theme";
+import { NotificationsProvider } from "@/notifications/NotificationsProvider";
 import { WalletProvider } from "@/wallet/WalletProvider";
 
 const queryClient = new QueryClient({
@@ -14,22 +15,24 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <WalletProvider>
-        <StatusBar style="dark" />
-        <Stack
-          screenOptions={{
-            headerTintColor: colors.forest,
-            headerStyle: { backgroundColor: colors.background },
-            headerShadowVisible: false,
-            headerTitleStyle: { fontWeight: "600", color: colors.forestDark },
-            contentStyle: { backgroundColor: colors.background },
-            headerBackButtonDisplayMode: "minimal",
-          }}
-        >
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="scan" options={{ title: "Escanear contenedor", presentation: "modal" }} />
-          <Stack.Screen name="deposit" options={{ title: "Reciclar" }} />
-          <Stack.Screen name="c/[containerId]" options={{ headerShown: false }} />
-        </Stack>
+        <NotificationsProvider>
+          <StatusBar style="dark" />
+          <Stack
+            screenOptions={{
+              headerTintColor: colors.forest,
+              headerStyle: { backgroundColor: colors.background },
+              headerShadowVisible: false,
+              headerTitleStyle: { fontWeight: "600", color: colors.forestDark },
+              contentStyle: { backgroundColor: colors.background },
+              headerBackButtonDisplayMode: "minimal",
+            }}
+          >
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="scan" options={{ title: "Escanear contenedor", presentation: "modal" }} />
+            <Stack.Screen name="deposit" options={{ title: "Reciclar" }} />
+            <Stack.Screen name="c/[containerId]" options={{ headerShown: false }} />
+          </Stack>
+        </NotificationsProvider>
       </WalletProvider>
     </QueryClientProvider>
   );

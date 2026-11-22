@@ -44,7 +44,15 @@
           "recordAudioAndroid": false
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#10B981",
+          "defaultChannel": "payments"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

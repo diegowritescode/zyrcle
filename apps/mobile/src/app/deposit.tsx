@@ -40,6 +40,8 @@ export default function Deposit() {
   const queryClient = useQueryClient();
   const [material, setMaterial] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // A full or closed hour: offer to book a turn instead.
+  const [needsTurn, setNeedsTurn] = useState(false);
   const [opening, setOpening] = useState(false);
 
   const onPaid = useCallback(() => {
@@ -75,6 +77,7 @@ export default function Deposit() {
     if (!qr || !chosen) return;
     setOpening(true);
     setError(null);
+    setNeedsTurn(false);
     try {
       const t = await ensureToken();
       try {
@@ -88,6 +91,7 @@ export default function Deposit() {
       }
     } catch (e) {
       setError(startErrorMessage(e));
+      setNeedsTurn(e instanceof ApiError && (e.code === "slot_full" || e.code === "closed"));
       haptic(Haptics.NotificationFeedbackType.Error);
     } finally {
       setOpening(false);
@@ -120,6 +124,7 @@ export default function Deposit() {
 
       {container.data && <ContainerHeader container={container.data} />}
       {error && <Notice text={error} />}
+      {needsTurn && <Button title="Reservar un turno" variant="outline" onPress={() => router.dismissTo("/turns")} />}
 
       {session ? (
         final ? (

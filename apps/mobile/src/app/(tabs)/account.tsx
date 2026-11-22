@@ -2,10 +2,13 @@ import { pesos, shortHex } from "@zyrcle/client";
 import * as Clipboard from "expo-clipboard";
 import Constants from "expo-constants";
 import * as WebBrowser from "expo-web-browser";
-import { BookOpen, Check, Copy, ExternalLink, KeyRound, LayoutDashboard } from "lucide-react-native";
+import { Bell, BellOff, BookOpen, Check, Copy, ExternalLink, KeyRound, LayoutDashboard } from "lucide-react-native";
 import { useState } from "react";
-import { Alert, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Linking, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { CHAIN_ID, REPO_URL, WEB_URL } from "@/lib/config";
+import { REMINDER_MINUTES, type PushSupport } from "@/lib/notifications";
+import { useNotifications } from "@/notifications/context";
+import { confirm } from "@/ui/confirm";
 import { Body, Button, Card, Heading, Muted, Title } from "@/ui/kit";
 import { Screen } from "@/ui/Screen";
 import { colors, radius, space } from "@/ui/theme";
@@ -32,17 +35,14 @@ export default function Account() {
     setTimeout(() => setCopied(false), 1500);
   };
 
-  const reset = () => {
-    const run = () => wallet.reset();
-    const message = "Es una red de prueba: la wallet actual y su saldo se pierden en este teléfono.";
-    if (Platform.OS === "web") {
-      if (globalThis.confirm?.(message)) run();
-      return;
-    }
-    Alert.alert("¿Crear otra wallet de prueba?", message, [
-      { text: "Cancelar", style: "cancel" },
-      { text: "Crear otra", style: "destructive", onPress: run },
-    ]);
+  const reset = async () => {
+    const ok = await confirm(
+      "¿Crear otra wallet de prueba?",
+      "Es una red de prueba: la wallet actual y su saldo se pierden en este teléfono.",
+      "Crear otra",
+      { destructive: true },
+    );
+    if (ok) wallet.reset();
   };
 
   return (
@@ -64,6 +64,8 @@ export default function Account() {
         <Muted>Saldo: {wallet.balance === null ? "—" : pesos(wallet.balance)} en ZYR</Muted>
       </Card>
 
+      {Platform.OS !== "web" && <NotificationsCard />}
+
       <Card style={{ gap: space(2) }}>
         <Heading>Red</Heading>
         <Muted>ZyrcleChain, la L1 propia de Zyrcle en Avalanche Fuji (testnet) · Chain ID {CHAIN_ID}</Muted>
@@ -82,7 +84,43 @@ export default function Account() {
   );
 }
 
+/** Why push cannot arrive on this build, when it cannot. Turn reminders are local and still work. */
+const PUSH_LIMIT: Record<Exclude<PushSupport, "ok" | "web">, string> = {
+  "expo-go": "En Expo Go para Android solo llegan los recordatorios de turno. Los avisos de pagos necesitan la app instalada.",
+  emulator: "En un emulador solo llegan los recordatorios de turno, no los avisos de pagos.",
+  unconfigured: "Esta versión todavía no está conectada al servicio de notificaciones: solo llegan los recordatorios de turno.",
+};
+
+function NotificationsCard() {
+  const { push, permission, enable } = useNotifications();
+  const on = permission === "granted";
+  return (
+    <Card style={{ gap: space(3) }}>
+      <View style={styles.row}>
+        {on ? <Bell color={colors.emerald} size={20} /> : <BellOff color={colors.muted} size={20} />}
+        <Heading style={{ flex: 1 }}>Notificaciones</Heading>
+        <Text style={[styles.state, { color: on ? colors.emeraldDark : colors.muted }]}>
+          {permission === null ? "…" : on ? "Activadas" : "Desactivadas"}
+        </Text>
+      </View>
+      <Body>
+        Te avisamos cuando te paguen, si un depósito queda en revisión y {REMINDER_MINUTES} minutos antes de cada turno.
+      </Body>
+      {on && push !== "ok" && push !== "web" && <Muted>{PUSH_LIMIT[push]}</Muted>}
+      {permission === "undetermined" && <Button title="Activar notificaciones" onPress={enable} />}
+      {permission === "denied" && (
+        <>
+          <Muted>Están bloqueadas en los ajustes del teléfono.</Muted>
+          <Button title="Abrir Ajustes" variant="outline" onPress={() => Linking.openSettings()} />
+        </>
+      )}
+    </Card>
+  );
+}
+
 const styles = StyleSheet.create({
+  row: { flexDirection: "row", alignItems: "center", gap: space(2) },
+  state: { fontSize: 13, fontWeight: "600" },
   address: {
     flexDirection: "row",
     alignItems: "center",
