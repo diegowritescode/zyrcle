@@ -165,9 +165,14 @@ async def test_siwe_nonce_cannot_be_reused(client, settings):
     assert (await client.post("/v1/auth/verify", json=body)).status_code == 401
 
 
-async def test_live_websocket_streams_readings_and_states(client, devices, resident, server_url):
+async def test_live_websocket_streams_readings_and_states(
+    client, devices, resident, server_url, settings, monkeypatch
+):
     import websockets
 
+    # The suite's 2 s idle timeout can close the lid before a slow CI runner delivers the first
+    # heavier reading (states: closing, verified; no depositing). This test is about streaming.
+    monkeypatch.setattr(settings, "idle_timeout_s", 30)
     runner = devices["ctr-0001"]
     session = await start(client, resident, runner)
     token = resident["Authorization"].removeprefix("Bearer ")
