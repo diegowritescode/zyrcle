@@ -6,7 +6,7 @@ import { Bell, BellOff, BookOpen, Check, Copy, ExternalLink, KeyRound, LayoutDas
 import { useState } from "react";
 import { Linking, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { CHAIN_ID, REPO_URL, WEB_URL } from "@/lib/config";
-import { REMINDER_MINUTES, type PushSupport } from "@/lib/notifications";
+import { REMINDER_MINUTES, sendTestNotification, type PushSupport } from "@/lib/notifications";
 import { RecoveryAlerts } from "@/account/RecoveryAlerts";
 import { RecoverCard, RecoveryEmailCard } from "@/account/RecoveryEmailCard";
 import { useNotifications } from "@/notifications/context";
@@ -99,6 +99,7 @@ const PUSH_LIMIT: Record<Exclude<PushSupport, "ok" | "web">, string> = {
 
 function NotificationsCard() {
   const { push, permission, enable } = useNotifications();
+  const [testSent, setTestSent] = useState(false);
   const on = permission === "granted";
   return (
     <Card style={{ gap: space(3) }}>
@@ -113,6 +114,21 @@ function NotificationsCard() {
         Te avisamos cuando te paguen, si un depósito queda en revisión y {REMINDER_MINUTES} minutos antes de cada turno.
       </Body>
       {on && push !== "ok" && push !== "web" && <Muted>{PUSH_LIMIT[push]}</Muted>}
+      {on && (
+        <>
+          <Button
+            title={testSent ? "Llega en 5 segundos…" : "Enviarme una de prueba"}
+            variant="outline"
+            disabled={testSent}
+            onPress={async () => {
+              await sendTestNotification(5);
+              setTestSent(true);
+              setTimeout(() => setTestSent(false), 6_000);
+            }}
+          />
+          <Muted>Puedes salir de la app o bloquear el teléfono para verla como llegaría de verdad.</Muted>
+        </>
+      )}
       {permission === "undetermined" && <Button title="Activar notificaciones" onPress={enable} />}
       {permission === "denied" && (
         <>

@@ -9,7 +9,8 @@
  */
 import type { Booking } from "@zyrcle/client";
 import { hourLabel } from "@zyrcle/client";
-import Constants, { ExecutionEnvironment } from "expo-constants";
+import { isRunningInExpoGo } from "expo";
+import Constants from "expo-constants";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import { AndroidImportance, IosAuthorizationStatus } from "expo-notifications";
@@ -42,9 +43,7 @@ if (native) {
 export function pushSupport(): PushSupport {
   if (!native) return "web";
   if (!Device.isDevice) return "emulator";
-  if (Platform.OS === "android" && Constants.executionEnvironment === ExecutionEnvironment.StoreClient) {
-    return "expo-go";
-  }
+  if (Platform.OS === "android" && isRunningInExpoGo()) return "expo-go";
   if (!projectId) return "unconfigured";
   return "ok";
 }
@@ -65,7 +64,7 @@ export async function setUpChannels(): Promise<void> {
     Notifications.setNotificationChannelAsync("account", { name: "Seguridad de tu cuenta", importance: HIGH }),
   ]);
   const failed = results.find((r) => r.status === "rejected");
-  if (failed && Constants.executionEnvironment !== ExecutionEnvironment.StoreClient) {
+  if (failed && !isRunningInExpoGo()) {
     console.log("could not create notification channels", failed.reason);
   }
 }
@@ -121,6 +120,20 @@ export async function syncTurnReminders(bookings: Booking[]): Promise<void> {
       trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: at, channelId: "turns" },
     });
   }
+}
+
+/** A local notification a few seconds from now, so the resident can see what ours look like and
+ * check that the phone shows them (sound, banner, lock screen). Works in Expo Go too. */
+export async function sendTestNotification(seconds = 5): Promise<void> {
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: "Así te avisamos",
+      body: "Cuando te paguen, si un depósito queda en revisión o antes de tu turno, te llega un aviso como este.",
+      data: { url: "/account", kind: "test" },
+      sound: "default",
+    },
+    trigger: { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds, channelId: "payments" },
+  });
 }
 
 /** Screens a notification may open (its `data.url`). */
