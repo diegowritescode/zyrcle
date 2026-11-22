@@ -16,6 +16,21 @@ forge test            # unit, fuzz and invariant tests
 python3 export-artifacts.py   # refresh the ABI/bytecode the backend deploys (CI checks this)
 ```
 
+## On ZyrcleChain (Fuji)
+
+| | |
+|---|---|
+| Treasury | `0xB843946A42F2791B8b932F8c0205C9D277E351B1` (on the NativeMinter allow list) |
+| Operator | `0x528815e03Aa80b045B32840f3e26B394D0838d0d` |
+| Oracle (backend) | `0xd3cBCecC587Bd5f9504bFdea1D3B7e198E66ca50` |
+| Shares | 70% residents, 15% collector, 15% operations |
+| Advance limits | 5,000 COP per deposit, 20,000 COP per resident per day |
+| Seed capital | 1,000,000 COP, **simulated** (testnet) |
+
+On the VPS, `infra/l1/scripts/zyrcle-api-docker.sh chain state` prints the live books.
+
+## Deploying
+
 Deployment goes through the backend so keys stay in files on the server:
 
 ```bash
