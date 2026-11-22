@@ -82,9 +82,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(op.f("ix_account_recovery_resident_id"), "account_recovery", ["resident_id"])
-    op.create_index(
-        "account_recovery_due_idx", "account_recovery", ["status", "next_attempt_at"]
-    )
+    op.create_index("account_recovery_due_idx", "account_recovery", ["status", "next_attempt_at"])
     op.create_index(
         "one_live_recovery_per_account",
         "account_recovery",

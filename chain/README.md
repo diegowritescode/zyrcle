@@ -28,6 +28,7 @@ python3 export-artifacts.py   # refresh the ABI/bytecode the backend deploys (CI
 | Shares | 70% residents, 15% collector, 15% operations |
 | Advance limits | 5,000 COP per deposit, 20,000 COP per resident per day |
 | Seed capital | 1,000,000 COP, **simulated** (testnet) |
+| AccountFactory | `0x0bE806Ca77340aA50AF6586CDC2FE2561668DaEA` (admin: the L1 admin; guardian: the oracle, on the deployer allow list) |
 
 On the VPS, `infra/l1/scripts/zyrcle-api-docker.sh chain state` prints the live books.
 
