@@ -9,6 +9,9 @@ export default defineConfig({
     port: 8080,
   },
   plugins: [react()],
+  // The entry chunk carries viem (wallet + SIWE signing), needed from the first page; routes are
+  // split in App.tsx.
+  build: { chunkSizeWarningLimit: 800 },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
