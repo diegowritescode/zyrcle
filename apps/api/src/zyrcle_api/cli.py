@@ -11,20 +11,22 @@ from files so they never appear in process arguments.
 
 import argparse
 import asyncio
+import os
 
 import uvicorn
 
 from .chain import Chain, load_account_file
-from .config import get_settings
 from .main import create_app
 
 
 async def _chain(args: argparse.Namespace) -> None:
-    settings = get_settings()
-    if not settings.chain_rpc_url:
+    # Only the chain variables: these commands must run without the API's secrets.
+    rpc = os.environ.get("ZYRCLE_CHAIN_RPC_URL")
+    treasury = os.environ.get("ZYRCLE_TREASURY_ADDRESS")
+    if not rpc:
         raise SystemExit("set ZYRCLE_CHAIN_RPC_URL")
     if args.action == "deploy":
-        chain = Chain(settings.chain_rpc_url)
+        chain = Chain(rpc)
         admin = load_account_file(args.admin_key_file)
         address = await chain.deploy_treasury(
             admin,
@@ -36,9 +38,9 @@ async def _chain(args: argparse.Namespace) -> None:
         await chain.enable_minting(admin)
         print(f"Treasury deployed at {address} and enabled on the NativeMinter")
         return
-    if not settings.treasury_address:
+    if not treasury:
         raise SystemExit("set ZYRCLE_TREASURY_ADDRESS")
-    chain = Chain(settings.chain_rpc_url, settings.treasury_address)
+    chain = Chain(rpc, treasury)
     if args.action == "seed":
         tx = await chain.record_seed_capital(
             load_account_file(args.operator_key_file), args.ref, args.amount_cop
