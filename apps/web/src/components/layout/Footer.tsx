@@ -6,7 +6,7 @@ import { shortHex } from "@zyrcle/client";
 
 const PLATFORM = [
     { to: "/recycling", label: "Reciclar" },
-    { to: "/residence", label: "Residencia" },
+    { to: "/sites", label: "Sedes" },
     { to: "/collectors", label: "Recolectores" },
 ];
 

@@ -34,21 +34,46 @@ def _now() -> Mapped[datetime]:
     return mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
-class Residence(Base):
-    __tablename__ = "residence"
+HOST_KINDS = ("university", "residential", "business", "public")
+
+
+class Host(Base):
+    """The institution that lets Zyrcle put containers on its sites (docs/adr/0011): a university,
+    a residential complex, a business. It is a party to the money and to the impact reports."""
+
+    __tablename__ = "host"
+    __table_args__ = (
+        CheckConstraint(
+            "kind IN (" + ", ".join(f"'{k}'" for k in HOST_KINDS) + ")", name="host_kind_valid"
+        ),
+    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(200))
+    kind: Mapped[str] = mapped_column(String(16))
+    # Where the host's share of each sale is paid (docs/adr/0013). None: not paid yet.
+    payout_address: Mapped[str | None] = mapped_column(String(42))
+    created_at: Mapped[datetime] = _now()
+
+
+class Site(Base):
+    """A place a host runs, with its own containers, opening hours and turns: a campus, a building,
+    a residential complex. It was called a residence before docs/adr/0011."""
+
+    __tablename__ = "site"
     __table_args__ = (
         CheckConstraint(
             "0 <= opens_hour AND opens_hour < closes_hour AND closes_hour <= 24",
-            name="residence_hours_valid",
+            name="site_hours_valid",
         ),
-        CheckConstraint("slot_capacity > 0", name="residence_slot_capacity_positive"),
+        CheckConstraint("slot_capacity > 0", name="site_slot_capacity_positive"),
     )
     id: Mapped[uuid.UUID] = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
+    host_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("host.id"), index=True)
     name: Mapped[str] = mapped_column(String(200))
     # Opening hours in local time (settings.timezone), as whole hours: [opens_hour, closes_hour).
     opens_hour: Mapped[int] = mapped_column(SmallInteger, default=0, server_default=text("0"))
     closes_hour: Mapped[int] = mapped_column(SmallInteger, default=24, server_default=text("24"))
-    # Residents per container per hour (docs/adr/0009-time-slots.md).
+    # Participants per container per hour (docs/adr/0009-time-slots.md).
     slot_capacity: Mapped[int] = mapped_column(SmallInteger, default=20, server_default=text("20"))
     created_at: Mapped[datetime] = _now()
 
@@ -72,7 +97,7 @@ class Device(Base):
 class Container(Base):
     __tablename__ = "container"
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    residence_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("residence.id"))
+    site_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("site.id"), index=True)
     device_id: Mapped[str] = mapped_column(ForeignKey("device.id"), unique=True)
     name: Mapped[str] = mapped_column(String(200))
     accepted_materials: Mapped[list[str]] = mapped_column(ARRAY(String(32)))

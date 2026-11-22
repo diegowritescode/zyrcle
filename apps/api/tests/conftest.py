@@ -340,11 +340,18 @@ async def client(app) -> httpx.AsyncClient:
 
 @pytest.fixture(scope="session")
 async def devices(client: httpx.AsyncClient, settings: Settings) -> dict[str, DeviceRunner]:
-    residence = (
+    host = (
         await client.post(
-            "/v1/operator/residences",
+            "/v1/operator/hosts",
+            json={"name": "Universidad del Río", "kind": "university"},
+            headers=OPS,
+        )
+    ).json()
+    site = (
+        await client.post(
+            "/v1/operator/sites",
             # Plenty of spots: every test signs in new residents, and each takes one per hour.
-            json={"name": "Torres del Río", "slot_capacity": 1000},
+            json={"host_id": host["id"], "name": "Torres del Río", "slot_capacity": 1000},
             headers=OPS,
         )
     ).json()
@@ -362,7 +369,7 @@ async def devices(client: httpx.AsyncClient, settings: Settings) -> dict[str, De
             headers=OPS,
             json={
                 "id": device_id,
-                "residence_id": residence["id"],
+                "site_id": site["id"],
                 "device_id": device_id,
                 "name": f"Contenedor {device_id}",
                 "accepted_materials": ["pet", "metal", "glass"],

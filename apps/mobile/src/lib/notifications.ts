@@ -145,7 +145,7 @@ export async function syncTurnReminders(bookings: Booking[]): Promise<void> {
       identifier,
       content: {
         title: `Tu turno empieza a las ${hourLabel(b.hour)}`,
-        body: `${b.container_name} · ${b.residence_name}. Lleva tu material separado.`,
+        body: `${b.container_name} · ${b.site_name}. Lleva tu material separado.`,
         data: { url: "/turns", kind: "turn_reminder" },
         sound: "default",
       },

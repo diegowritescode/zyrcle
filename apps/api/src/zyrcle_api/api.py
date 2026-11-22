@@ -19,7 +19,7 @@ from sqlalchemy.dialects.postgresql import insert
 from zyrcle_protocol import load_public_key
 
 from . import auth
-from .bookings import residence_schedule
+from .bookings import site_schedule
 from .chain import WEI_PER_COP
 from .config import Settings
 from .errors import SessionError
@@ -27,10 +27,11 @@ from .models import (
     Container,
     DepositSession,
     Device,
+    Host,
     MaterialPrice,
     Payout,
     PushToken,
-    Residence,
+    Site,
 )
 from .models import Resident as ResidentRow
 from .sessions import MATERIALS, SessionService, session_view
@@ -332,8 +333,15 @@ class ScheduleIn(BaseModel):
         return self
 
 
-class ResidenceIn(ScheduleIn):
-    name: str = Field(max_length=200)
+class HostIn(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    kind: Literal["university", "residential", "business", "public"]
+    payout_address: str | None = Field(default=None, pattern=r"^0x[0-9a-fA-F]{40}$")
+
+
+class SiteIn(ScheduleIn):
+    host_id: uuid.UUID
+    name: str = Field(min_length=1, max_length=200)
 
 
 class DeviceIn(BaseModel):
@@ -343,7 +351,7 @@ class DeviceIn(BaseModel):
 
 class ContainerIn(BaseModel):
     id: str = Field(pattern=r"^[a-z0-9-]{3,64}$")
-    residence_id: uuid.UUID
+    site_id: uuid.UUID
     device_id: str
     name: str = Field(max_length=200)
     accepted_materials: list[str] = Field(min_length=1)
@@ -356,27 +364,52 @@ class ReviewIn(BaseModel):
     note: str | None = Field(default=None, max_length=1000)
 
 
-@router.post("/v1/operator/residences", status_code=201)
-async def create_residence(body: ResidenceIn, _: Operator, request: Request) -> dict[str, Any]:
+def host_view(h: Host) -> dict[str, Any]:
+    return {
+        "id": str(h.id),
+        "name": h.name,
+        "kind": h.kind,
+        "payout_address": h.payout_address,
+    }
+
+
+@router.post("/v1/operator/hosts", status_code=201)
+async def create_host(body: HostIn, _: Operator, request: Request) -> dict[str, Any]:
     async with request.app.state.maker() as db:
-        r = Residence(id=uuid.uuid4(), **body.model_dump())
-        db.add(r)
+        h = Host(
+            id=uuid.uuid4(),
+            name=body.name,
+            kind=body.kind,
+            payout_address=body.payout_address.lower() if body.payout_address else None,
+        )
+        db.add(h)
         await db.commit()
-    return residence_schedule(r)
+    return host_view(h)
 
 
-@router.put("/v1/operator/residences/{residence_id}/schedule")
+@router.post("/v1/operator/sites", status_code=201)
+async def create_site(body: SiteIn, _: Operator, request: Request) -> dict[str, Any]:
+    async with request.app.state.maker() as db:
+        if await db.get(Host, body.host_id) is None:
+            raise HTTPException(404, {"code": "not_found", "detail": "unknown host"})
+        site = Site(id=uuid.uuid4(), **body.model_dump())
+        db.add(site)
+        await db.commit()
+    return site_schedule(site)
+
+
+@router.put("/v1/operator/sites/{site_id}/schedule")
 async def set_schedule(
-    residence_id: uuid.UUID, body: ScheduleIn, _: Operator, request: Request
+    site_id: uuid.UUID, body: ScheduleIn, _: Operator, request: Request
 ) -> dict[str, Any]:
     async with request.app.state.maker() as db:
-        r = await db.get(Residence, residence_id, with_for_update=True)
-        if r is None:
-            raise HTTPException(404, {"code": "not_found", "detail": "unknown residence"})
-        r.opens_hour, r.closes_hour = body.opens_hour, body.closes_hour
-        r.slot_capacity = body.slot_capacity
+        site = await db.get(Site, site_id, with_for_update=True)
+        if site is None:
+            raise HTTPException(404, {"code": "not_found", "detail": "unknown site"})
+        site.opens_hour, site.closes_hour = body.opens_hour, body.closes_hour
+        site.slot_capacity = body.slot_capacity
         await db.commit()
-        return residence_schedule(r)
+        return site_schedule(site)
 
 
 @router.post("/v1/operator/devices", status_code=201)
@@ -399,6 +432,8 @@ async def create_container(body: ContainerIn, _: Operator, request: Request) -> 
     if unknown:
         raise HTTPException(422, f"unknown materials: {sorted(unknown)}")
     async with request.app.state.maker() as db:
+        if await db.get(Site, body.site_id) is None:
+            raise HTTPException(404, {"code": "not_found", "detail": "unknown site"})
         db.add(Container(**body.model_dump()))
         await db.commit()
     return {"id": body.id}

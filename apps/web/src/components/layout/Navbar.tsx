@@ -20,7 +20,7 @@ const GROUPS = [
         heading: "Para residentes",
         links: [
             { to: "/recycling", label: "Reciclar" },
-            { to: "/residence", label: "Residencia" },
+            { to: "/sites", label: "Sedes" },
             { to: "/marketplace", label: "Marketplace" },
         ],
     },

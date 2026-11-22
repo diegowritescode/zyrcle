@@ -1,14 +1,14 @@
 # Zyrcle web app
 
 The hackathon's interface (May 2025), kept as it was designed (eco palette, shadcn/ui components,
-landing, residence dashboard) and wired to the rebuilt backend in [`apps/api`](../api). Live at
+landing, the dashboard) and wired to the rebuilt backend in [`apps/api`](../api). Live at
 https://zyrcle.deviego.xyz.
 
 | Route | What it shows | Data |
 |---|---|---|
 | `/` | Landing | Live totals from `GET /v1/stats` instead of the hackathon's made-up figures |
 | `/recycling` | The resident's deposit: scan the container's QR (camera or typed code), choose the material, live weight, "Terminé", verdict and payment; plus the resident's history | SIWE sign-in, `POST /v1/sessions`, WebSocket `/v1/sessions/{id}/live`, `GET /v1/me` |
-| `/residence` | Residence dashboard: totals, kilos per day and material, pesos paid per day, each container's fill level and weight | `GET /v1/residences/{id}/dashboard` |
+| `/sites` | A host's dashboard across its sites, or one site's: totals, kilos per day and material, pesos paid per day, each site's numbers or each container's fill level and weight. `/residence` redirects here | `GET /v1/hosts/{id}/dashboard`, `GET /v1/sites/{id}/dashboard` |
 | `/container/:id` | A container's screen, simulated: the QR whose code rotates every 30 s | `GET /v1/demo/containers` |
 | `/collectors`, `/validator`, `/marketplace`, `/my-certificates` | What comes next (phase 4 and later) | none |
 

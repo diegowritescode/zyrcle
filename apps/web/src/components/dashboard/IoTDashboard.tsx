@@ -18,7 +18,21 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { Tooltip as UITooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { StatusPill } from "@/components/recycling/StatusPill";
-import { type Dashboard, type DashboardContainer, dateTime, kg, pesos, shortDay, FAMILIES, FAMILY_OF, MATERIALS, familyOf, type Family } from "@zyrcle/client";
+import {
+    type DailySeries,
+    type DashboardContainer,
+    type SiteRef,
+    type Totals,
+    dateTime,
+    kg,
+    pesos,
+    shortDay,
+    FAMILIES,
+    FAMILY_OF,
+    MATERIALS,
+    familyOf,
+    type Family,
+} from "@zyrcle/client";
 
 const tooltipStyle = {
     backgroundColor: "#fff",
@@ -47,10 +61,21 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
     );
 }
 
-/** The hackathon's residence dashboard, drawn from the API's verified deposits and payouts. */
-export function IoTDashboard({ data }: { data: Dashboard }) {
+export interface DashboardData extends DailySeries {
+    /** Whose numbers these are: a site, or a host across all its sites. */
+    name: string;
+    totals: Totals;
+    /** A site's containers, with their sensors. */
+    containers?: DashboardContainer[];
+    /** A host's sites, each with its own totals. */
+    sites?: (SiteRef & { totals: Totals })[];
+}
+
+/** The hackathon's dashboard, drawn from the API's verified deposits and payouts: a site's, with its
+ * containers, or a host's, with its sites (docs/adr/0011). */
+export function IoTDashboard({ data, onSite }: { data: DashboardData; onSite?: (siteId: string) => void }) {
     const [selected, setSelected] = useState<DashboardContainer | null>(null);
-    const { totals, containers } = data;
+    const { totals, containers, sites } = data;
 
     const activity = useMemo(
         () =>
@@ -69,11 +94,11 @@ export function IoTDashboard({ data }: { data: Dashboard }) {
 
     const kgToday = Object.values(data.activity.at(-1)?.kg ?? {}).reduce((a, b) => a + b, 0);
     const copToday = data.payouts.at(-1)?.cop ?? 0;
-    const online = containers.filter((c) => c.online).length;
+    const online = containers?.filter((c) => c.online).length;
     const days = data.activity.length;
 
     const exportCsv = () =>
-        downloadCsv(`zyrcle-${data.residence.name.toLowerCase().replace(/\s+/g, "-")}.csv`, [
+        downloadCsv(`zyrcle-${data.name.toLowerCase().replace(/\s+/g, "-")}.csv`, [
             ["dia", ...FAMILIES.map((f) => `${f.key}_kg`), "pagado_cop"],
             ...activity.map((row, i) => [row.day as string, ...FAMILIES.map((f) => row[f.key] as number), data.payouts[i]?.cop ?? 0]),
         ]);
@@ -84,7 +109,7 @@ export function IoTDashboard({ data }: { data: Dashboard }) {
             <div className="text-center">
                 <h1 className="text-3xl font-bold text-eco-forest">Panel de reciclaje</h1>
                 <p className="text-eco-forest/60 mt-2">
-                    Lo que recicló {data.residence.name} y lo que se pagó por ello, verificado por los contenedores
+                    Lo que recicló {data.name} y lo que se pagó por ello, verificado por los contenedores
                 </p>
             </div>
 
@@ -100,10 +125,14 @@ export function IoTDashboard({ data }: { data: Dashboard }) {
                     <CardContent>
                         <div className="flex items-center justify-between">
                             <div className="text-2xl font-bold text-eco-forest">{totals.containers}</div>
-                            <div className="text-xs text-green-600 flex items-center">
-                                <span className="h-2 w-2 rounded-full bg-green-500 mr-1" />
-                                {online} en línea
-                            </div>
+                            {online !== undefined ? (
+                                <div className="text-xs text-green-600 flex items-center">
+                                    <span className="h-2 w-2 rounded-full bg-green-500 mr-1" />
+                                    {online} en línea
+                                </div>
+                            ) : (
+                                sites && <div className="text-xs text-eco-forest/70">en {sites.length} {sites.length === 1 ? "sede" : "sedes"}</div>
+                            )}
                         </div>
                     </CardContent>
                 </Card>
@@ -134,7 +163,7 @@ export function IoTDashboard({ data }: { data: Dashboard }) {
                                 <TooltipTrigger asChild>
                                     <Info className="h-3 w-3 ml-2 opacity-70" />
                                 </TooltipTrigger>
-                                <TooltipContent>Anticipos pagados a los residentes en ZyrcleChain (1 ZYR = 1 peso)</TooltipContent>
+                                <TooltipContent>Anticipos pagados a quienes reciclan, en ZyrcleChain (1 ZYR = 1 peso)</TooltipContent>
                             </UITooltip>
                         </CardTitle>
                     </CardHeader>
@@ -152,7 +181,7 @@ export function IoTDashboard({ data }: { data: Dashboard }) {
                     <CardHeader className="pb-2">
                         <CardTitle className="text-sm font-medium text-white/90 flex items-center">
                             <Users className="h-4 w-4 mr-2" />
-                            Residentes
+                            Personas
                             <UITooltip>
                                 <TooltipTrigger asChild>
                                     <Info className="h-3 w-3 ml-2 opacity-70" />
@@ -228,7 +257,7 @@ export function IoTDashboard({ data }: { data: Dashboard }) {
 
                 <Card className="lg:col-span-4 shadow-sm border-0 rounded-xl bg-white">
                     <CardHeader className="bg-eco-forest/5">
-                        <CardTitle className="text-xl text-eco-forest">Pagos a residentes</CardTitle>
+                        <CardTitle className="text-xl text-eco-forest">Pagos a quienes reciclan</CardTitle>
                         <CardDescription className="text-eco-forest/70">Pesos pagados por día en ZYR</CardDescription>
                     </CardHeader>
                     <CardContent className="p-6">
@@ -247,7 +276,68 @@ export function IoTDashboard({ data }: { data: Dashboard }) {
                 </Card>
             </div>
 
+            {/* Sedes del anfitrión */}
+            {sites && (
+                <div>
+                    <div className="mb-6">
+                        <h3 className="text-xl font-semibold text-eco-forest">Sedes</h3>
+                        <p className="text-eco-forest/70 text-sm">Lo que aporta cada sede, con sus propios contenedores</p>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {sites.map((site) => (
+                            <Card key={site.id} className="shadow-sm border-0 rounded-xl hover:shadow-md transition-shadow duration-200 bg-white">
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="text-lg text-eco-forest">{site.name}</CardTitle>
+                                    <CardDescription className="text-eco-forest/70">
+                                        {site.totals.containers} {site.totals.containers === 1 ? "contenedor" : "contenedores"}
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent className="py-4">
+                                    <div className="grid grid-cols-3 gap-2 text-sm">
+                                        <div className="flex flex-col">
+                                            <span className="text-xs text-eco-forest/80 mb-1">Kilos</span>
+                                            <span className="font-semibold flex items-center">
+                                                <Weight className="h-4 w-4 mr-1 text-eco-forest/80 shrink-0" />
+                                                {kgTick(site.totals.kg_verified)}
+                                            </span>
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <span className="text-xs text-eco-forest/80 mb-1">Pagado</span>
+                                            <span className="font-semibold flex items-center">
+                                                <CircleDollarSign className="h-4 w-4 mr-1 text-eco-emerald shrink-0" />
+                                                {copTick(site.totals.paid_cop)}
+                                            </span>
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <span className="text-xs text-eco-forest/80 mb-1">Depósitos</span>
+                                            <span className="font-semibold flex items-center">
+                                                <Recycle className="h-4 w-4 mr-1 text-eco-lime shrink-0" />
+                                                {site.totals.deposits_verified}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                                {onSite && (
+                                    <CardFooter>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="w-full text-eco-forest hover:bg-eco-forest/10"
+                                            onClick={() => onSite(site.id)}
+                                        >
+                                            <Info className="h-4 w-4 mr-2" />
+                                            Ver sede
+                                        </Button>
+                                    </CardFooter>
+                                )}
+                            </Card>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* Contenedores inteligentes */}
+            {containers && (
             <div>
                 <div className="flex justify-between items-center mb-6">
                     <div>
@@ -335,6 +425,7 @@ export function IoTDashboard({ data }: { data: Dashboard }) {
                     })}
                 </div>
             </div>
+            )}
 
             {/* Modal de detalles del contenedor */}
             <Dialog open={selected !== null} onOpenChange={(open) => !open && setSelected(null)}>

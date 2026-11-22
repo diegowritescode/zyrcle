@@ -135,7 +135,7 @@ export default function Turns() {
                 <Chip
                   key={c.id}
                   label={c.name}
-                  hint={c.residence_name}
+                  hint={`${c.site_name} · ${c.host_name}`}
                   selected={c.id === containerId}
                   onPress={() => {
                     setPicked(c.id);

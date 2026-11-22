@@ -18,12 +18,12 @@ export function ContainerDetails({ container }: { container: ContainerInfo }) {
                     <span className="text-sm font-medium text-eco-forest/80">Nombre</span>
                     <span className="text-sm font-semibold text-eco-forest text-right">{container.name}</span>
                 </div>
-                {container.residence_name && (
+                {container.site_name && (
                     <div className="flex items-center justify-between gap-4">
                         <span className="text-sm font-medium text-eco-forest/80">Ubicación</span>
                         <span className="text-sm font-semibold text-eco-forest flex items-center text-right">
                             <MapPin className="h-4 w-4 mr-1 text-eco-emerald shrink-0" />
-                            {container.residence_name}
+                            {container.host_name ? `${container.site_name} · ${container.host_name}` : container.site_name}
                         </span>
                     </div>
                 )}

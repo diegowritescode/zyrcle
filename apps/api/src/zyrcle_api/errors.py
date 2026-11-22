@@ -31,7 +31,7 @@ class Unavailable(SessionError):
 
 
 class Closed(Conflict):
-    """The container's residence is closed at this hour."""
+    """The container's site is closed at this hour."""
 
     code = "closed"
 

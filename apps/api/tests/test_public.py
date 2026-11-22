@@ -1,4 +1,4 @@
-"""Public views: platform totals, a scanned container, the residence dashboard, resident history."""
+"""Public views: platform totals, a scanned container, host and site dashboards, history."""
 
 import pytest
 
@@ -13,7 +13,9 @@ async def test_a_scanned_container_shows_what_it_accepts_but_never_its_code(clie
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["name"] == "Contenedor ctr-0002"
-    assert body["residence_name"] == "Torres del Río"
+    assert body["site_name"] == "Torres del Río"
+    assert body["host_name"] == "Universidad del Río"
+    assert body["residence_name"] == body["site_name"]  # deprecated alias for installed apps
     assert body["accepted_materials"] == ["pet", "metal", "glass"]
     assert body["online"] is True
     assert "qr" not in body and "code" not in str(body).lower()
@@ -26,10 +28,9 @@ async def test_a_paid_deposit_shows_up_in_stats_dashboard_and_history(
     app, client, devices, resident
 ):
     before = (await client.get("/v1/stats")).json()
-    residence = next(
-        r for r in (await client.get("/v1/residences")).json() if r["name"] == "Torres del Río"
-    )
-    assert residence["containers"] == 3
+    site = next(s for s in (await client.get("/v1/sites")).json() if s["name"] == "Torres del Río")
+    assert site["containers"] == 3
+    assert site["host"]["name"] == "Universidad del Río"
 
     session = await deposit(client, resident, devices["ctr-0002"], "metal", "aluminum_can", 10)
     final = await wait_state(client, resident, session["id"], "verified")
@@ -42,8 +43,9 @@ async def test_a_paid_deposit_shows_up_in_stats_dashboard_and_history(
     )
     assert after["paid_cop"] == before["paid_cop"] + payout.amount_cop
 
-    dash = (await client.get(f"/v1/residences/{residence['id']}/dashboard?days=7")).json()
-    assert dash["residence"]["name"] == "Torres del Río"
+    dash = (await client.get(f"/v1/sites/{site['id']}/dashboard?days=7")).json()
+    assert dash["site"]["name"] == "Torres del Río"
+    assert dash["host"] == site["host"]
     assert len(dash["activity"]) == len(dash["payouts"]) == 7
     assert dash["activity"][-1]["kg"]["metal"] >= final["deposited_g"] / 1000
     assert dash["payouts"][-1]["cop"] >= payout.amount_cop
@@ -53,6 +55,13 @@ async def test_a_paid_deposit_shows_up_in_stats_dashboard_and_history(
     assert ctr["paid_cop"] >= payout.amount_cop
     assert 0 <= ctr["fill_pct"] <= 100
     assert ctr["weight_kg"] > 0
+
+    host = (await client.get(f"/v1/hosts/{site['host']['id']}/dashboard?days=7")).json()
+    assert host["host"]["kind"] == "university"
+    assert [s["name"] for s in host["sites"]] == ["Torres del Río"]
+    # One site: the host's totals are that site's.
+    assert host["totals"] == host["sites"][0]["totals"] == dash["totals"]
+    assert host["activity"] == dash["activity"]
 
     me = (await client.get("/v1/me", headers=headers(resident))).json()
     latest = me["sessions"][0]
@@ -66,8 +75,26 @@ async def test_a_paid_deposit_shows_up_in_stats_dashboard_and_history(
 
 
 async def test_dashboard_rejects_bad_input(client, devices):
-    residence = (await client.get("/v1/residences")).json()[0]
-    r = await client.get(f"/v1/residences/{residence['id']}/dashboard?days=0")
+    site = (await client.get("/v1/sites")).json()[0]
+    r = await client.get(f"/v1/sites/{site['id']}/dashboard?days=0")
     assert r.status_code == 422
     unknown = "00000000-0000-0000-0000-000000000000"
-    assert (await client.get(f"/v1/residences/{unknown}/dashboard")).status_code == 404
+    assert (await client.get(f"/v1/sites/{unknown}/dashboard")).status_code == 404
+    assert (await client.get(f"/v1/hosts/{unknown}/dashboard")).status_code == 404
+
+
+async def test_hosts_list_their_sites(client, devices):
+    hosts = (await client.get("/v1/hosts")).json()
+    host = next(h for h in hosts if h["name"] == "Universidad del Río")
+    assert host["kind"] == "university"
+    assert host["sites"][0]["name"] == "Torres del Río" and host["sites"][0]["containers"] == 3
+
+
+async def test_residence_routes_remain_as_deprecated_aliases(client, devices):
+    """Installed apps still call these (docs/adr/0011)."""
+    old = next(
+        r for r in (await client.get("/v1/residences")).json() if r["name"] == "Torres del Río"
+    )
+    assert old["containers"] == 3
+    dash = (await client.get(f"/v1/residences/{old['id']}/dashboard?days=3")).json()
+    assert dash["residence"] == dash["site"] == {"id": old["id"], "name": "Torres del Río"}

@@ -1,8 +1,11 @@
-"""Public, read-only views: platform totals, residences and containers.
+"""Public, read-only views: platform totals, hosts, sites and containers.
 
-Traceability is the product, so the aggregates are public: anyone can see how many kilos each
-residence recycled and how many pesos were paid for them. Nothing here identifies a resident, and
-no access code is ever exposed (those only appear on the container's own screen).
+Traceability is the product, so the aggregates are public: anyone can see how many kilos each host
+and each of its sites recycled and how many pesos were paid for them. Nothing here identifies a
+participant, and no access code is ever exposed (those only appear on the container's own screen).
+
+`/v1/residences` and the `residence_*` fields are deprecated aliases of the site routes and fields,
+kept while installed apps still read them (docs/adr/0011).
 """
 
 import uuid
@@ -18,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .auth import utcnow
 from .config import Settings
 from .domain.session_machine import ACTIVE, CREDITED
-from .models import Container, DepositSession, Device, Payout, Residence
+from .models import Container, DepositSession, Device, Host, Payout, Site
 
 router = APIRouter(prefix="/v1", tags=["public"])
 
@@ -45,7 +48,7 @@ def _kg(grams: int | None) -> float:
     return round((grams or 0) / 1000, 3)
 
 
-async def _totals(db: AsyncSession, residence_id: uuid.UUID | None = None) -> dict[str, Any]:
+async def _totals(db: AsyncSession, site_ids: list[uuid.UUID] | None = None) -> dict[str, Any]:
     deposits = (
         select(
             func.count(DepositSession.id),
@@ -62,10 +65,10 @@ async def _totals(db: AsyncSession, residence_id: uuid.UUID | None = None) -> di
         .where(Payout.status == "confirmed")
     )
     containers = select(func.count(Container.id))
-    if residence_id is not None:
-        deposits = deposits.where(Container.residence_id == residence_id)
-        paid = paid.where(Container.residence_id == residence_id)
-        containers = containers.where(Container.residence_id == residence_id)
+    if site_ids is not None:
+        deposits = deposits.where(Container.site_id.in_(site_ids))
+        paid = paid.where(Container.site_id.in_(site_ids))
+        containers = containers.where(Container.site_id.in_(site_ids))
     count, grams, residents = (await db.execute(deposits)).one()
     payouts, cop = (await db.execute(paid)).one()
     return {
@@ -84,7 +87,8 @@ def _container_view(
     return {
         "id": container.id,
         "name": container.name,
-        "residence_id": str(container.residence_id),
+        "site_id": str(container.site_id),
+        "residence_id": str(container.site_id),  # deprecated alias
         "accepted_materials": container.accepted_materials,
         "online": is_online(device, now, settings),
         "busy": container.id in busy,
@@ -106,15 +110,17 @@ async def containers(request: Request) -> list[dict[str, Any]]:
     async with request.app.state.maker() as db:
         rows = (
             await db.execute(
-                select(Container, Device, Residence)
+                select(Container, Device, Site, Host)
                 .join(Device, Device.id == Container.device_id)
-                .join(Residence, Residence.id == Container.residence_id)
-                .order_by(Residence.name, Container.id)
+                .join(Site, Site.id == Container.site_id)
+                .join(Host, Host.id == Site.host_id)
+                .order_by(Host.name, Site.name, Container.id)
             )
         ).all()
         busy = await busy_containers(db)
     return [
-        {**_container_view(c, d, now, settings, busy), "residence_name": r.name} for c, d, r in rows
+        {**_container_view(c, d, now, settings, busy), **_place(site, host)}
+        for c, d, site, host in rows
     ]
 
 
@@ -124,56 +130,180 @@ async def container(container_id: str, request: Request) -> dict[str, Any]:
     async with request.app.state.maker() as db:
         row = (
             await db.execute(
-                select(Container, Device, Residence)
+                select(Container, Device, Site, Host)
                 .join(Device, Device.id == Container.device_id)
-                .join(Residence, Residence.id == Container.residence_id)
+                .join(Site, Site.id == Container.site_id)
+                .join(Host, Host.id == Site.host_id)
                 .where(Container.id == container_id)
             )
         ).one_or_none()
         if row is None:
             raise HTTPException(404, {"code": "not_found", "detail": "unknown container"})
         busy = await busy_containers(db)
-    c, device, residence = row
+    c, device, site, host = row
     view = _container_view(c, device, utcnow(), request.app.state.settings, busy)
-    return {**view, "residence_name": residence.name}
+    return {**view, **_place(site, host)}
 
 
-@router.get("/residences")
+def _place(site: Site, host: Host) -> dict[str, Any]:
+    return {
+        "site_name": site.name,
+        "host_id": str(host.id),
+        "host_name": host.name,
+        "residence_name": site.name,  # deprecated alias
+    }
+
+
+def _site_ref(site: Site) -> dict[str, Any]:
+    return {"id": str(site.id), "name": site.name}
+
+
+def _host_ref(host: Host) -> dict[str, Any]:
+    return {"id": str(host.id), "name": host.name, "kind": host.kind}
+
+
+async def _sites_with_counts(db: AsyncSession, host_id: uuid.UUID | None = None):
+    query = (
+        select(Site, func.count(Container.id))
+        .outerjoin(Container, Container.site_id == Site.id)
+        .group_by(Site.id)
+        .order_by(Site.created_at, Site.name)
+    )
+    if host_id is not None:
+        query = query.where(Site.host_id == host_id)
+    return (await db.execute(query)).all()
+
+
+@router.get("/hosts")
+async def hosts(request: Request) -> list[dict[str, Any]]:
+    """Every host and its sites."""
+    async with request.app.state.maker() as db:
+        host_rows = list(await db.scalars(select(Host).order_by(Host.created_at, Host.name)))
+        by_host: dict[uuid.UUID, list[dict[str, Any]]] = {h.id: [] for h in host_rows}
+        for site, n in await _sites_with_counts(db):
+            by_host.setdefault(site.host_id, []).append({**_site_ref(site), "containers": n})
+    return [{**_host_ref(h), "sites": by_host[h.id]} for h in host_rows]
+
+
+@router.get("/sites")
+async def sites(request: Request) -> list[dict[str, Any]]:
+    async with request.app.state.maker() as db:
+        rows = (
+            await db.execute(
+                select(Site, Host, func.count(Container.id))
+                .join(Host, Host.id == Site.host_id)
+                .outerjoin(Container, Container.site_id == Site.id)
+                .group_by(Site.id, Host.id)
+                .order_by(Host.name, Site.created_at, Site.name)
+            )
+        ).all()
+    return [{**_site_ref(site), "host": _host_ref(host), "containers": n} for site, host, n in rows]
+
+
+@router.get("/residences", deprecated=True)
 async def residences(request: Request) -> list[dict[str, Any]]:
+    """Deprecated alias of /v1/sites, in its old shape."""
     async with request.app.state.maker() as db:
-        rows = await db.execute(
-            select(Residence, func.count(Container.id))
-            .outerjoin(Container, Container.residence_id == Residence.id)
-            .group_by(Residence.id)
-            .order_by(Residence.created_at)
-        )
-        return [{"id": str(r.id), "name": r.name, "containers": n} for r, n in rows]
+        return [{**_site_ref(s), "containers": n} for s, n in await _sites_with_counts(db)]
 
 
-@router.get("/residences/{residence_id}/dashboard")
-async def residence_dashboard(
-    residence_id: uuid.UUID, request: Request, days: int = Query(default=14, ge=1, le=90)
-) -> dict[str, Any]:
-    """Everything the residence dashboard draws: totals, each container's state and the daily
-    kilos (by declared material) and pesos paid over the last `days` days, in local time."""
-    settings: Settings = request.app.state.settings
+def _window(settings: Settings, days: int) -> tuple[list[date], datetime]:
     tz = ZoneInfo(settings.timezone)
-    now = utcnow()
-    today = now.astimezone(tz).date()
+    today = utcnow().astimezone(tz).date()
     first_day = today - timedelta(days=days - 1)
-    since = datetime.combine(first_day, datetime.min.time(), tzinfo=tz)
+    return [first_day + timedelta(days=i) for i in range(days)], datetime.combine(
+        first_day, datetime.min.time(), tzinfo=tz
+    )
+
+
+async def _daily(
+    db: AsyncSession, settings: Settings, site_ids: list[uuid.UUID], days: int
+) -> dict[str, list[dict[str, Any]]]:
+    """Daily kilos (by declared material) and pesos paid over the last `days` days, local time."""
+    day_list, since = _window(settings, days)
+    local_day = cast(func.timezone(settings.timezone, DepositSession.created_at), Date)
+    activity_rows = await db.execute(
+        select(local_day, DepositSession.declared_material, func.sum(DepositSession.deposited_g))
+        .join(Container, Container.id == DepositSession.container_id)
+        .where(
+            Container.site_id.in_(site_ids),
+            DepositSession.state.in_(CREDITED_STATES),
+            DepositSession.created_at >= since,
+        )
+        .group_by(local_day, DepositSession.declared_material)
+    )
+    paid_day = cast(func.timezone(settings.timezone, Payout.updated_at), Date)
+    payout_rows = await db.execute(
+        select(paid_day, func.sum(Payout.amount_cop))
+        .join(DepositSession, DepositSession.id == Payout.session_id)
+        .join(Container, Container.id == DepositSession.container_id)
+        .where(
+            Container.site_id.in_(site_ids),
+            Payout.status == "confirmed",
+            Payout.updated_at >= since,
+        )
+        .group_by(paid_day)
+    )
+    kg_by_day: dict[date, dict[str, float]] = {d: {} for d in day_list}
+    for day, material, grams in activity_rows:
+        if day in kg_by_day:
+            kg_by_day[day][material] = _kg(grams)
+    cop_by_day: dict[date, int] = {d: 0 for d in day_list}
+    for day, cop in payout_rows:
+        if day in cop_by_day:
+            cop_by_day[day] = int(cop)
+    return {
+        "activity": [{"day": d.isoformat(), "kg": kg_by_day[d]} for d in day_list],
+        "payouts": [{"day": d.isoformat(), "cop": cop_by_day[d]} for d in day_list],
+    }
+
+
+@router.get("/hosts/{host_id}/dashboard")
+async def host_dashboard(
+    host_id: uuid.UUID, request: Request, days: int = Query(default=14, ge=1, le=90)
+) -> dict[str, Any]:
+    """A host's totals across its sites, each site's totals, and the daily series."""
+    settings: Settings = request.app.state.settings
+    async with request.app.state.maker() as db:
+        host = await db.get(Host, host_id)
+        if host is None:
+            raise HTTPException(404, {"code": "not_found", "detail": "unknown host"})
+        site_rows = await _sites_with_counts(db, host_id)
+        ids = [s.id for s, _ in site_rows]
+        totals = await _totals(db, ids)
+        per_site = [{**_site_ref(s), "totals": await _totals(db, [s.id])} for s, _ in site_rows]
+        series = await _daily(db, settings, ids, days)
+    return {
+        "host": _host_ref(host),
+        "timezone": settings.timezone,
+        "totals": totals,
+        "sites": per_site,
+        **series,
+    }
+
+
+@router.get("/sites/{site_id}/dashboard")
+async def site_dashboard(
+    site_id: uuid.UUID, request: Request, days: int = Query(default=14, ge=1, le=90)
+) -> dict[str, Any]:
+    """Everything a site's dashboard draws: totals, each container's state and the daily kilos (by
+    declared material) and pesos paid over the last `days` days, in local time."""
+    settings: Settings = request.app.state.settings
+    now = utcnow()
 
     async with request.app.state.maker() as db:
-        residence = await db.get(Residence, residence_id)
-        if residence is None:
-            raise HTTPException(404, {"code": "not_found", "detail": "unknown residence"})
-        totals = await _totals(db, residence_id)
+        site = await db.get(Site, site_id)
+        if site is None:
+            raise HTTPException(404, {"code": "not_found", "detail": "unknown site"})
+        host = await db.get(Host, site.host_id)
+        assert host is not None
+        totals = await _totals(db, [site_id])
         busy = await busy_containers(db)
         rows = (
             await db.execute(
                 select(Container, Device)
                 .join(Device, Device.id == Container.device_id)
-                .where(Container.residence_id == residence_id)
+                .where(Container.site_id == site_id)
                 .order_by(Container.id)
             )
         ).all()
@@ -218,44 +348,7 @@ async def residence_dashboard(
                 .order_by(DepositSession.container_id, DepositSession.updated_at.desc())
             )
         }
-
-        local_day = cast(func.timezone(settings.timezone, DepositSession.created_at), Date)
-        activity_rows = await db.execute(
-            select(
-                local_day,
-                DepositSession.declared_material,
-                func.sum(DepositSession.deposited_g),
-            )
-            .join(Container, Container.id == DepositSession.container_id)
-            .where(
-                Container.residence_id == residence_id,
-                DepositSession.state.in_(CREDITED_STATES),
-                DepositSession.created_at >= since,
-            )
-            .group_by(local_day, DepositSession.declared_material)
-        )
-        paid_day = cast(func.timezone(settings.timezone, Payout.updated_at), Date)
-        payout_rows = await db.execute(
-            select(paid_day, func.sum(Payout.amount_cop))
-            .join(DepositSession, DepositSession.id == Payout.session_id)
-            .join(Container, Container.id == DepositSession.container_id)
-            .where(
-                Container.residence_id == residence_id,
-                Payout.status == "confirmed",
-                Payout.updated_at >= since,
-            )
-            .group_by(paid_day)
-        )
-
-    day_list = [first_day + timedelta(days=i) for i in range(days)]
-    kg_by_day: dict[date, dict[str, float]] = {d: {} for d in day_list}
-    for day, material, grams in activity_rows:
-        if day in kg_by_day:
-            kg_by_day[day][material] = _kg(grams)
-    cop_by_day: dict[date, int] = {d: 0 for d in day_list}
-    for day, cop in payout_rows:
-        if day in cop_by_day:
-            cop_by_day[day] = int(cop)
+        series = await _daily(db, settings, [site_id], days)
 
     containers = []
     for c, device in rows:
@@ -279,10 +372,19 @@ async def residence_dashboard(
         )
 
     return {
-        "residence": {"id": str(residence.id), "name": residence.name},
+        "site": _site_ref(site),
+        "host": _host_ref(host),
+        "residence": _site_ref(site),  # deprecated alias
         "timezone": settings.timezone,
         "totals": totals,
         "containers": containers,
-        "activity": [{"day": d.isoformat(), "kg": kg_by_day[d]} for d in day_list],
-        "payouts": [{"day": d.isoformat(), "cop": cop_by_day[d]} for d in day_list],
+        **series,
     }
+
+
+@router.get("/residences/{site_id}/dashboard", deprecated=True)
+async def residence_dashboard(
+    site_id: uuid.UUID, request: Request, days: int = Query(default=14, ge=1, le=90)
+) -> dict[str, Any]:
+    """Deprecated alias of /v1/sites/{id}/dashboard."""
+    return await site_dashboard(site_id, request, days)

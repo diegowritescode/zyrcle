@@ -5,17 +5,17 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { RecyclingAccess } from "@/components/recycling/RecyclingAccess";
 import { History } from "@/components/recycling/History";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { useResidences } from "@/hooks/useResidences";
+import { useHosts } from "@/hooks/useHosts";
 import { useWallet } from "@/wallet/context";
 
 const RecyclingPage = () => {
-    const { data: residences } = useResidences();
+    const { data: hosts } = useHosts();
     const { token } = useWallet();
 
     return (
         <div className="min-h-screen flex flex-col">
             <Navbar />
-            <PageHeader title="Reciclar" residence={residences?.[0]?.name} />
+            <PageHeader title="Reciclar" place={hosts?.[0]?.name} />
             <main className="flex-grow bg-gray-50">
                 <div className="container mx-auto px-4 py-8">
                     <Tabs defaultValue="access">

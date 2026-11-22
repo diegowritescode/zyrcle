@@ -79,7 +79,7 @@ export default function Account() {
       </Card>
 
       <Card style={{ paddingVertical: space(2) }}>
-        <LinkRow icon={<LayoutDashboard color={colors.emerald} size={20} />} label="Panel de la residencia" url={`${WEB_URL}/residence`} />
+        <LinkRow icon={<LayoutDashboard color={colors.emerald} size={20} />} label="Panel de las sedes" url={`${WEB_URL}/sites`} />
         <View style={styles.divider} />
         <LinkRow icon={<BookOpen color={colors.emerald} size={20} />} label="Cómo funciona por dentro" url={`${REPO_URL}/blob/main/docs/architecture.md`} />
       </Card>

@@ -13,8 +13,10 @@ export interface Totals {
 export interface ContainerInfo {
   id: string;
   name: string;
-  residence_id: string;
-  residence_name?: string;
+  site_id: string;
+  site_name?: string;
+  host_id?: string;
+  host_name?: string;
   accepted_materials: string[];
   online: boolean;
   busy: boolean;
@@ -30,19 +32,45 @@ export interface DashboardContainer extends ContainerInfo {
   last_deposit_at: string | null;
 }
 
-export interface Dashboard {
-  residence: { id: string; name: string };
-  timezone: string;
-  totals: Totals;
-  containers: DashboardContainer[];
+export type HostKind = "university" | "residential" | "business" | "public";
+
+export interface HostRef {
+  id: string;
+  name: string;
+  kind: HostKind;
+}
+
+export interface SiteRef {
+  id: string;
+  name: string;
+}
+
+/** Daily kilos (by declared material) and pesos paid, in the deployment's time zone. */
+export interface DailySeries {
   activity: { day: string; kg: Record<string, number> }[];
   payouts: { day: string; cop: number }[];
 }
 
-export interface ResidenceSummary {
-  id: string;
-  name: string;
-  containers: number;
+/** A site's dashboard (GET /v1/sites/{id}/dashboard). */
+export interface Dashboard extends DailySeries {
+  site: SiteRef;
+  host: HostRef;
+  timezone: string;
+  totals: Totals;
+  containers: DashboardContainer[];
+}
+
+/** A host's dashboard: its totals across sites and each site's (GET /v1/hosts/{id}/dashboard). */
+export interface HostDashboard extends DailySeries {
+  host: HostRef;
+  timezone: string;
+  totals: Totals;
+  sites: (SiteRef & { totals: Totals })[];
+}
+
+/** A host and its sites (GET /v1/hosts). */
+export interface HostSummary extends HostRef {
+  sites: (SiteRef & { containers: number })[];
 }
 
 /** A demo container as its screen would show it, QR included (demo mode only). */
@@ -142,7 +170,8 @@ export interface CodeSent {
 
 /** A container in the booking list (GET /v1/containers). */
 export interface ContainerSummary extends ContainerInfo {
-  residence_name: string;
+  site_name: string;
+  host_name: string;
 }
 
 /** One hour of one container. `state` is relative to now. */
@@ -160,12 +189,12 @@ export interface Slot {
 export interface DaySlots {
   container_id: string;
   container_name: string;
-  residence_name: string;
+  site_name: string;
   timezone: string;
   opens_hour: number;
   closes_hour: number;
   capacity: number;
-  /** The bookable days (today first), as YYYY-MM-DD in the residence's time zone. */
+  /** The bookable days (today first), as YYYY-MM-DD in the site's time zone. */
   days: string[];
   day: string;
   slots: Slot[];
@@ -175,10 +204,10 @@ export interface Booking {
   id: string;
   container_id: string;
   container_name: string;
-  residence_name: string;
+  site_name: string;
   starts_at: string;
   ends_at: string;
-  /** YYYY-MM-DD and hour of day, in the residence's time zone. */
+  /** YYYY-MM-DD and hour of day, in the site's time zone. */
   day: string;
   hour: number;
   state: "upcoming" | "now" | "used" | "missed" | "cancelled";
@@ -236,9 +265,10 @@ export function createApi(baseUrl: string) {
     verify: (message: string, signature: string) => call<SignIn>("/v1/auth/verify", post({ message, signature })),
 
     stats: () => call<Totals>("/v1/stats"),
-    residences: () => call<ResidenceSummary[]>("/v1/residences"),
-    dashboard: (residenceId: string, days = 14) =>
-      call<Dashboard>(`/v1/residences/${residenceId}/dashboard?days=${days}`),
+    hosts: () => call<HostSummary[]>("/v1/hosts"),
+    hostDashboard: (hostId: string, days = 14) =>
+      call<HostDashboard>(`/v1/hosts/${hostId}/dashboard?days=${days}`),
+    dashboard: (siteId: string, days = 14) => call<Dashboard>(`/v1/sites/${siteId}/dashboard?days=${days}`),
     container: (id: string) => call<ContainerInfo>(`/v1/containers/${encodeURIComponent(id)}`),
     containers: () => call<ContainerSummary[]>("/v1/containers"),
 

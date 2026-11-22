@@ -28,7 +28,7 @@ export const colors = {
   white: "#FFFFFF",
 } as const;
 
-/** Card gradients of the residence dashboard. */
+/** Card gradients of the site dashboard. */
 export const gradients = {
   emerald: ["rgba(16,185,129,0.85)", "rgba(44,110,49,0.85)"],
   lime: ["rgba(132,204,22,0.85)", "rgba(16,185,129,0.85)"],

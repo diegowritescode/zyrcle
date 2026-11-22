@@ -30,9 +30,16 @@ CHAIN_ID = int(os.environ.get("ZYRCLE_CHAIN_ID", "20261121"))
 async def setup(api: httpx.AsyncClient) -> DeviceRunner:
     device_id = "ctr-0004"  # a dev broker account exists for ctr-0001..ctr-0004
     key = generate_private_key()
-    residence = (
+    host = (
         await api.post(
-            "/v1/operator/residences", headers=OPS, json={"name": f"Demo {uuid.uuid4().hex[:4]}"}
+            "/v1/operator/hosts",
+            headers=OPS,
+            json={"name": f"Demo {uuid.uuid4().hex[:4]}", "kind": "university"},
+        )
+    ).json()
+    site = (
+        await api.post(
+            "/v1/operator/sites", headers=OPS, json={"host_id": host["id"], "name": "Campus demo"}
         )
     ).json()
     r = await api.post(
@@ -47,7 +54,7 @@ async def setup(api: httpx.AsyncClient) -> DeviceRunner:
         headers=OPS,
         json={
             "id": device_id,
-            "residence_id": residence["id"],
+            "site_id": site["id"],
             "device_id": device_id,
             "name": "Contenedor demo",
             "accepted_materials": ["pet", "metal"],

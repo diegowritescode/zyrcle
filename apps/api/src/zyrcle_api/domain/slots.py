@@ -1,6 +1,6 @@
 """Hourly time slots (docs/adr/0009-time-slots.md). Pure: no I/O.
 
-Slots are whole local hours in the deployment's time zone. A residence is open over
+Slots are whole local hours in the deployment's time zone. A site is open over
 [opens_hour, closes_hour); each container takes `slot_capacity` residents per hour.
 """
 

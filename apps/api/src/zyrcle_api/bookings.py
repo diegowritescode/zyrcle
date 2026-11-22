@@ -33,21 +33,21 @@ from .errors import (
     SlotFull,
     TooManyBookings,
 )
-from .models import Booking, Container, Residence
+from .models import Booking, Container, Site
 from .recovery import recovery_pending
 
 
-def hours_of(residence: Residence) -> Hours:
-    return Hours(residence.opens_hour, residence.closes_hour)
+def hours_of(site: Site) -> Hours:
+    return Hours(site.opens_hour, site.closes_hour)
 
 
-async def _locked_container(db: AsyncSession, container_id: str) -> tuple[Container, Residence]:
+async def _locked_container(db: AsyncSession, container_id: str) -> tuple[Container, Site]:
     container = await db.get(Container, container_id, with_for_update=True)
     if container is None:
         raise NotFound("unknown container")
-    residence = await db.get(Residence, container.residence_id)
-    assert residence is not None
-    return container, residence
+    site = await db.get(Site, container.site_id)
+    assert site is not None
+    return container, site
 
 
 async def _taken(db: AsyncSession, container_id: str, starts_at: datetime) -> int:
@@ -85,10 +85,10 @@ async def claim_spot(
 ) -> Booking:
     """The spot a resident uses to open a container now: their booking for this hour, or a
     walk-in spot if the hour still has room. The caller must hold the container row lock."""
-    residence = await db.get(Residence, container.residence_id)
-    assert residence is not None
+    site = await db.get(Site, container.site_id)
+    assert site is not None
     start = slot_start(now, tz)
-    hours = hours_of(residence)
+    hours = hours_of(site)
     if not hours.contains(start.hour):
         raise Closed(f"the container is open from {hours.label()}")
     booking = await _mine(db, resident_id, container.id, start)
@@ -96,7 +96,7 @@ async def claim_spot(
         if booking.used_at is None:
             booking.used_at, booking.updated_at = now, now
         return booking
-    if await _taken(db, container.id, start) >= residence.slot_capacity:
+    if await _taken(db, container.id, start) >= site.slot_capacity:
         raise SlotFull("every spot of this hour is booked")
     booking = Booking(
         id=uuid.uuid4(),
@@ -125,7 +125,7 @@ async def book(
         raise Invalid("starts_at needs a time zone offset")
     if await recovery_pending(db, resident_id):
         raise RecoveryPending("this phone is waiting to recover an account")
-    container, residence = await _locked_container(db, container_id)
+    container, site = await _locked_container(db, container_id)
     if not is_slot_start(starts_at, tz):
         raise Invalid("a slot starts on the hour")
     start = starts_at.astimezone(tz)
@@ -133,7 +133,7 @@ async def book(
         raise Invalid("that hour is over")
     if start.date() not in bookable_days(now, tz):
         raise Invalid("bookings open up to 7 days ahead")
-    hours = hours_of(residence)
+    hours = hours_of(site)
     if not hours.contains(start.hour):
         raise Closed(f"the container is open from {hours.label()}")
     if await _mine(db, resident_id, container_id, start) is not None:
@@ -149,7 +149,7 @@ async def book(
     )
     if (upcoming or 0) >= MAX_UPCOMING:
         raise TooManyBookings(f"you can hold up to {MAX_UPCOMING} upcoming bookings")
-    if await _taken(db, container_id, start) >= residence.slot_capacity:
+    if await _taken(db, container_id, start) >= site.slot_capacity:
         raise SlotFull("every spot of this hour is booked")
     booking = Booking(
         id=uuid.uuid4(),
@@ -182,7 +182,7 @@ async def cancel(
 
 
 def booking_view(
-    b: Booking, container: Container, residence: Residence, now: datetime, tz: ZoneInfo
+    b: Booking, container: Container, site: Site, now: datetime, tz: ZoneInfo
 ) -> dict[str, Any]:
     start = b.starts_at.astimezone(tz)
     when = slot_state(start, now)
@@ -196,7 +196,8 @@ def booking_view(
         "id": str(b.id),
         "container_id": container.id,
         "container_name": container.name,
-        "residence_name": residence.name,
+        "site_name": site.name,
+        "residence_name": site.name,  # deprecated alias (docs/adr/0011)
         "starts_at": start.isoformat(),
         "ends_at": (start + SLOT).isoformat(),
         "day": start.date().isoformat(),
@@ -211,9 +212,9 @@ async def upcoming(
 ) -> list[dict[str, Any]]:
     """The resident's booked hours that have not ended, soonest first (walk-ins excluded)."""
     rows = await db.execute(
-        select(Booking, Container, Residence)
+        select(Booking, Container, Site)
         .join(Container, Container.id == Booking.container_id)
-        .join(Residence, Residence.id == Container.residence_id)
+        .join(Site, Site.id == Container.site_id)
         .where(
             Booking.resident_id == resident_id,
             Booking.status == "booked",
@@ -237,13 +238,13 @@ async def slots(
     container = await db.get(Container, container_id)
     if container is None:
         raise NotFound("unknown container")
-    residence = await db.get(Residence, container.residence_id)
-    assert residence is not None
+    site = await db.get(Site, container.site_id)
+    assert site is not None
     days = bookable_days(now, tz)
     day = day or days[0]
     if day not in days:
         raise Invalid("bookings open up to 7 days ahead")
-    hours = hours_of(residence)
+    hours = hours_of(site)
     starts = day_slots(day, hours, tz)
     first, last = (starts[0], starts[-1] + SLOT) if starts else (now, now)
     in_day = (
@@ -275,31 +276,33 @@ async def slots(
                 "ends_at": (start + SLOT).isoformat(),
                 "hour": start.hour,
                 "taken": n,
-                "capacity": residence.slot_capacity,
+                "capacity": site.slot_capacity,
                 "mine": start in mine,
                 "state": when,
-                "available": when != "past" and n < residence.slot_capacity and start not in mine,
+                "available": when != "past" and n < site.slot_capacity and start not in mine,
             }
         )
     return {
         "container_id": container.id,
         "container_name": container.name,
-        "residence_name": residence.name,
+        "site_name": site.name,
+        "residence_name": site.name,  # deprecated alias (docs/adr/0011)
         "timezone": str(tz),
-        "opens_hour": residence.opens_hour,
-        "closes_hour": residence.closes_hour,
-        "capacity": residence.slot_capacity,
+        "opens_hour": site.opens_hour,
+        "closes_hour": site.closes_hour,
+        "capacity": site.slot_capacity,
         "days": [d.isoformat() for d in days],
         "day": day.isoformat(),
         "slots": out,
     }
 
 
-def residence_schedule(residence: Residence) -> dict[str, Any]:
+def site_schedule(site: Site) -> dict[str, Any]:
     return {
-        "id": str(residence.id),
-        "name": residence.name,
-        "opens_hour": residence.opens_hour,
-        "closes_hour": residence.closes_hour,
-        "slot_capacity": residence.slot_capacity,
+        "id": str(site.id),
+        "host_id": str(site.host_id),
+        "name": site.name,
+        "opens_hour": site.opens_hour,
+        "closes_hour": site.closes_hour,
+        "slot_capacity": site.slot_capacity,
     }

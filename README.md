@@ -27,7 +27,7 @@ The deposit cycle works end to end: a signed device protocol, a container simula
 sensors, a backend that runs the session state machine and the anti-cheating checks, and a Treasury
 on the project's own L1 that pays the advance in ZYR. The web app keeps the hackathon design and
 now runs on real data: live platform totals, the resident flow (QR scan, live weight, verdict,
-payment) with an embedded wallet or MetaMask/Core, and the residence dashboard. Collectors and
+payment) with an embedded wallet or MetaMask/Core, and the dashboard of each host (a university, a residential complex) and its sites. Collectors and
 sales (phase 4) are marked as coming next. Route optimization comes after phase 4. See
 [docs/architecture.md](docs/architecture.md) for the design and [docs/adr](docs/adr) for the
 decisions behind it.

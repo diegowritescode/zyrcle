@@ -31,7 +31,8 @@ received.
 
 | Actor | Role |
 |---|---|
-| Resident | Deposits material at a container and gets paid in ZYR, shown as Colombian pesos. |
+| Resident | Deposits material at a container and gets paid in ZYR, shown as Colombian pesos. Also called a participant: on a campus they are students and staff. |
+| Host | The institution whose sites hold the containers: a university, a residential complex, a business ([ADR 0011](adr/0011-hosts-and-sites.md)). Gets a share of each sale and the impact reports. |
 | Container | Device with scale, fill sensor, metal sensor, camera, lock and a small display. Simulated until hardware exists. |
 | Collector | Empties containers into bags tagged per material and delivers them to a collection center. |
 | Collection center | Buys the material and pays the operator in COP. External party with its own scale. |

@@ -12,7 +12,7 @@ from . import bookings
 from .api import Resident
 from .auth import utcnow
 from .errors import SessionError
-from .models import Container, Residence
+from .models import Container, Site
 
 router = APIRouter(prefix="/v1", tags=["bookings"])
 
@@ -75,5 +75,5 @@ async def cancel_booking(
 
 async def _view(db, b, now: datetime, tz: ZoneInfo) -> dict[str, Any]:
     container = await db.get(Container, b.container_id)
-    residence = await db.get(Residence, container.residence_id)
-    return bookings.booking_view(b, container, residence, now, tz)
+    site = await db.get(Site, container.site_id)
+    return bookings.booking_view(b, container, site, now, tz)

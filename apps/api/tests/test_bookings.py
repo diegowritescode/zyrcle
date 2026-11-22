@@ -20,16 +20,12 @@ def _at(settings, days: int, hour: int, minute: int = 0) -> datetime:
     return datetime.combine(day, time(hour, minute), tzinfo=tz)
 
 
-async def _residence(client) -> dict:
-    return next(
-        r for r in (await client.get("/v1/residences")).json() if r["name"] == "Torres del Río"
-    )
+async def _site(client) -> dict:
+    return next(r for r in (await client.get("/v1/sites")).json() if r["name"] == "Torres del Río")
 
 
-async def _schedule(client, residence_id: str, **schedule) -> None:
-    r = await client.put(
-        f"/v1/operator/residences/{residence_id}/schedule", json=schedule, headers=OPS
-    )
+async def _schedule(client, site_id: str, **schedule) -> None:
+    r = await client.put(f"/v1/operator/sites/{site_id}/schedule", json=schedule, headers=OPS)
     assert r.status_code == 200, r.text
 
 
@@ -113,7 +109,7 @@ async def test_booking_rules(client, devices, resident, settings):
 async def test_a_full_hour_opens_only_for_residents_with_a_spot(
     client, devices, resident, settings
 ):
-    residence = await _residence(client)
+    site = await _site(client)
     tz = _tz(settings)
     now = datetime.now(tz)
     day, hour = now.date().isoformat(), now.hour
@@ -121,7 +117,7 @@ async def test_a_full_hour_opens_only_for_residents_with_a_spot(
     assert current["state"] == "now"
     try:
         # Leave exactly one free spot in this hour, and give it to `resident`.
-        await _schedule(client, residence["id"], slot_capacity=current["taken"] + 1)
+        await _schedule(client, site["id"], slot_capacity=current["taken"] + 1)
         r = await _book(client, resident, "ctr-0003", datetime.fromisoformat(current["starts_at"]))
         assert r.status_code == 201, r.text
         assert r.json()["state"] == "now"
@@ -150,11 +146,11 @@ async def test_a_full_hour_opens_only_for_residents_with_a_spot(
         r = await client.delete(f"/v1/bookings/{mine[0]['id']}", headers=headers(resident))
         assert r.status_code == 403
     finally:
-        await _schedule(client, residence["id"], slot_capacity=1000)
+        await _schedule(client, site["id"], slot_capacity=1000)
 
 
 async def test_a_closed_hour_refuses_deposits_and_bookings(client, devices, resident, settings):
-    residence = await _residence(client)
+    site = await _site(client)
     now = datetime.now(_tz(settings))
     hours = (
         {"opens_hour": now.hour + 1, "closes_hour": 24}
@@ -165,13 +161,13 @@ async def test_a_closed_hour_refuses_deposits_and_bookings(client, devices, resi
         }
     )
     bad = await client.put(
-        f"/v1/operator/residences/{residence['id']}/schedule",
+        f"/v1/operator/sites/{site['id']}/schedule",
         json={"opens_hour": 10, "closes_hour": 10},
         headers=OPS,
     )
     assert bad.status_code == 422
     try:
-        await _schedule(client, residence["id"], slot_capacity=1000, **hours)
+        await _schedule(client, site["id"], slot_capacity=1000, **hours)
         r = await client.post(
             "/v1/sessions",
             json={"qr": qr(devices["ctr-0001"]), "material": "pet"},
@@ -192,4 +188,4 @@ async def test_a_closed_hour_refuses_deposits_and_bookings(client, devices, resi
             range(hours["opens_hour"], hours["closes_hour"])
         )
     finally:
-        await _schedule(client, residence["id"], slot_capacity=1000)
+        await _schedule(client, site["id"], slot_capacity=1000)

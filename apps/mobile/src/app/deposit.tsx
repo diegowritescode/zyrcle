@@ -178,7 +178,7 @@ function ContainerHeader({ container }: { container: ContainerInfo }) {
       <Recycle color={familyColor[familyOf(container.accepted_materials).key]} size={28} />
       <View style={{ flex: 1 }}>
         <Text style={styles.containerName}>{container.name}</Text>
-        <Muted>{container.residence_name ?? container.accepted_materials.map((m) => MATERIALS[m] ?? m).join(" · ")}</Muted>
+        <Muted>{container.site_name ?? container.accepted_materials.map((m) => MATERIALS[m] ?? m).join(" · ")}</Muted>
       </View>
       <Pill label={status[0]} tone={status[1]} />
     </GradientCard>
