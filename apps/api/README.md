@@ -14,7 +14,9 @@ Design: [docs/architecture.md](../../docs/architecture.md), protocol:
 | `sessions.py` | Orchestration: row locks, transitions, audit events, commands after commit, timeouts, access-code rotation |
 | `mqtt.py` | Broker connection with reconnect and shared subscription |
 | `auth.py` | Sign-In with Ethereum (EIP-4361) and JWTs |
-| `api.py` | REST + WebSocket routes |
+| `api.py` | REST + WebSocket routes for residents and operators |
+| `public.py` | Public read-only views: platform totals, a scanned container, residence dashboards. Aggregates only, no access codes |
+| `demo.py` | Demo-only routes (mounted when a simulator is configured): containers with their live QR, "drop this item" |
 | `models.py`, `migrations/` | Schema; one active session per container enforced by a partial unique index |
 | `pricing.py`, `payouts.py`, `chain.py` | Advance sizing, the payout outbox worker, and the Treasury client (web3.py) |
 
@@ -53,7 +55,9 @@ cp .env.example .env                             # fill in the two secrets
 Unit tests cover the state machine (including random event sequences with Hypothesis) and the
 verification rules. End-to-end tests run the real app against Postgres and Mosquitto with simulated
 containers: PET verified, stone to review, walk-away credited, empty deposit, busy container, bad
-codes, replayed and forged messages, broker ACL, SIWE nonce reuse, and the live WebSocket. Chain
+codes, replayed and forged messages, broker ACL, SIWE nonce reuse, the live WebSocket, and the
+public views (a paid deposit shows up in the totals, the residence dashboard and the resident's
+history). `test_auth.py` parses the exact SIWE message the web app signs. Chain
 end-to-end tests deploy the Treasury on anvil with the backend's own code and check that verified
 or approved deposits land as ZYR in the resident's wallet, capped, and never twice (needs Foundry's
 `anvil` on the PATH; skipped otherwise).

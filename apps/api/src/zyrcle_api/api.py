@@ -20,7 +20,7 @@ from zyrcle_protocol import load_public_key
 from . import auth
 from .chain import WEI_PER_COP
 from .config import Settings
-from .models import Container, Device, MaterialPrice, Payout, Residence
+from .models import Container, DepositSession, Device, MaterialPrice, Payout, Residence
 from .models import Resident as ResidentRow
 from .sessions import MATERIALS, SessionError, SessionService, session_view
 
@@ -195,7 +195,7 @@ async def live(websocket: WebSocket, session_id: uuid.UUID) -> None:
 
 @router.get("/v1/me")
 async def me(resident: Resident, request: Request) -> dict[str, Any]:
-    """The resident's wallet, on-chain ZYR balance (shown as pesos) and payouts."""
+    """The resident's wallet, on-chain ZYR balance (shown as pesos), payouts and deposits."""
     async with request.app.state.maker() as db:
         row = await db.get(ResidentRow, resident)
         if row is None:
@@ -208,6 +208,16 @@ async def me(resident: Resident, request: Request) -> dict[str, Any]:
                 .limit(50)
             )
         )
+        deposits = (
+            await db.execute(
+                select(DepositSession, Container.name, Payout)
+                .join(Container, Container.id == DepositSession.container_id)
+                .outerjoin(Payout, Payout.session_id == DepositSession.id)
+                .where(DepositSession.resident_id == resident)
+                .order_by(DepositSession.created_at.desc())
+                .limit(20)
+            )
+        ).all()
     chain = request.app.state.chain
     balance = None
     if chain is not None:
@@ -229,6 +239,16 @@ async def me(resident: Resident, request: Request) -> dict[str, Any]:
                 "created_at": p.created_at.isoformat(),
             }
             for p in payouts
+        ],
+        "sessions": [
+            {
+                **session_view(s),
+                "container_name": name,
+                "payout": None
+                if p is None
+                else {"amount_cop": p.amount_cop, "status": p.status, "tx_hash": p.tx_hash},
+            }
+            for s, name, p in deposits
         ],
     }
 

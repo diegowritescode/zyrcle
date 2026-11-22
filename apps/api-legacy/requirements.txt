@@ -1,8 +1,0 @@
-# Updated 2026-06: bumped FastAPI + Pydantic v2 for Python 3.13 compatibility
-# (old pins fastapi==0.95.2 / pydantic==1.10.13 fail to import on 3.13)
-fastapi>=0.115,<0.116
-pydantic>=2.9,<3
-uvicorn[standard]>=0.30
-python-dotenv>=1.0.1
-python-multipart>=0.0.9
-requests>=2.32.3

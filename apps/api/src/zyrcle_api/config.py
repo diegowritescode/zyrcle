@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     operator_token: str = Field(min_length=24)
 
     siwe_domain: str = "zyrcle.deviego.xyz"
+    # Local time zone for daily aggregates (dashboard charts group deposits by local day).
+    timezone: str = "America/Bogota"
     chain_id: int = 20261121
 
     code_rotation_s: int = 30

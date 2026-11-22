@@ -13,6 +13,7 @@ from .db import make_engine, make_sessionmaker
 from .live import LiveHub
 from .mqtt import MqttBridge
 from .payouts import PayoutWorker
+from .public import router as public_router
 from .sessions import SessionService
 
 log = logging.getLogger(__name__)
@@ -83,6 +84,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app = FastAPI(title="Zyrcle API", version="0.1.0", lifespan=lifespan)
     app.include_router(router)
+    app.include_router(public_router)
     if settings.demo_simulator_url:
         from .demo import router as demo_router
 

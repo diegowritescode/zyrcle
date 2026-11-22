@@ -17,8 +17,9 @@ from zyrcle_protocol import qr_payload
 
 from .api import Resident, Service
 from .auth import utcnow
-from .domain.session_machine import ACTIVE, State
-from .models import Container, DepositSession, Device
+from .domain.session_machine import State
+from .models import Container, Device
+from .public import busy_containers, is_online
 
 router = APIRouter(prefix="/v1/demo", tags=["demo"])
 
@@ -41,19 +42,10 @@ async def containers(request: Request) -> list[dict[str, Any]]:
     settings = request.app.state.settings
     async with request.app.state.maker() as db:
         rows = (await db.execute(select(Container, Device).join(Device))).all()
-        busy = set(
-            await db.scalars(
-                select(DepositSession.container_id).where(
-                    DepositSession.state.in_([s.value for s in ACTIVE])
-                )
-            )
-        )
+        busy = await busy_containers(db)
     out = []
     for container, device in rows:
-        online = bool(
-            device.last_seen_at
-            and (now - device.last_seen_at).total_seconds() < settings.device_offline_after_s
-        )
+        online = is_online(device, now, settings)
         code_ok = bool(
             device.current_code and device.code_expires_at and device.code_expires_at > now
         )

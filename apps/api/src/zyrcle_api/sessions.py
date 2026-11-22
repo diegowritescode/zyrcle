@@ -92,6 +92,8 @@ def session_view(s: DepositSession) -> dict[str, Any]:
         "container_id": s.container_id,
         "state": s.state,
         "declared_material": s.declared_material,
+        # Scale reading when the lid opened: live readings minus this = what went in so far.
+        "tare_g": s.tare_g,
         "deposited_g": s.deposited_g,
         "score": s.score,
         "reasons": s.reasons or [],
