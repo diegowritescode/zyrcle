@@ -19,7 +19,7 @@ properly. The hackathon state is preserved at tag [`v0-hackathon`](../../tree/v0
 | 0 | Monorepo, cleanup of the hackathon code, CI | done |
 | 1 | Deposit session: device simulator over MQTT, state machine, Postgres | done |
 | 2 | ZyrcleChain v2 (own Avalanche L1, native ZYR = 1 COP), Treasury contract, payouts | done: live on Fuji, advances paid on chain |
-| 3 | Resident app (Expo) | planned |
+| 3 | Resident app (Expo) | in progress: deposit flow, wallet and history working |
 | 4 | Collection, sale at the collection center, bank reconciliation, mass balance | planned |
 | 5 | Deployment and live demo | done: the hackathon web app, wired to the new backend |
 
@@ -37,6 +37,8 @@ decisions behind it.
 ```
 apps/api          Backend: deposit sessions, device link, verification, payouts, public views
 apps/web          Web app: the hackathon design on the new API (React, viem, Tailwind, shadcn/ui)
+apps/mobile       Resident app (Expo, React Native): scan, deposit, get paid
+packages/client   API client, SIWE message, QR codes and labels shared by web and mobile
 packages/protocol Device protocol shared by the API and the simulator
 device/simulator  Simulated container: scale, distance, metal, camera, lock
 chain             Treasury contract (Foundry)
