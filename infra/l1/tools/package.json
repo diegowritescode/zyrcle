@@ -1,0 +1,8 @@
+{
+  "name": "zyrcle-l1-tools",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@avalabs/avalanchejs": "6.0.0"
+  }
+}
