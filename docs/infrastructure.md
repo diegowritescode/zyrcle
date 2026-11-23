@@ -619,6 +619,9 @@ Deployment goes through the backend's command line, so keys stay in files on the
 | `zyrcle-api chain state` | Prints backing, minted, available, seed capital and operations revenue, in COP. |
 | `zyrcle-api chain accounts-deploy --admin-key-file F --guardian 0x..` | Deploys the AccountFactory and puts the guardian on the ContractDeployerAllowList. |
 | `zyrcle-api chain accounts-guardian --admin-key-file F --guardian 0x..` | Adds the new guardian to the allow list and makes it the factory's guardian. Needs `ZYRCLE_ACCOUNT_FACTORY_ADDRESS`. |
+| `zyrcle-api chain minter-revoke --admin-key-file F --address 0x..` | Takes a retired Treasury off the NativeMinter allow list, so it can no longer mint. Refuses the Treasury in `ZYRCLE_TREASURY_ADDRESS`; does nothing if the address is already off. |
+| `zyrcle-api chain fund --from-key-file F --to 0x.. --amount-zyr N` | Sends native ZYR (gas) from one key to an address and prints both balances. |
+| `zyrcle-api chain balance --address 0x..` | Prints an address's native ZYR. |
 
 On the VPS these run through
 [infra/l1/scripts/zyrcle-api-docker.sh](../infra/l1/scripts/zyrcle-api-docker.sh), because the host
@@ -841,7 +844,7 @@ Before any of these:
    docker compose -f deploy/compose.yml --profile ops run --rm migrate alembic downgrade <revision>
    deploy/deploy.sh <previous-api-sha> <previous-web-sha>
    ```
-   Revisions are `0001` to `0008` ([apps/api/migrations/versions](../apps/api/migrations/versions)).
+   Revisions are `0001` to `0013` ([apps/api/migrations/versions](../apps/api/migrations/versions)).
    A downgrade drops the tables and columns the newer migrations added, with their data. There is no
    backup to restore from.
 4. Contract deployments, on-chain payments and installed mobile builds cannot be rolled back.
@@ -948,8 +951,12 @@ transaction on Fuji, so it needs Diego's approval.
    `VITE_TREASURY_ADDRESS` default in `apps/web/Dockerfile`, and `chain/README.md`. Commit, wait for
    the release, then run `deploy.sh`.
 6. **Retire the old contract.** It stays on the NativeMinter allow list, and the oracle key keeps its
-   role there, so it can still mint up to its unused backing. Pause it, or remove it from the
-   allow list. **Gap:** neither is scripted.
+   role there, so it could still mint up to its unused backing. Take it off the allow list once the
+   new one is deployed and the API points at it:
+   ```bash
+   infra/l1/scripts/zyrcle-api-docker.sh chain minter-revoke \
+     --admin-key-file /keys/zyrcle-l1-admin.pk --address <old Treasury>
+   ```
 7. **Mind old advances.** The new contract's `advanceOf` is empty. When it settles a deposit whose
    advance the old contract paid, it does not subtract that advance (`_settleDeposit` in
    [Treasury.sol](../chain/src/Treasury.sol)). **Gap:** the repository does not say how to treat
@@ -1096,6 +1103,23 @@ broker, the chain's latest block and its age, the Treasury's mintable pesos and 
 and operator keys. Each warning is emailed to every active admin at most once a day. Thresholds are
 settings (`alert_*` in [config.py](../apps/api/src/zyrcle_api/config.py)): queue stuck 30 min, any
 failed row, no block for 10 min, under 100,000 COP mintable, under 1 ZYR of gas.
+
+### 9.12 Top up gas for the backend's keys
+
+The oracle key (advances, and as guardian it relays payments and deploys accounts) and the operator
+key (sales, settlements, certificate anchors) pay gas in ZYR. The health report warns under 1 ZYR
+(runbook 9.11). Send gas from the L1 admin's float:
+
+```bash
+infra/l1/scripts/zyrcle-api-docker.sh chain balance --address 0xfdDD10F3BB701dCB21bF711bf3d28f96FA9a2f7d
+infra/l1/scripts/zyrcle-api-docker.sh chain fund --from-key-file /keys/zyrcle-l1-admin.pk \
+  --to 0xd3cBCecC587Bd5f9504bFdea1D3B7e198E66ca50 --amount-zyr 20      # oracle
+infra/l1/scripts/zyrcle-api-docker.sh chain fund --from-key-file /keys/zyrcle-l1-admin.pk \
+  --to 0x528815e03Aa80b045B32840f3e26B394D0838d0d --amount-zyr 20      # operator
+```
+
+It is a transaction on Fuji and needs Diego's approval. The float is finite; minting more gas with
+the admin key would create ZYR without backing, so it is not done.
 
 ## 10. Known gaps and risks
 

@@ -31,6 +31,13 @@ ALLOW_LIST_ABI = [
     },
     {
         "type": "function",
+        "name": "setNone",
+        "stateMutability": "nonpayable",
+        "inputs": [{"name": "addr", "type": "address"}],
+        "outputs": [],
+    },
+    {
+        "type": "function",
         "name": "readAllowList",
         "stateMutability": "view",
         "inputs": [{"name": "addr", "type": "address"}],
@@ -235,6 +242,18 @@ class Chain:
         if await self.minter.functions.readAllowList(self.treasury.address).call() < 1:
             raise TxFailed("NotEnabled", "the Treasury is not on the NativeMinter allow list")
 
+    async def disable_minting(self, admin: LocalAccount, address: str) -> None:
+        """Take `address` off the NativeMinter allow list: a retired Treasury can no longer mint,
+        whatever backing it has left (docs/infrastructure.md, runbook 9.6)."""
+        addr = to_checksum_address(address)
+        await self._send(admin, self.minter.functions.setNone(addr))
+        if await self.minter.functions.readAllowList(addr).call() != 0:
+            raise TxFailed("StillEnabled", f"{addr} is still on the NativeMinter allow list")
+
+    async def minting_role(self, address: str) -> int:
+        """0 none, 1 enabled, 2 admin, 3 manager on the NativeMinter allow list."""
+        return await self.minter.functions.readAllowList(to_checksum_address(address)).call()
+
     # ------------------------------------------------------------------ treasury operations
 
     async def record_seed_capital(self, operator: LocalAccount, ref: str, amount_cop: int) -> str:
@@ -361,6 +380,26 @@ class Chain:
         base = fees["baseFeePerGas"][-1]
         tx["maxPriorityFeePerGas"] = 0
         tx["maxFeePerGas"] = base * 2 + 1
+        signed = sender.sign_transaction(tx)
+        tx_hash = await self.w3.eth.send_raw_transaction(signed.raw_transaction)
+        receipt = await self.w3.eth.wait_for_transaction_receipt(tx_hash, timeout=60)
+        if receipt["status"] != 1:
+            raise TxFailed("Reverted", f"transaction {tx_hash.to_0x_hex()} reverted")
+        return tx_hash.to_0x_hex()
+
+    async def transfer_native(self, sender: LocalAccount, to: str, wei: int) -> str:
+        """Send native ZYR from `sender` to `to`: gas for the backend's keys."""
+        tx = {
+            "from": sender.address,
+            "to": to_checksum_address(to),
+            "value": wei,
+            "nonce": await self.w3.eth.get_transaction_count(sender.address, "pending"),
+            "chainId": await self.w3.eth.chain_id,
+            "gas": 21_000,
+        }
+        fees = await self.w3.eth.fee_history(1, "latest")
+        tx["maxPriorityFeePerGas"] = 0
+        tx["maxFeePerGas"] = fees["baseFeePerGas"][-1] * 2 + 1
         signed = sender.sign_transaction(tx)
         tx_hash = await self.w3.eth.send_raw_transaction(signed.raw_transaction)
         receipt = await self.w3.eth.wait_for_transaction_receipt(tx_hash, timeout=60)

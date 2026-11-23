@@ -6,9 +6,13 @@
   zyrcle-api chain state                                                     backing, minted, ...
   zyrcle-api chain accounts-deploy --admin-key-file F --guardian 0x..         account factory
   zyrcle-api chain accounts-guardian --admin-key-file F --guardian 0x..       replace guardian
+  zyrcle-api chain minter-revoke --admin-key-file F --address 0x..            retire old Treasury
+  zyrcle-api chain fund --from-key-file F --to 0x.. --amount-zyr N            gas for a key
+  zyrcle-api chain balance --address 0x..                                     native ZYR balance
   zyrcle-api demo seed --keys-dir DIR --devices ctr-0001,ctr-0002            register demo bins
 
-Chain commands use ZYRCLE_CHAIN_RPC_URL and, except deploy, ZYRCLE_TREASURY_ADDRESS;
+Chain commands use ZYRCLE_CHAIN_RPC_URL and, except deploy, fund and balance,
+ZYRCLE_TREASURY_ADDRESS (minter-revoke refuses to revoke that one);
 accounts-guardian also ZYRCLE_ACCOUNT_FACTORY_ADDRESS. The admin key is the precompile admin's: it
 also puts the guardian on the deployer allow list. Keys are read from files so they never appear in
 process arguments.
@@ -17,10 +21,11 @@ process arguments.
 import argparse
 import asyncio
 import os
+from decimal import Decimal
 
 import uvicorn
 
-from .chain import Chain, load_account_file
+from .chain import WEI_PER_COP, Chain, load_account_file
 from .main import create_app
 
 
@@ -61,9 +66,34 @@ async def _chain(args: argparse.Namespace) -> None:
         tx = await chain.set_guardian(admin, args.guardian)
         print(f"guardian is now {args.guardian}: {tx}")
         return
+    if args.action == "fund":
+        chain = Chain(rpc)
+        sender = load_account_file(args.from_key_file)
+        wei = int(Decimal(args.amount_zyr) * WEI_PER_COP)
+        if wei <= 0:
+            raise SystemExit("the amount must be positive")
+        tx = await chain.transfer_native(sender, args.to, wei)
+        left = await chain.balance_wei(sender.address)
+        print(f"sent {args.amount_zyr} ZYR to {args.to}: {tx}")
+        print(f"{args.to} now holds {Decimal(await chain.balance_wei(args.to)) / WEI_PER_COP} ZYR")
+        print(f"{sender.address} keeps {Decimal(left) / WEI_PER_COP} ZYR")
+        return
+    if args.action == "balance":
+        wei = await Chain(rpc).balance_wei(args.address)
+        print(f"{args.address} {Decimal(wei) / WEI_PER_COP} ZYR")
+        return
     if not treasury:
         raise SystemExit("set ZYRCLE_TREASURY_ADDRESS")
     chain = Chain(rpc, treasury)
+    if args.action == "minter-revoke":
+        if args.address.lower() == treasury.lower():
+            raise SystemExit("that is the Treasury in use (ZYRCLE_TREASURY_ADDRESS); not revoked")
+        if await chain.minting_role(args.address) == 0:
+            print(f"{args.address} is not on the NativeMinter allow list; nothing to do")
+            return
+        await chain.disable_minting(load_account_file(args.admin_key_file), args.address)
+        print(f"{args.address} removed from the NativeMinter allow list")
+        return
     if args.action == "seed":
         tx = await chain.record_seed_capital(
             load_account_file(args.operator_key_file), args.ref, args.amount_cop
@@ -93,6 +123,15 @@ def main() -> None:
     seed.add_argument("--amount-cop", type=int, required=True)
     seed.add_argument("--ref", required=True, help="e.g. the bank transfer reference")
     chain.add_parser("state")
+    revoke = chain.add_parser("minter-revoke")
+    revoke.add_argument("--admin-key-file", required=True)
+    revoke.add_argument("--address", required=True, help="the retired Treasury")
+    fund = chain.add_parser("fund")
+    fund.add_argument("--from-key-file", required=True)
+    fund.add_argument("--to", required=True)
+    fund.add_argument("--amount-zyr", required=True, help="e.g. 20 or 0.5")
+    balance = chain.add_parser("balance")
+    balance.add_argument("--address", required=True)
     for name in ("accounts-deploy", "accounts-guardian"):
         accounts = chain.add_parser(name)
         accounts.add_argument("--admin-key-file", required=True)

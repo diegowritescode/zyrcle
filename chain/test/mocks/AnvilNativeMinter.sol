@@ -12,6 +12,10 @@ contract AnvilNativeMinter {
         roles[addr] = 1;
     }
 
+    function setNone(address addr) external {
+        roles[addr] = 0;
+    }
+
     function readAllowList(address addr) external view returns (uint256) {
         return roles[addr];
     }
