@@ -37,6 +37,8 @@ from .sale_routes import router as sale_router
 from .sessions import SessionService
 from .settlement import SettlementWorker
 from .setup_routes import router as setup_router
+from .ticket_routes import router as ticket_router
+from .tickets import ClaudeTicketReader
 
 log = logging.getLogger(__name__)
 
@@ -73,6 +75,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.bridge, app.state.sessions = bridge, service
         app.state.collections = collections
         app.state.impact = ImpactService(maker, settings)
+        app.state.ticket_reader = None
+        if settings.anthropic_api_key:
+            import anthropic
+
+            app.state.ticket_reader = ClaudeTicketReader(
+                anthropic.AsyncAnthropic(
+                    api_key=settings.anthropic_api_key,
+                    base_url=settings.anthropic_base_url,
+                    timeout=120,
+                ),
+                settings.ticket_model,
+            )
 
         chain = None
         if settings.chain_enabled:
@@ -222,6 +236,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(booking_router)
     app.include_router(setup_router)
     app.include_router(center_router)
+    app.include_router(ticket_router)
     app.include_router(account_router)
     app.include_router(collection_router)
     app.include_router(sale_router)

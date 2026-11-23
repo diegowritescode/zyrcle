@@ -9,6 +9,8 @@ export const API = "http://127.0.0.1:8010";
 export const RPC = "http://127.0.0.1:8546";
 export const WEB = "http://localhost:4180";
 export const MOB = "http://localhost:8092";
+/** Pinata, the IPFS gateway and Anthropic, stood in by stack/fake-services.mjs. */
+export const SERVICES = "http://127.0.0.1:8093";
 
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 

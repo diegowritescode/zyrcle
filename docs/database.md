@@ -833,6 +833,18 @@ retry at once.
 `site.center_id` (FK, indexed, nullable) names the center a site sells to; `sale.center_id` (FK,
 indexed, nullable) the center that bought, when it is one on record.
 
+### 3.3c Ticket scans
+
+[ADR 0038](adr/0038-reading-scale-tickets-with-ai.md). Written by
+[`ticket_routes.py`](../apps/api/src/zyrcle_api/ticket_routes.py) and `record_sale` in
+[`sale_routes.py`][sale-routes].
+
+**`ticket_scan`.** A photo of a scale ticket and what the model read: `id`, `image` (bytea, at most
+5 MB), `media_type`, `image_sha256` (indexed), `status` (`read`, `failed`; CHECK
+`ticket_scan_status_valid`), `model` and `request_id` of the call, `reading` (jsonb, the structured
+output), `error`, `created_by` (the operator), `sale_id` (FK → `sale.id`, indexed, set when a sale is
+recorded from it), `created_at`. The photos are in the database, so the backups carry them.
+
 ### 3.4 Sales and settlement
 
 Sales and settlement are described in [ADR 0013][adr-0013]. A **settlement** is the payment after
@@ -1579,6 +1591,7 @@ Until a worker runs, its rows stay `pending`.
 | [`0006`][m0006] | 2026-11-22 | `bag`, `collector`, `collection` with `one_active_collection_per_container`, `collection_fill` with `one_open_fill_per_collection`, `incident`; `deposit_session.collection_id`. | [ADR 0012][adr-0012] |
 | [`0007`][m0007] | 2026-11-22 | `sale`, `sale_line`, `settlement` with `one_settlement_per_party`. | [ADR 0013][adr-0013] |
 | [`0008`][m0008] | 2026-11-22 | `operator`, `operator_code`. | [ADR 0014][adr-0014] |
+| [`0015`][m0015] | 2026-11-23 | `ticket_scan`. | [ADR 0038](adr/0038-reading-scale-tickets-with-ai.md) |
 | [`0014`][m0014] | 2026-11-23 | `collection_center`, `center_price`; `site.center_id`, `sale.center_id`. | [ADR 0037](adr/0037-prices-per-collection-center.md) |
 | [`0013`][m0013] | 2026-11-23 | `certificate.ipfs_cid`: the CID of the certificate's public copy on IPFS. | [ADR 0027, amendment](adr/0027-impact-certificates.md#amendments) |
 | [`0012`][m0012] | 2026-11-23 | `merchant`, `payment_request` with `one_payment_in_flight_per_payer`, `redemption_request`. | [ADR 0029](adr/0029-closed-loop-payments.md) |
@@ -1753,6 +1766,7 @@ Found on 2026-11-22 by comparing the code with its comments, docstrings and ADRs
 [m0012]: ../apps/api/migrations/versions/0012_merchants_payments_redemptions.py
 [m0013]: ../apps/api/migrations/versions/0013_certificate_ipfs_cid.py
 [m0014]: ../apps/api/migrations/versions/0014_collection_centers.py
+[m0015]: ../apps/api/migrations/versions/0015_ticket_scans.py
 [adr-0002]: adr/0002-own-avalanche-l1.md
 [adr-0003]: adr/0003-advance-and-settlement.md
 [adr-0005]: adr/0005-device-link-mqtt.md

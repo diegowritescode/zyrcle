@@ -336,6 +336,73 @@ async def pinata() -> FakePinata:
     await task
 
 
+class FakeAnthropic:
+    """The Messages API, enough for reading tickets: answers with `reading` as the structured
+    output, or declines when `refuse` is set. Keeps every request body and its headers."""
+
+    KEY = "sk-ant-test"
+
+    def __init__(self) -> None:
+        self.requests: list[dict] = []
+        self.reading: dict = {}
+        self.refuse = False
+        self.url = ""
+
+    def app(self):
+        import json
+
+        from fastapi import FastAPI, Request
+        from fastapi.responses import JSONResponse
+
+        api = FastAPI()
+
+        @api.post("/v1/messages")
+        async def messages(request: Request):
+            sent = request.headers.get("x-api-key") or request.headers.get(
+                "authorization", ""
+            ).removeprefix("Bearer ")
+            if sent != self.KEY:
+                return JSONResponse(
+                    {"type": "error", "error": {"type": "authentication_error", "message": "x"}},
+                    status_code=401,
+                )
+            body = await request.json()
+            self.requests.append({"body": body, "headers": dict(request.headers)})
+            content = [] if self.refuse else [{"type": "text", "text": json.dumps(self.reading)}]
+            return {
+                "id": "msg_test",
+                "type": "message",
+                "role": "assistant",
+                "model": body["model"],
+                "content": content,
+                "stop_reason": "refusal" if self.refuse else "end_turn",
+                "stop_sequence": None,
+                "usage": {"input_tokens": 10, "output_tokens": 10},
+            }
+
+        return api
+
+
+@pytest.fixture(scope="session")
+async def anthropic_api() -> FakeAnthropic:
+    import socket
+
+    import uvicorn
+
+    fake = FakeAnthropic()
+    sock = socket.socket()
+    sock.bind(("127.0.0.1", 0))
+    port = sock.getsockname()[1]
+    sock.close()
+    server = uvicorn.Server(uvicorn.Config(fake.app(), port=port, log_level="warning"))
+    task = asyncio.create_task(server.serve())
+    await wait_for(lambda: server.started, timeout=5)
+    fake.url = f"http://127.0.0.1:{port}"
+    yield fake
+    server.should_exit = True
+    await task
+
+
 @pytest.fixture(scope="session")
 def settings(
     chain_env: dict,
@@ -343,8 +410,11 @@ def settings(
     expo: FakeExpo,
     resend: FakeResend,
     pinata: FakePinata,
+    anthropic_api: FakeAnthropic,
 ) -> Settings:
     return Settings(
+        anthropic_api_key=FakeAnthropic.KEY,
+        anthropic_base_url=anthropic_api.url,
         account_factory_address=chain_env["factory"],
         pinata_api_url=pinata.url,
         pinata_jwt=FakePinata.JWT,

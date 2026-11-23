@@ -76,12 +76,16 @@ from .places import (
 from .sales import (
     LINE_STATUSES,
     SALE_STATUSES,
+    TICKET_SCAN_STATUSES,
     Sale,
     SaleLine,
     Settlement,
+    TicketScan,
 )
 
 __all__ = [
+    "TICKET_SCAN_STATUSES",
+    "TicketScan",
     "PRICE_SOURCES",
     "CenterPrice",
     "CollectionCenter",

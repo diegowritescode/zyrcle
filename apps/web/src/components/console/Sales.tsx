@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { MATERIALS, dateTime, grams, pesos, shortHex } from "@zyrcle/client";
 import { Banknote, ChevronDown, ChevronUp, Receipt } from "lucide-react";
@@ -10,7 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import type { Sale, SaleLine } from "@/console/api";
+import type { Sale, SaleLine, TicketScan } from "@/console/api";
+import { TicketScanCard } from "./TicketScan";
 import { useConsole } from "@/console/context";
 import { Empty, Loading, Section } from "./shared";
 import { failed } from "@/console/format";
@@ -26,9 +27,11 @@ const PARTY: Record<string, string> = { deposit: "Depósito", collector: "Recole
 
 /** Sales from the buyer's ticket, the bank match, and the settlement of each bag (docs/adr/0013). */
 export function Sales() {
+    const [prefill, setPrefill] = useState<TicketScan | null>(null);
     return (
         <div className="space-y-6">
-            <NewSale />
+            <TicketScanCard onUse={setPrefill} />
+            <NewSale prefill={prefill} />
             <SaleList />
         </div>
     );
@@ -39,18 +42,36 @@ interface Draft {
     amount_cop: string;
 }
 
-function NewSale() {
+function NewSale({ prefill }: { prefill: TicketScan | null }) {
     const { api } = useConsole();
     const queryClient = useQueryClient();
     const sealed = useQuery({ queryKey: ["op", "bags", "sealed"], queryFn: () => api.bags("sealed"), refetchInterval: 15_000 });
     const [buyer, setBuyer] = useState("");
     const centers = useQuery({ queryKey: ["op", "centers"], queryFn: api.centers });
     const [centerId, setCenterId] = useState<string | null>(null);
+    const [scanId, setScanId] = useState<string | null>(null);
     const [ticket, setTicket] = useState("");
     // Today in the operator's own time zone (toISOString would give tomorrow's date at night in Colombia).
     const [soldOn, setSoldOn] = useState(() => new Date().toLocaleDateString("en-CA"));
     const [lines, setLines] = useState<Record<string, Draft>>({});
     const [busy, setBusy] = useState(false);
+
+    // A ticket read from a photo fills the form; the operator still reviews every field.
+    useEffect(() => {
+        const r = prefill?.reading;
+        if (!prefill || !r) return;
+        setScanId(prefill.id);
+        setBuyer(r.center_name ?? "");
+        setCenterId(prefill.center_id);
+        setTicket(r.ticket_ref ?? "");
+        if (r.date && /^\d{4}-\d{2}-\d{2}$/.test(r.date)) setSoldOn(r.date);
+        const next: Record<string, Draft> = {};
+        r.lines.forEach((l, i) => {
+            const bag = prefill.proposed_bags[i];
+            if (bag) next[bag] = { buyer_g: l.kg === null ? "" : String(Math.round(l.kg * 1000)), amount_cop: l.amount_cop === null ? "" : String(Math.round(l.amount_cop)) };
+        });
+        setLines(next);
+    }, [prefill]);
 
     const picked = Object.entries(lines);
     const valid =
@@ -72,6 +93,7 @@ function NewSale() {
             await api.recordSale({
                 buyer: buyer.trim(),
                 center_id: centerId,
+                ticket_scan_id: scanId,
                 ticket_ref: ticket.trim(),
                 sold_on: soldOn,
                 lines: picked.map(([bag, d]) => ({ bag, buyer_g: Number(d.buyer_g), amount_cop: Number(d.amount_cop) })),
@@ -79,6 +101,7 @@ function NewSale() {
             toast.success("Venta registrada. Confírmala cuando veas el pago en el banco.");
             setLines({});
             setTicket("");
+            setScanId(null);
             await queryClient.invalidateQueries({ queryKey: ["op"] });
         } catch (e) {
             failed(e);

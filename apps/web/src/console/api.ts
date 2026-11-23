@@ -97,6 +97,26 @@ export interface SaleLine {
     settlements?: SettlementRow[];
 }
 
+/** What the model read from a ticket photo, and what the API made of it (docs/adr/0038). */
+export interface TicketScan {
+    id: string;
+    status: "read" | "failed";
+    reading: {
+        readable: boolean;
+        center_name: string | null;
+        ticket_ref: string | null;
+        date: string | null;
+        lines: { material: string; label: string; kg: number | null; cop_per_kg: number | null; amount_cop: number | null }[];
+        total_cop: number | null;
+        notes: string;
+    } | null;
+    error: string | null;
+    checks: { kind: string; detail: string; line?: number }[];
+    proposed_bags: (string | null)[];
+    center_id: string | null;
+    sale_id: string | null;
+}
+
 export interface Sale {
     id: string;
     buyer: string;
@@ -252,7 +272,9 @@ export function operatorApi(token: string | null, onUnauthorized: () => void) {
             call<Center>(`/v1/operator/centers/${id}/prices/${material}`, json("PUT", { cop_per_kg, source })),
         centerSuggestions: (id: string) => call<Record<string, { cop_per_kg: number; lines: number }>>(`/v1/operator/centers/${id}/suggested-prices`),
         setSiteCenter: (siteId: string, center_id: string | null) => call<unknown>(`/v1/operator/sites/${siteId}/center`, json("PUT", { center_id })),
-        recordSale: (body: { buyer: string; center_id?: string | null; ticket_ref: string; sold_on: string; lines: { bag: string; buyer_g: number; amount_cop: number }[] }) =>
+        scanTicket: (image_base64: string, media_type: "image/jpeg" | "image/png" | "image/webp") =>
+            call<TicketScan>("/v1/operator/ticket-scans", json("POST", { image_base64, media_type })),
+        recordSale: (body: { buyer: string; center_id?: string | null; ticket_scan_id?: string | null; ticket_ref: string; sold_on: string; lines: { bag: string; buyer_g: number; amount_cop: number }[] }) =>
             call<Sale>("/v1/operator/sales", json("POST", body)),
         confirmSale: (id: string, bank_ref: string, received_cop: number) => call<Sale>(`/v1/operator/sales/${id}/confirm`, json("POST", { bank_ref, received_cop })),
 

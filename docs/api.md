@@ -1155,6 +1155,21 @@ of the center it sells to, else the general table (`/v1/operator/prices`).
 `POST /v1/operator/sales` takes an optional `center_id` (404 if unknown or inactive), and sales and
 `GET /v1/operator/sites` show it.
 
+#### Reading scale tickets (operator)
+
+[ADR 0038](adr/0038-reading-scale-tickets-with-ai.md),
+[`ticket_routes.py`](../apps/api/src/zyrcle_api/ticket_routes.py). Off without an Anthropic key (503
+`unavailable`).
+
+| Method and path | Body | Returns |
+|---|---|---|
+| `POST /v1/operator/ticket-scans` | `{image_base64, media_type: "image/jpeg" \| "image/png" \| "image/webp"}`, at most 5 MB | 201: `{id, status: "read" \| "failed", reading: {readable, center_name, ticket_ref, date, lines: [{material, label, kg, cop_per_kg, amount_cop}], total_cop, notes}, checks: [{kind, detail, line?}], proposed_bags: [code \| null], center_id, error, model, created_by, sale_id}`. A failed reading keeps the photo and says why |
+| `GET /v1/operator/ticket-scans/{id}` | | The same view |
+| `GET /v1/operator/ticket-scans/{id}/image` | | The photo |
+
+`POST /v1/operator/sales` takes an optional `ticket_scan_id`; the scan then names the sale it became
+(409 if it already did).
+
 #### Impact certificates (operator)
 
 | Method and path | Body | Returns |

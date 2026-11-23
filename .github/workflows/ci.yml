@@ -112,7 +112,7 @@ jobs:
           (cd apps/web && npm ci)
           (cd apps/mobile && npm ci)
           (cd e2e && npm ci && npx playwright install --with-deps chromium)
-      - name: Start the stack (chain, database, simulator, API, Pinata stand-in)
+      - name: Start the stack (chain, database, simulator, API, Pinata and Anthropic stand-ins)
         run: e2e/stack/up.sh
       - name: Build and serve the web app and the mobile app
         run: e2e/stack/apps.sh

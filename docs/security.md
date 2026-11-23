@@ -47,6 +47,8 @@ cd chain && ../.slither/bin/slither . --filter-paths "test|lib|dependencies" --e
   (ADR 0028).
 - One VPS and one validator; backups stay on the same machine until an off-site copy is decided
   (ADR 0028).
+- Ticket photos go to Anthropic to be read (ADR 0038). They show a collection center's ticket, not
+  participants; the photo, the reading and who accepted it stay in the database.
 - Error reports go to Sentry, a third party, when its DSNs are set. They are scrubbed before they
   leave (emails, long hex strings, tokens, request bodies, cookies, headers, the user), but stack
   traces and account addresses remain (ADR 0033).

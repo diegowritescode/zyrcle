@@ -384,6 +384,7 @@ has none). Unknown variables are ignored. "Default" means the column is not set 
 | `ZYRCLE_CHAIN_RPC_URL` | none | `http://zyrcle-l1-node-1:9650/ext/bc/${BLOCKCHAIN_ID}/rpc` | no | ZyrcleChain JSON-RPC endpoint, reached over `edge`. |
 | `ZYRCLE_TREASURY_ADDRESS` | none | `${TREASURY}` | no | Treasury contract address. |
 | `ZYRCLE_ORACLE_KEY_FILE` | none | `/run/secrets/oracle.key` | the file is | Path to the hex private key with the Treasury's ORACLE_ROLE. |
+| `ZYRCLE_ANTHROPIC_API_KEY` | none | `${ANTHROPIC_API_KEY:-}` | yes | Reads scale tickets from photos with Claude ([ADR 0038](adr/0038-reading-scale-tickets-with-ai.md)). Empty: off. `ZYRCLE_TICKET_MODEL` defaults to `claude-opus-5-5`. |
 | `ZYRCLE_RATE_LIMITS_ENABLED`, `ZYRCLE_RATE_LIMIT_CODES_PER_MIN` (20), `_SIGNIN_PER_MIN` (120), `_WRITE_PER_MIN` (120), `_READ_PER_MIN` (600), `_PROXY_HOPS` (1) | as listed | default | no | Rate limits per caller ([ADR 0035](adr/0035-rate-limits.md)). `PROXY_HOPS` is the number of proxies in front of the API: Traefik, one. |
 | `ZYRCLE_SENTRY_DSN` | none | `${SENTRY_DSN_API:-}` | no | Sentry DSN of the API's project. Empty: no error reports ([ADR 0033](adr/0033-error-reports-and-uptime.md)). |
 | `ZYRCLE_RELEASE` | none | `${ZYRCLE_API_TAG:-}` | no | The deployed commit, named in error reports. |
@@ -522,6 +523,7 @@ about 88.95 (read from the public RPC). No script funds them; see section 10.
 | `MQTT_CTR_0001_PASSWORD` … `0004` | Each simulated container's broker account. | Publish on that container's topics. Messages still need the device's signature, so the password alone cannot forge readings. |
 | `EXPO_ACCESS_TOKEN` (optional) | Expo push with enhanced security ([ADR 0008](adr/0008-push-notifications.md)). | Send push notifications through the project, when enhanced security is on. |
 | `OFFSITE_S3_ACCESS_KEY_ID`, `OFFSITE_S3_SECRET_ACCESS_KEY` (optional) | Write the encrypted copies to the backup bucket ([ADR 0034](adr/0034-encrypted-off-site-backups.md)). | Read the copies, which are useless without Diego's private age key, and fill or try to delete them; the bucket lock keeps recent ones. |
+| `ANTHROPIC_API_KEY` (optional) | Reads ticket photos with Claude ([ADR 0038](adr/0038-reading-scale-tickets-with-ai.md)). | Spend on Zyrcle's Anthropic account up to its monthly limit. |
 | `RESEND_API_KEY` (optional) | Sends email for the verified domain. | Send email as `no-reply@zyrcle.deviego.xyz` and use up the daily quota ([ADR 0010](adr/0010-smart-accounts-and-recovery.md)). |
 | `PINATA_JWT` (optional) | Pins impact certificates on IPFS ([ADR 0027, amendment](adr/0027-impact-certificates.md#amendments)). | Pin or, if the key allows it, unpin files in Zyrcle's Pinata account and use up its quota. It cannot change a pinned file: a CID is its content's hash. |
 

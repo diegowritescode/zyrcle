@@ -114,6 +114,11 @@ class Settings(BaseSettings):
     rate_limit_read_per_min: int = 600
     rate_limit_proxy_hops: int = 1
 
+    # Reading scale tickets with Claude (docs/adr/0038). No key, no reading.
+    anthropic_api_key: str | None = None
+    anthropic_base_url: str | None = None  # tests only
+    ticket_model: str = "claude-opus-5-5"
+
     # Error reports to Sentry (docs/adr/0033), without personal data. No DSN, no reports.
     sentry_dsn: str | None = None
     sentry_environment: str = "production"

@@ -10,6 +10,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     String,
     Text,
     text,
@@ -114,4 +115,32 @@ class Settlement(Base):
     # For deposits: the share minus the advance; otherwise the share. None until paid.
     paid_cop: Mapped[int | None] = mapped_column(BigInteger)
     tx_hash: Mapped[str | None] = mapped_column(String(66))
+    created_at: Mapped[datetime] = _now()
+
+
+TICKET_SCAN_STATUSES = ("read", "failed")
+
+
+class TicketScan(Base):
+    """A photo of a scale ticket and what the model read from it (docs/adr/0038). Kept for audit:
+    the photo, the model and request, the reading, who sent it, and the sale it became."""
+
+    __tablename__ = "ticket_scan"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN (" + ", ".join(f"'{s}'" for s in TICKET_SCAN_STATUSES) + ")",
+            name="ticket_scan_status_valid",
+        ),
+    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
+    image: Mapped[bytes] = mapped_column(LargeBinary)
+    media_type: Mapped[str] = mapped_column(String(32))
+    image_sha256: Mapped[str] = mapped_column(String(64), index=True)
+    status: Mapped[str] = mapped_column(String(16))
+    model: Mapped[str | None] = mapped_column(String(64))
+    request_id: Mapped[str | None] = mapped_column(String(100))
+    reading: Mapped[dict | None] = mapped_column(JSONB)
+    error: Mapped[str | None] = mapped_column(Text)
+    created_by: Mapped[str] = mapped_column(String(254))
+    sale_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("sale.id"), index=True)
     created_at: Mapped[datetime] = _now()

@@ -7,7 +7,9 @@
  * The steps build on each other and run in order.
  */
 import { expect, test, type Page } from "@playwright/test";
-import { API, Errors, MOB, WEB, emailCode, openPage, ops, overflow, phone, rpc, sleep } from "./helpers";
+import { API, Errors, MOB, SERVICES, WEB, emailCode, openPage, ops, overflow, phone, rpc, sleep } from "./helpers";
+
+const PNG_1X1 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
 
 test.describe.configure({ mode: "serial" });
 
@@ -130,12 +132,35 @@ test("a sale confirmed against the bank settles the participants, the collector 
   await desk.getByRole("button", { name: "Guardar" }).first().click();
   await sleep(800);
   await desk.getByRole("tab", { name: "Ventas" }).click();
-  await desk.getByRole("combobox", { name: "Centro de acopio registrado" }).click();
-  await desk.getByRole("option", { name: "Centro de acopio La 80" }).click();
+  // The center's ticket, read from a photo (ADR 0038). The model is a stand-in that answers what the
+  // test sets, so the test can check what the API sent it and what the console did with the answer.
+  const sealed = await (await fetch(`${API}/v1/operator/bags?status=sealed`, { headers: ops() })).json();
+  const bag = sealed[0];
+  const kg = bag.grams / 1000;
+  await fetch(`${SERVICES}/control/ticket-reading`, {
+    method: "POST",
+    body: JSON.stringify({
+      readable: true,
+      center_name: "Centro de acopio La 80",
+      ticket_ref: "T-0001",
+      date: new Date().toLocaleDateString("en-CA"),
+      lines: [{ material: "pet", label: "PET botella", kg, cop_per_kg: Math.round(20_000 / kg), amount_cop: 20_000 }],
+      total_cop: 20_000,
+      notes: "",
+    }),
+  });
+  await desk.getByLabel("Foto del tiquete").setInputFiles({ name: "tiquete.png", mimeType: "image/png", buffer: Buffer.from(PNG_1X1, "base64") });
+  await desk.getByRole("button", { name: "Leer tiquete" }).click();
+  await expect(desk.getByRole("cell", { name: bag.code, exact: true })).toBeVisible();
+  expect(await (await fetch(`${SERVICES}/control/last-message`)).json()).toMatchObject({
+    model: "claude-opus-5-5",
+    fallbacks: "default",
+    format: "json_schema",
+  });
+  await desk.getByRole("button", { name: "Usar en la venta" }).click();
   await expect(desk.locator("#sale-buyer")).toHaveValue("Centro de acopio La 80");
-  await desk.getByLabel("Número del tiquete").fill("T-0001");
-  await desk.getByRole("checkbox").first().click();
-  await desk.getByLabel("Pago por la bolsa").first().fill("20000");
+  await expect(desk.getByLabel("Número del tiquete")).toHaveValue("T-0001");
+  await expect(desk.getByLabel("Pago por la bolsa").first()).toHaveValue("20000");
   await desk.getByRole("button", { name: "Registrar venta" }).click();
   await expect(desk.getByText("Por confirmar").first()).toBeVisible();
   await desk.getByLabel("Referencia del banco").first().fill("BANCO-0001");

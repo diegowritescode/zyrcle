@@ -2,7 +2,7 @@
 # The whole Zyrcle system on one machine, from this checkout, for the end-to-end tests (ADR 0031).
 #
 #   anvil (ZyrcleChain stand-in) 8546 · simulator control 8091 · API 8010
-#   web 4180 · mobile web 8092 · Pinata and IPFS gateway stand-in 8093   (apps.sh starts the two apps)
+#   web 4180 · mobile web 8092 · Pinata, IPFS gateway and Anthropic stand-ins 8093 (apps.sh: the apps)
 #
 # Needs Postgres at E2E_PG, Mosquitto on localhost:1883 with the development passwords
 # (apps/api/dev/mosquitto), anvil (Foundry), node, and a Python with the API installed (E2E_PY, the
@@ -31,8 +31,8 @@ wait_for() { # url, what
 
 (exec anvil --port 8546 --chain-id 20261121 --silent) > anvil.log 2>&1 &
 echo $! > anvil.pid
-(exec node "$STACK/fake-pinata.mjs" 8093) > pinata.log 2>&1 &
-echo $! > pinata.pid
+(exec node "$STACK/fake-services.mjs" 8093) > services.log 2>&1 &
+echo $! > services.pid
 
 "$PY/python" - "$PG" "$DB" <<'PY'
 import asyncio, sys
@@ -70,6 +70,8 @@ ZYRCLE_IDLE_TIMEOUT_S=300
 ZYRCLE_PINATA_API_URL=http://127.0.0.1:8093
 ZYRCLE_PINATA_JWT=e2e-pinata-jwt
 ZYRCLE_IPFS_GATEWAY=http://127.0.0.1:8093/ipfs/
+ZYRCLE_ANTHROPIC_API_KEY=e2e-anthropic-key
+ZYRCLE_ANTHROPIC_BASE_URL=http://127.0.0.1:8093
 ENV
 cat chain.env >> api.env
 set -a

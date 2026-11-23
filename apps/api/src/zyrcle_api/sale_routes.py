@@ -15,7 +15,16 @@ from .auth import utcnow
 from .collection import parse_bag
 from .deps import Operator
 from .errors import Invalid
-from .models import Bag, CollectionCenter, Host, Incident, Sale, SaleLine, Settlement
+from .models import (
+    Bag,
+    CollectionCenter,
+    Host,
+    Incident,
+    Sale,
+    SaleLine,
+    Settlement,
+    TicketScan,
+)
 from .setup_routes import host_view
 
 router = APIRouter(prefix="/v1/operator", tags=["sales"])
@@ -39,6 +48,8 @@ class SaleIn(BaseModel):
     buyer: str = Field(min_length=1, max_length=200)
     # The center on record that bought, when it is one (docs/adr/0037).
     center_id: uuid.UUID | None = None
+    # The photo of the ticket the operator read with AI, when there is one (docs/adr/0038).
+    ticket_scan_id: uuid.UUID | None = None
     ticket_ref: str = Field(min_length=1, max_length=100)
     sold_on: date
     lines: list[LineIn] = Field(min_length=1, max_length=100)
@@ -173,6 +184,13 @@ async def record_sale(body: SaleIn, operator: Operator, request: Request) -> dic
         )
         db.add(sale)
         await db.flush()
+        if body.ticket_scan_id is not None:
+            scan = await db.get(TicketScan, body.ticket_scan_id, with_for_update=True)
+            if scan is None or scan.sale_id is not None:
+                raise HTTPException(
+                    409, {"code": "conflict", "detail": "unknown ticket scan, or already a sale"}
+                )
+            scan.sale_id = sale.id
         for code, line in zip(codes, body.lines, strict=True):
             bag = bags[code]
             bag.status = "sold"
