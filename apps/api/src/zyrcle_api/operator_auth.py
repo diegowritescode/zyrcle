@@ -20,10 +20,10 @@ from sqlalchemy import func, select, update
 
 from .auth import utcnow
 from .config import Settings
+from .email_codes import mask_email, normalize_email
 from .mail import CODE_TTL, enqueue_email, render_html
 from .models import Operator as OperatorRow
 from .models import OperatorCode
-from .recovery import mask_email, normalize_email
 
 router = APIRouter(prefix="/v1/operator", tags=["operators"])
 

@@ -8,9 +8,9 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 
-from .api import Operator, Resident
 from .auth import utcnow
 from .collection import CollectionService, bag_view, new_bag_code
+from .deps import Operator, Resident
 from .errors import SessionError
 from .models import Bag, Collection, Collector, Container, Incident, SaleLine
 from .models import Resident as ResidentRow

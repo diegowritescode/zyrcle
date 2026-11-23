@@ -31,10 +31,11 @@ from .payments import PaymentService, RelayWorker
 from .payouts import PayoutWorker
 from .public import router as public_router
 from .ratelimit import RateLimitMiddleware
-from .recovery import RecoveryWorker
+from .recovery_worker import RecoveryWorker
 from .sale_routes import router as sale_router
 from .sessions import SessionService
 from .settlement import SettlementWorker
+from .setup_routes import router as setup_router
 
 log = logging.getLogger(__name__)
 
@@ -218,6 +219,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(router)
     app.include_router(public_router)
     app.include_router(booking_router)
+    app.include_router(setup_router)
     app.include_router(account_router)
     app.include_router(collection_router)
     app.include_router(sale_router)

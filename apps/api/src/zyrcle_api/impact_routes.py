@@ -6,7 +6,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from .api import Operator
+from .deps import Operator
 from .errors import SessionError
 from .impact import ImpactService
 

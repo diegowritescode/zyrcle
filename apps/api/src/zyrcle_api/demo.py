@@ -16,9 +16,9 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from zyrcle_protocol import qr_payload
 
-from .api import Resident, Service
 from .auth import utcnow
 from .collection import bag_view
+from .deps import Resident, Service
 from .domain.session_machine import State
 from .errors import SessionError
 from .models import Bag, Collection, Container, Device

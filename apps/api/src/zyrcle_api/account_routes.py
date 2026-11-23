@@ -8,10 +8,10 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from . import recovery
-from .api import Resident
+from . import email_codes, recovery
 from .auth import utcnow
 from .config import Settings
+from .deps import Resident
 from .errors import RecoveryUnavailable, SessionError
 
 router = APIRouter(prefix="/v1", tags=["account"])
@@ -60,7 +60,7 @@ async def send_email_code(body: EmailIn, resident: Resident, request: Request) -
     _need(_settings(request).email_enabled, "email")
     async with request.app.state.maker() as db:
         try:
-            return await recovery.request_email_code(
+            return await email_codes.request_email_code(
                 db, _settings(request), resident, body.email, utcnow()
             )
         except SessionError as e:
@@ -72,7 +72,7 @@ async def verify_email(body: CodeIn, resident: Resident, request: Request) -> di
     _need(_settings(request).email_enabled, "email")
     async with request.app.state.maker() as db:
         try:
-            return await recovery.verify_email(
+            return await email_codes.verify_email(
                 db, _settings(request), resident, body.email, body.code, utcnow()
             )
         except SessionError as e:

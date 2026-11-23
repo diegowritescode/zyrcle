@@ -14,7 +14,13 @@ Design: [docs/architecture.md](../../docs/architecture.md), protocol:
 | `sessions.py` | Orchestration: row locks, transitions, audit events, commands after commit, timeouts, access-code rotation |
 | `mqtt.py` | Broker connection with reconnect and shared subscription |
 | `auth.py` | Sign-In with Ethereum (EIP-4361) and JWTs |
-| `api.py` | REST + WebSocket routes for residents and operators |
+| `api.py` | Participant routes: sign-in, sessions and their WebSocket, `/v1/me` |
+| `deps.py` | What every route depends on: settings, the session service, the calling resident or operator |
+| `setup_routes.py` | Operator routes that set the system up: hosts, sites, schedules, devices, containers, prices, the review queue |
+| `email_codes.py`, `recovery.py`, `recovery_worker.py`, `account_routes.py` | Recovery email and lost-phone recovery ([ADR 0010](../../docs/adr/0010-smart-accounts-and-recovery.md)): emailed codes, starting and cancelling a recovery, and the worker that carries it through the chain |
+| `ipfs.py` | The certificate's public copy pinned on IPFS through Pinata ([ADR 0027](../../docs/adr/0027-impact-certificates.md), amendment) |
+| `ratelimit.py` | Rate limits per class of route and caller ([ADR 0035](../../docs/adr/0035-rate-limits.md)) |
+| `observability.py` | Error reports to Sentry, scrubbed of personal data ([ADR 0033](../../docs/adr/0033-error-reports-and-uptime.md)) |
 | `public.py` | Public read-only views: platform totals, a scanned container, host and site dashboards. Aggregates only, no access codes |
 | `collection.py`, `collection_routes.py` | Collections ([ADR 0012](../../docs/adr/0012-collection-and-bags.md)): a collector empties a container into bags weighed by its own scale, deposits traced to the collection, mass balances and incidents |
 | `sale_routes.py`, `settlement.py`, `domain/settlement.py` | Sales ([ADR 0013](../../docs/adr/0013-sale-and-settlement.md)): the buyer's ticket per bag, the bank match, and the worker that settles each bag on chain (record, residents pro rata minus advance, collector, hosts) |
@@ -23,7 +29,7 @@ Design: [docs/architecture.md](../../docs/architecture.md), protocol:
 | `health.py` | Health report for the console and admin email alerts ([ADR 0028](../../docs/adr/0028-pilot-readiness.md)): outboxes, devices, broker, chain head, Treasury, gas of the hot keys |
 | `operator_auth.py` | Operator accounts ([ADR 0014](../../docs/adr/0014-operator-accounts.md)): sign-in by email code, operator sessions, admins manage operators; every operator route records who acted |
 | `demo.py` | Demo-only routes (mounted when a simulator is configured): containers with their live QR, "drop this item", "take this out", bags standing in for printed labels |
-| `models.py`, `migrations/` | Schema; one active session per container enforced by a partial unique index |
+| `models/`, `migrations/` | Schema, one module per area (places, participants, deposits, money, messaging, collection, sales, operators, impact, payments); one active session per container enforced by a partial unique index |
 | `pricing.py`, `payouts.py`, `chain.py` | Advance sizing, the payout outbox worker, and the Treasury client (web3.py) |
 
 ## Guarantees and how they are enforced

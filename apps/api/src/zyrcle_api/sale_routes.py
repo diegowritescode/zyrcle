@@ -11,11 +11,12 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import any_, select, update
 
-from .api import Operator, host_view
 from .auth import utcnow
 from .collection import parse_bag
+from .deps import Operator
 from .errors import Invalid
 from .models import Bag, Host, Incident, Sale, SaleLine, Settlement
+from .setup_routes import host_view
 
 router = APIRouter(prefix="/v1/operator", tags=["sales"])
 

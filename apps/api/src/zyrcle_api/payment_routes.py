@@ -7,8 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import or_, select
 
-from .api import Operator, Resident
 from .chain import load_account_file
+from .deps import Operator, Resident
 from .errors import SessionError
 from .models import Host, Merchant, RedemptionRequest
 from .models import Resident as ResidentRow

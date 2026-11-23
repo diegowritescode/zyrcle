@@ -95,11 +95,13 @@ M17 Keys: own guardian key, admin powers behind a multisig
 - **Done when:** a burst against any route is cut off without affecting other users.
 
 ### M13. Cleanup and refactor
-- **What:** split the largest modules by responsibility, with M8's tests around every move:
-  `models.py` into a package per domain, account recovery into service, worker and routes, and the
-  same for sessions and collection. No behavior changes. The deprecated `residence` routes and
-  fields wait for M23, once the new Android build is in use.
-- **Done when:** no module is over about 400 lines and every test still passes.
+- **What:** split the modules that mixed responsibilities, with M8's tests around every move:
+  `models.py` into a package per area, account recovery into emailed codes, recovery and its
+  worker, and `api.py` into participant routes, shared dependencies and the operator's setup
+  routes. No behavior changes. Modules that are one cohesive class (the chain client, the session
+  service, the collection service) stay whole ([ADR 0036](adr/0036-module-boundaries.md)). The
+  deprecated `residence` routes and fields wait for M23, once the new Android build is in use.
+- **Done when:** every test still passes and the schema is unchanged (`alembic check`).
 
 ### M14. Prices per collection center
 - **What:** collection centers become records (name, tax id, address, contact). Each has its

@@ -516,7 +516,7 @@ about 88.95 (read from the public RPC). No script funds them; see section 10.
 | Secret | What it is for | If it leaks |
 |---|---|---|
 | `POSTGRES_PASSWORD` | The database user's password. Postgres is reachable only on `internal`. | Read and write every table, for someone who can reach the database. |
-| `JWT_SECRET` | Signs resident and operator sessions; keys the HMAC of email codes ([operator_auth.py](../apps/api/src/zyrcle_api/operator_auth.py), [recovery.py](../apps/api/src/zyrcle_api/recovery.py)). | The holder can forge a session for any resident or operator, admins included. |
+| `JWT_SECRET` | Signs resident and operator sessions; keys the HMAC of email codes ([operator_auth.py](../apps/api/src/zyrcle_api/operator_auth.py), [email_codes.py](../apps/api/src/zyrcle_api/email_codes.py)). | The holder can forge a session for any resident or operator, admins included. |
 | `OPERATOR_TOKEN` | Shared machine token; acts as admin `token` ([ADR 0014](adr/0014-operator-accounts.md)). | Every operator action: add admins, approve deposits, record and confirm sales. A confirmed sale makes the backend record it on chain with the operator key. ADR 0014 says to rotate it once operators have their own accounts. |
 | `MQTT_API_PASSWORD` | The API's broker account. | Read every device's uplink and send commands (`display`, `unlock`, `lock`) to any container. Commands are not signed ([device-protocol.md](device-protocol.md)). The broker is not published outside the VPS. |
 | `MQTT_CTR_0001_PASSWORD` … `0004` | Each simulated container's broker account. | Publish on that container's topics. Messages still need the device's signature, so the password alone cannot forge readings. |

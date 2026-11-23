@@ -4,7 +4,7 @@ This document describes Zyrcle's PostgreSQL database. It covers every table, the
 each one, the rules the schema enforces, and how to change the schema. It is written for engineers
 who are new to the codebase.
 
-The code is the source of truth: [`models.py`][models] and the migrations in
+The code is the source of truth: [`models/`][models] and the migrations in
 [`migrations/versions/`][versions]. If this document and the code disagree, the code wins, and this
 document needs a fix. This document describes the schema at migration `0008`.
 
@@ -48,7 +48,7 @@ document needs a fix. This document describes the schema at migration `0008`.
   `ZYRCLE_TEST_DATABASE_URL`. Its default is the same local database that development uses, so
   running the tests wipes your local data.
 - CI applies all migrations to an empty database and then runs `alembic check` ([CI][ci]).
-  `alembic check` fails when `models.py` and the migrated schema differ in what it compares. It
+  `alembic check` fails when `models/` and the migrated schema differ in what it compares. It
   compares tables, columns, column types ([`env.py`][env] sets `compare_type=True`), nullability,
   indexes, unique constraints and foreign keys. It does not compare CHECK constraints or server
   defaults. [Section 9](#9-discrepancies-found) lists a gap this caused.
@@ -107,7 +107,7 @@ document needs a fix. This document describes the schema at migration `0008`.
   `updated_at` current: the code sets it on every change.
 - **Addresses** are `varchar(42)`, lowercase `0x` hex. **Transaction hashes and sha256 digests** are
   `varchar(66)`, `0x` plus 64 hex characters. **HMACs** are `varchar(64)` hex.
-- **Names written in `models.py`:**
+- **Names written in `models/`:**
   - `<table>_<column>_valid`: CHECK on allowed values.
   - `<table>_<column>_positive`, `bag_grams_not_negative`: CHECK on amounts.
   - `one_<thing>_per_<scope>`: unique index, usually partial.
@@ -391,7 +391,7 @@ sites ([ADR 0011][adr-0011], [ADR 0013][adr-0013]).
 
 - `host_kind_valid`: CHECK on `kind`.
 
-**Written by:** `create_host` in [`api.py`][api] (`POST /v1/operator/hosts`); `update_host` in
+**Written by:** `create_host` in [`setup_routes.py`][setup-routes] (`POST /v1/operator/hosts`); `update_host` in
 [`sale_routes.py`][sale-routes] (`PATCH /v1/operator/hosts/{id}`), which also makes waiting sale
 lines retry at once when it sets an address; [`demo_seed.py`][demo-seed]; migration `0005`, which created one
 `residential` host per existing residence, with the same id.
@@ -419,7 +419,7 @@ building, a residential complex. It was the `residence` table until migration `0
 - `site_slot_capacity_positive`: `slot_capacity > 0`. A capacity of 0 would make every hour full.
 - `ix_site_host_id`.
 
-**Written by:** `create_site` and `set_schedule` in [`api.py`][api]; [`demo_seed.py`][demo-seed].
+**Written by:** `create_site` and `set_schedule` in [`setup_routes.py`][setup-routes]; [`demo_seed.py`][demo-seed].
 **Read by:** [`bookings.py`][bookings] (hours and capacity), [`settlement.py`][settlement] (which
 host a bag's material came from), [`public.py`][public].
 
@@ -441,7 +441,7 @@ rotating access code it shows as a QR ([ADR 0005][adr-0005], [device protocol][d
 | `previous_code_expires_at` | timestamptz | yes | End of validity of `previous_code`. |
 | `created_at` | timestamptz | no | |
 
-**Written by:** `register_device` in [`api.py`][api]; `handle_device_message` in
+**Written by:** `register_device` in [`setup_routes.py`][setup-routes]; `handle_device_message` in
 [`sessions.py`][sessions] (`last_seq`, `last_seen_at`, `firmware`), under a row lock, so messages
 from one device are applied one at a time; `rotate_codes` in [`sessions.py`][sessions], every few
 seconds, with `SKIP LOCKED`; [`demo_seed.py`][demo-seed].
@@ -473,7 +473,7 @@ A physical bin on a site, driven by one device.
 deposit, starting a collection, and booking or claiming a turn. Each one locks the row with
 `SELECT … FOR UPDATE` before it checks anything.
 
-**Written by:** `create_container` in [`api.py`][api]; [`demo_seed.py`][demo-seed].
+**Written by:** `create_container` in [`setup_routes.py`][setup-routes]; [`demo_seed.py`][demo-seed].
 **Read by:** nearly every module.
 
 #### `device_message`
@@ -540,7 +540,7 @@ Two terms used below:
   'closing', 'depositing', 'open')`. A container serves one session at a time. Two participants
   who scan at the same moment can both pass the checks in `SessionService.start`. The second
   `INSERT` then fails with a unique violation, and the API answers 409 ("container is busy").
-  `models.py` builds the predicate from `ACTIVE` in [`domain/session_machine.py`][machine];
+  `models/` builds the predicate from `ACTIVE` in [`domain/session_machine.py`][machine];
   migration `0001` has the same list written out. Changing `ACTIVE` needs a migration.
 - `deposit_session_state_idx` on `state`: the sweeper and the review queue select by state.
 - `ix_deposit_session_collection_id`: settlement finds the deposits of a collection.
@@ -600,7 +600,7 @@ that participant at that container in that hour.
   refuses when the count reaches `site.slot_capacity`.
 
 **Written by:** [`bookings.py`][bookings] (`book`, `cancel`, and `claim_spot`, which
-`SessionService.start` calls); `_complete` in [`recovery.py`][recovery].
+`SessionService.start` calls); `_complete` in [`recovery_worker.py`][recovery-worker].
 **Read by:** [`bookings.py`][bookings]; `has_activity` in [`recovery.py`][recovery].
 
 #### `material_price`
@@ -620,9 +620,9 @@ Reference price per material, used to size advances.
   max_advance_cop)`, rounded down ([`pricing.py`][pricing]). The defaults are 5,000 bps (50 %) and
   5,000 COP. A material without a row earns no advance, and the session logs `no_advance`.
 
-**Written by:** `set_price` in [`api.py`][api] (`PUT /v1/operator/prices/{material}`);
+**Written by:** `set_price` in [`setup_routes.py`][setup-routes] (`PUT /v1/operator/prices/{material}`);
 [`demo_seed.py`][demo-seed].
-**Read by:** `_queue_advance` in [`sessions.py`][sessions]; `list_prices` in [`api.py`][api].
+**Read by:** `_queue_advance` in [`sessions.py`][sessions]; `list_prices` in [`setup_routes.py`][setup-routes].
 
 #### `payout`
 
@@ -992,8 +992,8 @@ participant, collectors included. A participant is their account, not their phon
 - `resident_email_key` (unique): an email identifies exactly one account for recovery.
 
 **Written by:** `verify_siwe` in [`auth.py`][auth] (creates a resident on a key's first sign-in;
-gives older residents their account address); `verify_email` and `ensure_account` in
-[`recovery.py`][recovery]; `_complete` in [`recovery.py`][recovery] (sets the new
+gives older residents their account address); `verify_email` in [`email_codes.py`][email-codes]
+and `ensure_account` in [`recovery.py`][recovery]; `_complete` in [`recovery_worker.py`][recovery-worker] (sets the new
 `owner_address` and deletes the new phone's own resident).
 **Read by:** almost everything. `resident_dep` in [`api.py`][api] checks `owner_address` against
 the token on every request, so a recovery ends the old phone's session at once.
@@ -1041,7 +1041,7 @@ Without the key, a leaked digest cannot be checked against the million possible 
 - A code row is created even for an address with no account. No email is sent then, but the answer
   and the rate limits are the same, so nobody can probe which addresses have accounts.
 
-**Written by:** `issue_code` and `check_code` in [`recovery.py`][recovery]. Wrong guesses are
+**Written by:** `issue_code` and `check_code` in [`email_codes.py`][email-codes]. Wrong guesses are
 committed even though the request then fails.
 
 #### `account_recovery`
@@ -1105,7 +1105,7 @@ An Expo push token: one per installed app ([ADR 0008][adr-0008]).
 
 **Written by:** `register_push_token` in [`api.py`][api] (`PUT /v1/me/push-token`);
 `NotificationWorker` in [`notifications.py`][notifications] (`disabled_at`);
-`_complete` in [`recovery.py`][recovery].
+`_complete` in [`recovery_worker.py`][recovery-worker].
 
 #### `notification`
 
@@ -1138,7 +1138,7 @@ The outbox for push notifications. It is written in the transaction that caused 
 
 **Written by:** `enqueue` in [`notifications.py`][notifications], called from
 [`sessions.py`][sessions], [`payouts.py`][payouts], [`settlement.py`][settlement] and
-[`recovery.py`][recovery]; `NotificationWorker`; `_complete` in [`recovery.py`][recovery] (deletes
+[`recovery.py`][recovery]; `NotificationWorker`; `_complete` in [`recovery_worker.py`][recovery-worker] (deletes
 the new phone's rows).
 
 #### `email_message`
@@ -1579,7 +1579,7 @@ Downgrades drop the tables and columns their upgrade added, so the data in them 
    .venv/bin/alembic upgrade head
    ```
 
-2. **Change `models.py`.** Give every CHECK constraint and every index an explicit `name=`, using
+2. **Change `models/`.** Give every CHECK constraint and every index an explicit `name=`, using
    the conventions in [section 1](#naming-conventions). An unnamed `CheckConstraint` written inline
    on a column is invisible to autogenerate; that is how three CHECKs were lost
    ([section 9](#9-discrepancies-found-while-writing-this-and-what-happened-to-them)).
@@ -1594,13 +1594,13 @@ Downgrades drop the tables and columns their upgrade added, so the data in them 
 
 4. **Review it by hand.** Autogenerate is a draft.
    - It does not detect CHECK constraints. Add `op.create_check_constraint(...)` and
-     `op.drop_constraint(..., type_="check")` yourself, with the same names as `models.py`.
+     `op.drop_constraint(..., type_="check")` yourself, with the same names as `models/`.
    - It does not detect renames. A renamed table or column shows up as a drop plus an add, which
      loses data. Replace it with `op.rename_table` or `op.alter_column(..., new_column_name=...)`,
      and rename the primary key, foreign keys and checks too, as [`0005`][m0005] does.
    - It does not compare server defaults (`compare_server_default` is not set in
      [`env.py`][env]).
-   - Check every partial index's `WHERE` clause against `models.py`.
+   - Check every partial index's `WHERE` clause against `models/`.
    - A new NOT NULL column on a table with rows: add it nullable, backfill with `op.execute`, then
      set NOT NULL, as [`0004`][m0004] and [`0005`][m0005] do.
    - Changing a value list (for example `PAYOUT_STATUSES`) means dropping and recreating the named
@@ -1670,7 +1670,7 @@ Found on 2026-11-22 by comparing the code with its comments, docstrings and ADRs
 
 | # | Discrepancy | Resolution |
 |---|---|---|
-| 1 | The CHECKs `container.area_mm2 > 0`, `container.depth_mm > 0` and `material_price.cop_per_kg >= 0` were declared in `models.py` but no migration created them (`alembic check` does not compare CHECKs) | Fixed: migration `0009` creates them with explicit names, and `models.py` names them |
+| 1 | The CHECKs `container.area_mm2 > 0`, `container.depth_mm > 0` and `material_price.cop_per_kg >= 0` were declared in `models/` but no migration created them (`alembic check` does not compare CHECKs) | Fixed: migration `0009` creates them with explicit names, and `models/` names them |
 | 2 | `account_recovery.cancelled_by` comment omitted `replaced` | Fixed: comment updated |
 | 3 | `SaleLine` docstring did not show every transition | Fixed: docstring matches section 4.4 |
 | 4 | `CollectionFill` docstring did not mention the 10 g noise floor | Fixed: docstring updated |
@@ -1680,7 +1680,7 @@ Found on 2026-11-22 by comparing the code with its comments, docstrings and ADRs
 | 8 | ADR 0012 said only credited deposits are linked to a collection; the code also links `review` and `rejected` ones | The code is right (their material is inside); ADR 0012 amended |
 | 9 | Completing a recovery deleted the new phone's resident even if an operator had made it a collector, so the recovery could never finish | Fixed: the collector role moves to the account before the delete |
 
-[models]: ../apps/api/src/zyrcle_api/models.py
+[models]: ../apps/api/src/zyrcle_api/models/
 [versions]: ../apps/api/migrations/versions/
 [env]: ../apps/api/migrations/env.py
 [db]: ../apps/api/src/zyrcle_api/db.py
@@ -1702,6 +1702,9 @@ Found on 2026-11-22 by comparing the code with its comments, docstrings and ADRs
 [notifications]: ../apps/api/src/zyrcle_api/notifications.py
 [mail]: ../apps/api/src/zyrcle_api/mail.py
 [recovery]: ../apps/api/src/zyrcle_api/recovery.py
+[recovery-worker]: ../apps/api/src/zyrcle_api/recovery_worker.py
+[setup-routes]: ../apps/api/src/zyrcle_api/setup_routes.py
+[email-codes]: ../apps/api/src/zyrcle_api/email_codes.py
 [public]: ../apps/api/src/zyrcle_api/public.py
 [chain]: ../apps/api/src/zyrcle_api/chain.py
 [demo]: ../apps/api/src/zyrcle_api/demo.py

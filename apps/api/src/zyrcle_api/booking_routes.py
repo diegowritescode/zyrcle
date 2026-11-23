@@ -9,8 +9,8 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import AwareDatetime, BaseModel, Field
 
 from . import bookings
-from .api import Resident
 from .auth import utcnow
+from .deps import Resident
 from .errors import SessionError
 from .models import Container, Site
 

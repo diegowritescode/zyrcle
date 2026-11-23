@@ -61,6 +61,7 @@ code format. If a number in the code changes how money, weight or trust is handl
 | [0033](0033-error-reports-and-uptime.md) | Error reports to Sentry without personal data; uptime check from outside | proposed 2026-11-23 | Claude (block 3, M10); not yet confirmed |
 | [0034](0034-encrypted-off-site-backups.md) | Encrypted copies off the VPS: database, validator identity, keys | proposed 2026-11-23 | Claude (block 3, M11); not yet confirmed; needs Diego's bucket and age key |
 | [0035](0035-rate-limits.md) | Rate limits on the whole API, per account, per address only for codes and sign-in | proposed 2026-11-23 | Claude (block 3, M12); not yet confirmed |
+| [0036](0036-module-boundaries.md) | Split modules by responsibility, not by line count | proposed 2026-11-23 | Claude (block 3, M13); not yet confirmed |
 
 Records 0016 to 0024 describe decisions taken before this log existed. They were written on
 2026-11-22 from the code, the commit history and the conversations, and keep the date each decision

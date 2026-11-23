@@ -14,60 +14,41 @@ the account back on a new phone:
    its session.
 """
 
-import hashlib
-import hmac
 import logging
-import re
-import secrets
 import uuid
-from collections.abc import Callable
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import delete, exists, func, or_, select, update
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy import exists, func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from .chain import Chain, TxFailed, account_address
+from .chain import account_address
 from .config import Settings
+from .email_codes import DAY, _sent, check_code, issue_code, normalize_email
 from .errors import (
     CodeInvalid,
     Conflict,
-    EmailTaken,
-    InvalidEmail,
     NotFound,
     PhoneInUse,
     RecoveryInProgress,
-    TooManyCodes,
-    TooSoon,
 )
-from .mail import CODE_TTL, enqueue_email, render_html
+from .mail import enqueue_email, render_html
 from .models import (
     RECOVERY_LIVE,
     AccountRecovery,
     Booking,
-    Collector,
     DepositSession,
-    EmailCode,
-    Notification,
-    PushToken,
     Resident,
 )
 from .notifications import enqueue
 
 log = logging.getLogger(__name__)
 
-RESEND_AFTER = timedelta(seconds=60)
-CODES_PER_DAY = 5  # per email address and purpose
-CODES_PER_REQUESTER = 10  # per resident and day, whatever the addresses
-MAX_CODE_ATTEMPTS = 5
 # ZyrcleAccount.RECOVERY_DELAY. Only an estimate here: the chain's readyAt is what counts.
 RECOVERY_DELAY = timedelta(hours=48)
 LEASE = timedelta(minutes=2)  # how long a claimed recovery is left alone by other workers
-DAY = timedelta(days=1)
 
-_EMAIL = re.compile(r"^[a-z0-9._%+-]+@[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$")
 _WEEKDAYS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
 _MONTHS = [
     "enero",
@@ -85,22 +66,6 @@ _MONTHS = [
 ]
 
 
-# ---------------------------------------------------------------- helpers
-
-
-def normalize_email(raw: str) -> str:
-    email = raw.strip().lower()
-    if len(email) > 254 or not _EMAIL.match(email):
-        raise InvalidEmail("that does not look like an email address")
-    return email
-
-
-def mask_email(email: str) -> str:
-    """d•••@gmail.com: enough for the resident to recognise it, not enough to harvest it."""
-    local, _, domain = email.partition("@")
-    return f"{local[0]}•••@{domain}"
-
-
 def when_label(at: datetime, tz: ZoneInfo) -> str:
     """'sábado 28 de noviembre, 3:15 p. m.' (built by hand: Intl differs between runtimes)."""
     t = at.astimezone(tz)
@@ -110,199 +75,11 @@ def when_label(at: datetime, tz: ZoneInfo) -> str:
     return f"{day}, {hour}:{t.minute:02d} {suffix}"
 
 
-def _hash(settings: Settings, purpose: str, email: str, requester: uuid.UUID, code: str) -> str:
-    message = f"{purpose}|{email}|{requester}|{code}".encode()
-    return hmac.new(settings.jwt_secret.encode(), message, hashlib.sha256).hexdigest()
-
-
 def ensure_account(resident: Resident, settings: Settings) -> None:
     """Give a resident from before smart accounts (address == owner) their account address."""
     factory = settings.account_factory_address
     if settings.accounts_enabled and factory and resident.address == resident.owner_address:
         resident.address = account_address(factory, resident.owner_address)
-
-
-# ---------------------------------------------------------------- one-time codes
-
-
-def _code_email(purpose: str, code: str) -> tuple[str, str, str]:
-    minutes = int(CODE_TTL.total_seconds() // 60)
-    if purpose == "verify":
-        subject = f"{code} es tu código de Zyrcle"
-        title = "Confirma tu correo"
-        lines = [
-            "Escribe este código en la app de Zyrcle para confirmar tu correo:",
-            f"Vence en {minutes} minutos. Si no fuiste tú, ignora este correo.",
-        ]
-    else:
-        subject = f"{code} es tu código para recuperar tu cuenta de Zyrcle"
-        title = "Recupera tu cuenta"
-        lines = [
-            "Pidieron recuperar tu cuenta de Zyrcle en un teléfono nuevo. Si fuiste tú, escribe "
-            "este código en la app:",
-            f"Vence en {minutes} minutos. Si no fuiste tú, no se lo des a nadie: con él, otra "
-            "persona podría quedarse con tu cuenta.",
-        ]
-    text = f"{lines[0]}\n\n{code}\n\n{lines[1]}\n"
-    return subject, text, render_html(title, lines, code)
-
-
-async def issue_code(
-    db: AsyncSession,
-    settings: Settings,
-    *,
-    purpose: str,
-    email: str,
-    requester: uuid.UUID,
-    now: datetime,
-    deliver: bool,
-) -> None:
-    """Create a code and, if `deliver`, email it. The limits apply either way, so a request for an
-    address that has no account looks and behaves exactly like one that has."""
-    recent = list(
-        await db.scalars(
-            select(EmailCode.created_at)
-            .where(
-                EmailCode.email == email,
-                EmailCode.purpose == purpose,
-                EmailCode.created_at > now - DAY,
-            )
-            .order_by(EmailCode.created_at.desc())
-        )
-    )
-    if recent and recent[0] > now - RESEND_AFTER:
-        wait = int((recent[0] + RESEND_AFTER - now).total_seconds()) + 1
-        raise TooSoon(f"wait {wait} seconds before asking for another code")
-    by_requester = await db.scalar(
-        select(func.count())
-        .select_from(EmailCode)
-        .where(EmailCode.resident_id == requester, EmailCode.created_at > now - DAY)
-    )
-    if len(recent) >= CODES_PER_DAY or (by_requester or 0) >= CODES_PER_REQUESTER:
-        raise TooManyCodes("too many codes today, try again tomorrow")
-
-    # A new code replaces the previous ones.
-    await db.execute(
-        update(EmailCode)
-        .where(
-            EmailCode.email == email,
-            EmailCode.purpose == purpose,
-            EmailCode.resident_id == requester,
-            EmailCode.used_at.is_(None),
-        )
-        .values(used_at=now)
-    )
-    code = f"{secrets.randbelow(10**6):06d}"
-    row = EmailCode(
-        id=uuid.uuid4(),
-        purpose=purpose,
-        email=email,
-        resident_id=requester,
-        code_hash=_hash(settings, purpose, email, requester, code),
-        expires_at=now + CODE_TTL,
-        created_at=now,
-    )
-    db.add(row)
-    if deliver:
-        subject, text, html_body = _code_email(purpose, code)
-        await enqueue_email(
-            db,
-            to=email,
-            kind=f"code_{purpose}",
-            dedupe_key=f"code:{row.id}",
-            subject=subject,
-            text=text,
-            html_body=html_body,
-            now=now,
-        )
-
-
-async def check_code(
-    db: AsyncSession,
-    settings: Settings,
-    *,
-    purpose: str,
-    email: str,
-    requester: uuid.UUID,
-    code: str,
-    now: datetime,
-) -> None:
-    """Consume the latest code, or raise CodeInvalid. Wrong guesses are committed even though the
-    caller's transaction then fails, and the fifth one burns the code."""
-    row = await db.scalar(
-        select(EmailCode)
-        .where(
-            EmailCode.email == email,
-            EmailCode.purpose == purpose,
-            EmailCode.resident_id == requester,
-            EmailCode.used_at.is_(None),
-            EmailCode.expires_at > now,
-        )
-        .order_by(EmailCode.created_at.desc())
-        .limit(1)
-        .with_for_update()
-    )
-    if row is None:
-        raise CodeInvalid("the code expired or was never requested")
-    expected = _hash(settings, purpose, email, requester, code.strip())
-    if not hmac.compare_digest(row.code_hash, expected):
-        row.attempts += 1
-        left = MAX_CODE_ATTEMPTS - row.attempts
-        if left <= 0:
-            row.used_at = now
-        await db.commit()
-        raise CodeInvalid(f"wrong code, {max(left, 0)} attempts left")
-    row.used_at = now
-
-
-# ---------------------------------------------------------------- recovery email
-
-
-async def request_email_code(
-    db: AsyncSession, settings: Settings, resident_id: uuid.UUID, raw_email: str, now: datetime
-) -> dict[str, Any]:
-    email = normalize_email(raw_email)
-    await issue_code(
-        db, settings, purpose="verify", email=email, requester=resident_id, now=now, deliver=True
-    )
-    await db.commit()
-    return _sent(email)
-
-
-async def verify_email(
-    db: AsyncSession,
-    settings: Settings,
-    resident_id: uuid.UUID,
-    raw_email: str,
-    code: str,
-    now: datetime,
-) -> dict[str, Any]:
-    email = normalize_email(raw_email)
-    await check_code(
-        db, settings, purpose="verify", email=email, requester=resident_id, code=code, now=now
-    )
-    taken = await db.scalar(
-        select(exists().where(Resident.email == email, Resident.id != resident_id))
-    )
-    if taken:
-        raise EmailTaken("another account already uses that email")
-    resident = await db.get(Resident, resident_id, with_for_update=True)
-    if resident is None:
-        raise NotFound("unknown resident")
-    resident.email, resident.email_verified_at = email, now
-    try:
-        await db.commit()
-    except IntegrityError:
-        raise EmailTaken("another account already uses that email") from None
-    return {"email": email, "email_verified_at": now.isoformat()}
-
-
-def _sent(email: str) -> dict[str, Any]:
-    return {
-        "sent_to": mask_email(email),
-        "expires_in_s": int(CODE_TTL.total_seconds()),
-        "resend_in_s": int(RESEND_AFTER.total_seconds()),
-    }
 
 
 # ---------------------------------------------------------------- recovery
@@ -555,214 +332,3 @@ async def account_view(
         "outgoing": recovery_view(outgoing, tz) if outgoing else None,
         "recovered_at": recovered.isoformat() if recovered else None,
     }
-
-
-# ---------------------------------------------------------------- worker
-
-
-class RecoveryWorker:
-    """Carries recoveries through the chain. Each step first reads the chain, so a step that ran
-    but whose outcome was not saved (a crash, a timeout) is recognised instead of repeated."""
-
-    def __init__(
-        self,
-        maker: async_sessionmaker[AsyncSession],
-        chain: Chain,
-        guardian,
-        settings: Settings,
-        clock: Callable[[], datetime] = lambda: datetime.now(UTC),
-    ):
-        self._maker = maker
-        self._chain = chain
-        self._guardian = guardian
-        self._settings = settings
-        self._tz = ZoneInfo(settings.timezone)
-        self._now = clock
-
-    async def run_once(self, batch: int = 5) -> int:
-        now = self._now()
-        async with self._maker() as db:
-            rows = list(
-                await db.scalars(
-                    select(AccountRecovery)
-                    .where(
-                        AccountRecovery.status.in_(RECOVERY_LIVE),
-                        AccountRecovery.next_attempt_at <= now,
-                    )
-                    .order_by(AccountRecovery.next_attempt_at)
-                    .limit(batch)
-                    .with_for_update(skip_locked=True)
-                )
-            )
-            claimed = [(r.id, r.status) for r in rows]
-            for r in rows:
-                r.next_attempt_at, r.attempts = now + LEASE, r.attempts + 1
-            await db.commit()
-        for rec_id, status in claimed:
-            try:
-                if status == "starting":
-                    await self._start(rec_id)
-                elif status == "waiting":
-                    await self._finish(rec_id)
-                else:
-                    await self._cancel(rec_id)
-            except TxFailed as e:
-                await self._tx_failed(rec_id, e)
-            except Exception as e:  # network trouble: try again shortly
-                log.warning("recovery %s: %s", rec_id, e)
-                await self._later(rec_id, f"{type(e).__name__}: {e}", timedelta(seconds=30))
-        return len(claimed)
-
-    async def _load(self, rec_id: uuid.UUID) -> tuple[AccountRecovery, Resident]:
-        async with self._maker() as db:
-            rec = await db.get(AccountRecovery, rec_id)
-            target = await db.get(Resident, rec.resident_id) if rec else None
-            assert rec is not None and target is not None
-            return rec, target
-
-    async def _start(self, rec_id: uuid.UUID) -> None:
-        rec, target = await self._load(rec_id)
-        account = rec.account_address
-        if not await self._chain.is_deployed(account):
-            # Never deployed, so its owner is still its first owner: the key it was predicted from.
-            factory = self._settings.account_factory_address
-            if not factory or account_address(factory, target.owner_address) != account:
-                raise TxFailed("AccountMismatch", f"{account} is not {target.owner_address}'s")
-            await self._chain.create_account(self._guardian, target.owner_address)
-        pending = await self._chain.pending_recovery(account)
-        tx = None
-        if pending.new_owner != rec.new_owner:
-            tx = await self._chain.start_recovery(self._guardian, account, rec.new_owner)
-            pending = await self._chain.pending_recovery(account)
-        ready_at = datetime.fromtimestamp(pending.ready_at, UTC)
-        async with self._maker() as db:
-            rec = await db.get(AccountRecovery, rec_id, with_for_update=True)
-            assert rec is not None
-            rec.start_tx, rec.ready_at, rec.last_error = tx or rec.start_tx, ready_at, None
-            rec.updated_at = self._now()
-            if rec.status == "starting":
-                rec.status, rec.next_attempt_at = "waiting", ready_at
-            elif rec.status == "cancelling":
-                rec.next_attempt_at = self._now()
-            await db.commit()
-        log.info("recovery %s waiting on chain until %s (%s)", rec_id, ready_at, tx)
-
-    async def _finish(self, rec_id: uuid.UUID) -> None:
-        rec, _ = await self._load(rec_id)
-        tx = None
-        if await self._chain.account_owner(rec.account_address) != rec.new_owner:
-            pending = await self._chain.pending_recovery(rec.account_address)
-            if pending.new_owner != rec.new_owner:
-                # Cancelled on chain by the owner itself (a signed message submitted by anyone).
-                await self._cancelled(rec_id, None, by="chain")
-                return
-            tx = await self._chain.finish_recovery(self._guardian, rec.account_address)
-        await self._complete(rec_id, tx)
-
-    async def _cancel(self, rec_id: uuid.UUID) -> None:
-        rec, _ = await self._load(rec_id)
-        tx = None
-        if await self._chain.is_deployed(rec.account_address):
-            pending = await self._chain.pending_recovery(rec.account_address)
-            if pending.new_owner == rec.new_owner:
-                tx = await self._chain.cancel_recovery(self._guardian, rec.account_address)
-            elif await self._chain.account_owner(rec.account_address) == rec.new_owner:
-                await self._complete(rec_id, None)  # too late: the chain already finished it
-                return
-        await self._cancelled(rec_id, tx, by=None)
-
-    async def _cancelled(self, rec_id: uuid.UUID, tx: str | None, by: str | None) -> None:
-        now = self._now()
-        async with self._maker() as db:
-            rec = await db.get(AccountRecovery, rec_id, with_for_update=True)
-            assert rec is not None
-            if rec.status not in RECOVERY_LIVE:
-                return
-            rec.status, rec.cancel_tx, rec.updated_at = "cancelled", tx, now
-            rec.cancelled_by = by or rec.cancelled_by
-            await _notify_cancelled(db, rec, now)
-            await db.commit()
-        log.info("recovery %s cancelled (%s)", rec_id, tx)
-
-    async def _complete(self, rec_id: uuid.UUID, tx: str | None) -> None:
-        """The account obeys the new key: fold the new phone's resident into it."""
-        now = self._now()
-        async with self._maker() as db:
-            rec = await db.get(AccountRecovery, rec_id, with_for_update=True)
-            assert rec is not None
-            if rec.status == "done":
-                return
-            target = await db.get(Resident, rec.resident_id, with_for_update=True)
-            assert target is not None
-            new_id = rec.new_resident_id
-            # The old phones stop getting this account's notifications...
-            await db.execute(delete(PushToken).where(PushToken.resident_id == target.id))
-            if new_id is not None:
-                # ...and the new one starts. Anything the new phone did meanwhile moves too.
-                for model in (PushToken, DepositSession, Booking):
-                    await db.execute(
-                        update(model)
-                        .where(model.resident_id == new_id)
-                        .values(resident_id=target.id)
-                    )
-                await db.execute(delete(Notification).where(Notification.resident_id == new_id))
-                # A collector role given to the new phone moves to the account (docs/adr/0012).
-                if await db.get(Collector, target.id) is None:
-                    await db.execute(
-                        update(Collector)
-                        .where(Collector.resident_id == new_id)
-                        .values(resident_id=target.id)
-                    )
-                await db.execute(delete(Collector).where(Collector.resident_id == new_id))
-                rec.new_resident_id = None
-                await db.flush()
-                await db.execute(delete(Resident).where(Resident.id == new_id))
-            target.owner_address = rec.new_owner
-            rec.status, rec.finish_tx, rec.updated_at, rec.last_error = "done", tx, now, None
-            await db.flush()
-            await enqueue(
-                db,
-                resident_id=target.id,
-                kind="recovery_done",
-                dedupe_key=f"recovery_done:{rec.id}",
-                title="Recuperaste tu cuenta",
-                body="Tu saldo, tu historial y tus turnos ya están en este teléfono.",
-                data={"url": "/", "recovery_id": str(rec.id)},
-                now=now,
-            )
-            if target.email:
-                lines = [
-                    "Tu cuenta de Zyrcle ya está en tu teléfono nuevo, con tu saldo y tu "
-                    "historial.",
-                    "El teléfono anterior ya no puede usarla.",
-                ]
-                await enqueue_email(
-                    db,
-                    to=target.email,
-                    kind="recovery_done",
-                    dedupe_key=f"recovery_done:{rec.id}",
-                    subject="Tu cuenta de Zyrcle ya está en tu teléfono nuevo",
-                    text="\n\n".join(lines) + "\n",
-                    html_body=render_html("Recuperaste tu cuenta", lines),
-                    now=now,
-                )
-            await db.commit()
-        log.info("recovery %s done (%s)", rec_id, tx)
-
-    async def _tx_failed(self, rec_id: uuid.UUID, e: TxFailed) -> None:
-        if e.error == "RecoveryNotReady":  # chain time is behind ours: try again a bit later
-            await self._later(rec_id, str(e), timedelta(minutes=1))
-            return
-        log.error("recovery %s failed: %s", rec_id, e)
-        async with self._maker() as db:
-            rec = await db.get(AccountRecovery, rec_id, with_for_update=True)
-            assert rec is not None
-            rec.status, rec.last_error, rec.updated_at = "failed", str(e), self._now()
-            await db.commit()
-
-    async def _later(self, rec_id: uuid.UUID, error: str, after: timedelta) -> None:
-        async with self._maker() as db:
-            rec = await db.get(AccountRecovery, rec_id, with_for_update=True)
-            assert rec is not None
-            rec.last_error, rec.next_attempt_at = error, self._now() + after
-            await db.commit()

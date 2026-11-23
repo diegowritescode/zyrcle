@@ -187,7 +187,7 @@ inténtalo de nuevo."
 
 | What | Limit | Error | Source |
 |---|---|---|---|
-| Participant email codes (recovery email and recovery) | 1 per 60 s and 5 per 24 h for each address and purpose; 10 per 24 h for each participant, whatever the addresses | `too_soon`, `too_many_codes` | [`recovery.py`](../apps/api/src/zyrcle_api/recovery.py) |
+| Participant email codes (recovery email and recovery) | 1 per 60 s and 5 per 24 h for each address and purpose; 10 per 24 h for each participant, whatever the addresses | `too_soon`, `too_many_codes` | [`email_codes.py`](../apps/api/src/zyrcle_api/email_codes.py) |
 | Operator sign-in codes | 1 per 60 s and 10 per 24 h for each address | `too_soon`, `too_many_codes` | [`operator_auth.py`](../apps/api/src/zyrcle_api/operator_auth.py) |
 | Wrong guesses of any email code | the 5th wrong guess burns the code | `code_invalid` | same |
 | Code lifetime | 10 minutes | `code_invalid` | `CODE_TTL` in [`mail.py`](../apps/api/src/zyrcle_api/mail.py) |
@@ -329,7 +329,7 @@ What the answer means:
 | `role` | `resident` |
 | `iat`, `exp` | issued at and expiry, Unix seconds; `exp` is 24 h later by default |
 
-**Every participant request** (`resident_dep` in [`api.py`](../apps/api/src/zyrcle_api/api.py)):
+**Every participant request** (`resident_dep` in [`deps.py`](../apps/api/src/zyrcle_api/deps.py)):
 
 1. The token must decode with the secret, carry `exp` and `sub`, and have `role: resident`.
 2. The participant must still exist.
@@ -1348,11 +1348,11 @@ print(json.dumps(create_app(s).openapi(), indent=2))'
 ### Adding an endpoint
 
 1. **Pick the router module by audience and area.** Public reads go in `public.py`; deposits and
-   the original operator routes in `api.py`; bookings in `booking_routes.py`; recovery in
+   the original participant routes in `api.py`, the operator's setup routes in `setup_routes.py`; bookings in `booking_routes.py`; recovery in
    `account_routes.py`; collection in `collection_routes.py`; sales in `sale_routes.py`; operator
    accounts in `operator_auth.py`; demo-only routes in `demo.py`. A new area gets a new module with
    `APIRouter(prefix="/v1/...", tags=[...])`, included in `create_app` in `main.py`.
-2. **Declare who may call it** with the existing dependencies: `Resident` (from `api.py`) for a
+2. **Declare who may call it** with the existing dependencies: `Resident` (from `deps.py`) for a
    participant, `Operator` for any operator (it gives the email to record), `AdminWho` (from
    `operator_auth.py`) for admins, nothing for public. Do not read the header yourself.
 3. **Model the request with Pydantic**, with limits on every field (`Field(max_length=...)`,
