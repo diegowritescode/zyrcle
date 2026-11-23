@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     device_offline_after_s: int = 90
     unlock_ack_timeout_s: int = 15
     idle_timeout_s: int = 60
+    # A collector bags several materials one after another (docs/adr/0012).
+    collection_idle_timeout_s: int = 600
     measurement_timeout_s: int = 20
     sweep_interval_s: float = 1.0
 

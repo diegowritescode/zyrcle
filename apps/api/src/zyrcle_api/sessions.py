@@ -27,6 +27,8 @@ from .domain.verification import MAX_BULK_DENSITY_G_PER_ML, Measurement, Outcome
 from .errors import Conflict, Forbidden, Invalid, NotFound, RecoveryPending, Unavailable
 from .live import LiveHub
 from .models import (
+    COLLECTION_ACTIVE,
+    Collection,
     Container,
     DepositSession,
     Device,
@@ -96,6 +98,8 @@ class SessionService:
         self._tz = ZoneInfo(settings.timezone)
         self._keys: dict[str, Any] = {}
         self.rejected_messages = 0
+        # Device messages that name a collection go there (collection.py, docs/adr/0012).
+        self.collections: Any = None
 
     # ------------------------------------------------------------------ resident actions
 
@@ -116,10 +120,18 @@ class SessionService:
             assert device is not None
             if not self._online(device, now):
                 raise Conflict("container is offline")
-            if not self._code_valid(device, code, now):
+            if not code_valid(device, code, now):
                 raise Forbidden("access code is invalid or expired; scan the container again")
             if material not in container.accepted_materials:
                 raise Invalid(f"this container does not accept {material}")
+            emptying = await db.scalar(
+                select(Collection.id).where(
+                    Collection.container_id == container_id,
+                    Collection.state.in_(COLLECTION_ACTIVE),
+                )
+            )
+            if emptying is not None:
+                raise Conflict("this container is being emptied; try again in a few minutes")
             busy_elsewhere = await db.scalar(
                 select(DepositSession.id).where(
                     DepositSession.resident_id == resident_id,
@@ -250,7 +262,9 @@ class SessionService:
                 device.firmware = str(env.body.get("fw", ""))[:64]
             elif env.type in ("event", "reading", "measurement"):
                 session = await self._session_for_device(db, env.body.get("session_id"), device_id)
-                if session is not None:
+                if session is None and self.collections is not None:
+                    await self._to_collection(db, env.type, env.body, device_id, now)
+                elif session is not None:
                     if env.type == "event":
                         await self._on_event(db, session, env.body, outbox)
                     elif env.type == "reading":
@@ -259,6 +273,19 @@ class SessionService:
                         await self._on_measurement(db, session, env.body, outbox)
             await db.commit()
         self._flush(outbox)
+
+    async def _to_collection(
+        self, db: AsyncSession, kind: str, body: dict, device_id: str, now: datetime
+    ) -> None:
+        collection = await self.collections.find(db, body.get("session_id"), device_id)
+        if collection is None:
+            return
+        if kind == "event":
+            await self.collections.on_event(db, collection, body, now)
+        elif kind == "reading":
+            await self.collections.on_reading(db, collection, body, now)
+        else:
+            await self.collections.on_measurement(db, collection, body, now)
 
     async def _on_event(
         self, db: AsyncSession, session: DepositSession, body: dict, outbox: list
@@ -553,15 +580,16 @@ class SessionService:
             seconds=self._s.device_offline_after_s
         )
 
-    @staticmethod
-    def _code_valid(device: Device, code: str, now: datetime) -> bool:
-        for value, expires in (
-            (device.current_code, device.code_expires_at),
-            (device.previous_code, device.previous_code_expires_at),
-        ):
-            if value and expires and expires > now and secrets.compare_digest(value, code):
-                return True
-        return False
+
+def code_valid(device: Device, code: str, now: datetime) -> bool:
+    """Whether `code` is the container's current QR code, or the one before it while it lasts."""
+    for value, expires in (
+        (device.current_code, device.code_expires_at),
+        (device.previous_code, device.previous_code_expires_at),
+    ):
+        if value and expires and expires > now and secrets.compare_digest(value, code):
+            return True
+    return False
 
 
 def _int(value: Any) -> int | None:

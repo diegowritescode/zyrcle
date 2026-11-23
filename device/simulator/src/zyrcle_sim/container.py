@@ -7,6 +7,9 @@ Sensors and their noise:
 - camera + vision model: one label per deposit, or None when it cannot tell
 """
 
+import json
+import os
+import pathlib
 import random
 from collections import Counter
 from dataclasses import dataclass, field
@@ -18,7 +21,7 @@ class Item:
     weight_g: int
     volume_ml: int  # loose volume it takes inside the container
     metal: bool
-    label: str  # what the camera model reports
+    label: str  # what the camera model reports, and the pile it ends up in inside the container
 
 
 CATALOG: dict[str, Item] = {
@@ -49,7 +52,15 @@ class LidClosed(Exception):
     pass
 
 
+# Contents of a container that were there before anyone could tell what they were.
+UNKNOWN = "unknown"
+
+
 class SimulatedContainer:
+    """A container's physics. What is inside is kept per kind (the item's camera label, or
+    `unknown` for what was there at the start), so a collector can take one material out at a time
+    (docs/adr/0012). With `state_path`, the contents survive restarts like a real bin's would."""
+
     def __init__(
         self,
         device_id: str,
@@ -58,22 +69,33 @@ class SimulatedContainer:
         contents_g: int = 4_000,
         contents_height_mm: int = 120,
         seed: int | None = None,
+        state_path: pathlib.Path | None = None,
     ):
         self.device_id = device_id
         self.area_mm2 = area_mm2
         self.depth_mm = depth_mm
-        self._weight_g = float(contents_g)
-        self._distance_mm = float(depth_mm - contents_height_mm)
         self._rng = random.Random(seed)
+        self._state_path = state_path
+        # kind -> grams and kind -> loose millilitres inside the container
+        self._grams: Counter[str] = Counter()
+        self._ml: Counter[str] = Counter()
+        if contents_g:
+            self._grams[UNKNOWN] = contents_g
+            self._ml[UNKNOWN] = contents_height_mm * area_mm2 // 1000
         self.code: str | None = None
         self.session: Session | None = None
+        if state_path is not None and state_path.exists():
+            saved = json.loads(state_path.read_text())
+            self._grams = Counter(saved["grams"])
+            self._ml = Counter(saved["ml"])
 
     # sensors -----------------------------------------------------------------
     def read_weight(self) -> int:
-        return round(self._weight_g + self._rng.gauss(0, 2))
+        return round(sum(self._grams.values()) + self._rng.gauss(0, 2))
 
     def read_distance(self) -> int:
-        return round(self._distance_mm + self._rng.gauss(0, 1))
+        height = sum(self._ml.values()) * 1000 / self.area_mm2
+        return round(max(self.depth_mm - height, 0) + self._rng.gauss(0, 1))
 
     def metal_present(self) -> bool:
         return bool(self.session and any(i.metal for i in self.session.items))
@@ -83,6 +105,10 @@ class SimulatedContainer:
             return None
         label, _ = Counter(i.label for i in self.session.items).most_common(1)[0]
         return label
+
+    def contents(self) -> dict[str, int]:
+        """Grams inside, per kind (the simulator's truth; a real container cannot know this)."""
+        return {kind: round(g) for kind, g in sorted(self._grams.items()) if g > 0}
 
     # actuators ---------------------------------------------------------------
     @property
@@ -120,5 +146,25 @@ class SimulatedContainer:
         item = CATALOG[item] if isinstance(item, str) else item
         for _ in range(count):
             self.session.items.append(item)
-            self._weight_g += item.weight_g
-            self._distance_mm -= item.volume_ml * 1000 / self.area_mm2
+            self._grams[item.label] += item.weight_g
+            self._ml[item.label] += item.volume_ml
+        self._save()
+
+    def take_out(self, kind: str | None = None) -> int:
+        """A collector takes one kind of material out (`None`: everything left). Returns grams."""
+        if self.session is None:
+            raise LidClosed(f"{self.device_id}: the lid is closed")
+        kinds = [kind] if kind is not None else list(self._grams)
+        grams = 0
+        for k in kinds:
+            grams += round(self._grams.pop(k, 0))
+            self._ml.pop(k, None)
+        self._save()
+        return grams
+
+    def _save(self) -> None:
+        if self._state_path is None:
+            return
+        tmp = self._state_path.with_suffix(".tmp")
+        tmp.write_text(json.dumps({"grams": dict(self._grams), "ml": dict(self._ml)}))
+        os.replace(tmp, self._state_path)

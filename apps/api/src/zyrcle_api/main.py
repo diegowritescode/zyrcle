@@ -11,6 +11,8 @@ from .account_routes import router as account_router
 from .api import router
 from .booking_routes import router as booking_router
 from .chain import Chain, load_account_file
+from .collection import CollectionService
+from .collection_routes import router as collection_router
 from .config import Settings, get_settings
 from .db import make_engine, make_sessionmaker
 from .live import LiveHub
@@ -49,9 +51,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
         bridge = MqttBridge(settings, on_message)
         service = SessionService(maker, settings, bridge, hub)
+        collections = CollectionService(maker, settings, bridge)
+        service.collections = collections
         holder["service"] = service
         app.state.settings, app.state.maker, app.state.hub = settings, maker, hub
         app.state.bridge, app.state.sessions = bridge, service
+        app.state.collections = collections
 
         chain = None
         if settings.chain_enabled:
@@ -70,6 +75,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         tasks = [
             asyncio.create_task(bridge.run(), name="mqtt"),
             asyncio.create_task(_every(settings.sweep_interval_s, service.sweep, "sweep")),
+            asyncio.create_task(
+                _every(settings.sweep_interval_s, collections.sweep, "collection-sweep")
+            ),
             asyncio.create_task(
                 _every(min(5.0, settings.code_rotation_s / 3), service.rotate_codes, "codes")
             ),
@@ -138,6 +146,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(public_router)
     app.include_router(booking_router)
     app.include_router(account_router)
+    app.include_router(collection_router)
     if settings.demo_simulator_url:
         from .demo import router as demo_router
 

@@ -16,7 +16,8 @@ Design: [docs/architecture.md](../../docs/architecture.md), protocol:
 | `auth.py` | Sign-In with Ethereum (EIP-4361) and JWTs |
 | `api.py` | REST + WebSocket routes for residents and operators |
 | `public.py` | Public read-only views: platform totals, a scanned container, host and site dashboards. Aggregates only, no access codes |
-| `demo.py` | Demo-only routes (mounted when a simulator is configured): containers with their live QR, "drop this item" |
+| `collection.py`, `collection_routes.py` | Collections ([ADR 0012](../../docs/adr/0012-collection-and-bags.md)): a collector empties a container into bags weighed by its own scale, deposits traced to the collection, mass balances and incidents |
+| `demo.py` | Demo-only routes (mounted when a simulator is configured): containers with their live QR, "drop this item", "take this out", bags standing in for printed labels |
 | `models.py`, `migrations/` | Schema; one active session per container enforced by a partial unique index |
 | `pricing.py`, `payouts.py`, `chain.py` | Advance sizing, the payout outbox worker, and the Treasury client (web3.py) |
 
@@ -25,6 +26,8 @@ Design: [docs/architecture.md](../../docs/architecture.md), protocol:
 | Guarantee | Mechanism |
 |---|---|
 | One resident at a time per container | Partial unique index on active sessions; concurrent requests get 409 |
+| Nobody deposits while a container is emptied, and the reverse | Both lock the container row before checking for the other; one active collection per container (partial unique index) |
+| Collectors never declare a weight | A bag's grams are two signed scale readings apart; mass balances open incidents |
 | A container cannot act on a session the DB has not stored | Commands are sent only after commit |
 | Forged, replayed or duplicated device messages change nothing | ECDSA signature per device, strictly increasing `seq`, `(device_id, seq)` primary key |
 | A device cannot speak for another | Broker ACL plus device id check on every envelope |

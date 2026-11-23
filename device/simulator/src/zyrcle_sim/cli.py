@@ -36,6 +36,11 @@ def main() -> None:
     serve.add_argument("--control-host", default="0.0.0.0")
     serve.add_argument("--control-port", type=int, default=8090)
     serve.add_argument("--reading-interval", type=float, default=0.5)
+    serve.add_argument(
+        "--state-dir",
+        type=pathlib.Path,
+        help="where each container saves its contents (default: the keys dir)",
+    )
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
 
@@ -91,11 +96,13 @@ async def _serve(args: argparse.Namespace) -> None:
     from .control import create_control_app
 
     runners = {}
+    state_dir = args.state_dir or args.keys_dir
+    state_dir.mkdir(parents=True, exist_ok=True)
     for device_id in [d.strip() for d in args.devices.split(",") if d.strip()]:
         env = "ZYRCLE_SIM_PASSWORD_" + device_id.upper().replace("-", "_")
         password = os.environ.get(env) or os.environ.get("ZYRCLE_SIM_PASSWORD")
         runners[device_id] = DeviceRunner(
-            SimulatedContainer(device_id),
+            SimulatedContainer(device_id, state_path=state_dir / f"{device_id}.state.json"),
             _load_or_create_key(args.keys_dir, device_id),
             args.broker,
             args.port,

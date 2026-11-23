@@ -19,3 +19,14 @@ def test_deposit_only_while_the_lid_is_open():
         client.post("/containers/ctr-0001/deposit", json={"item": "plutonium"}).status_code == 422
     )
     assert client.post("/containers/nope/deposit", json={"item": "stone"}).status_code == 404
+
+
+def test_take_out_only_while_the_lid_is_open():
+    runner = DeviceRunner(SimulatedContainer("ctr-0001", seed=1), generate_private_key())
+    client = TestClient(create_control_app({"ctr-0001": runner}))
+    assert client.post("/containers/ctr-0001/take-out", json={"kind": "unknown"}).status_code == 409
+    runner.c.open_for("collection")
+    r = client.post("/containers/ctr-0001/take-out", json={"kind": "unknown"})
+    assert r.status_code == 200 and r.json()["grams"] == 4_000 and r.json()["contents_g"] == {}
+    assert client.get("/containers").json()[0]["contents_g"] == {}
+    assert client.post("/containers/nope/take-out", json={}).status_code == 404

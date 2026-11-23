@@ -91,11 +91,16 @@ Cheapest signal first, combined into one confidence score:
 High score: accepted automatically. Low score: goes to operator review. A deposit is never rejected
 silently.
 
-## 7. Collection and sale *(planned, phase 4)*
+## 7. Collection and sale
+
+Collection is built ([ADR 0012](adr/0012-collection-and-bags.md)); the sale is planned (v1 M3).
 
 - The container's own scale measures each emptying. Collectors do not declare weights.
 - Collectors carry one bag per material, each with a QR. Emptying a container records
-  "container C put N grams of material M into bag B".
+  "container C put N grams of material M into bag B": the collector scans the bag, takes that
+  material out, and the bag gets the difference between two signed readings. What is not
+  recyclable goes out as residue, weighed the same way. When the lid closes, the deposits made
+  since the previous collection are linked to it.
 - The sale of each bag is recorded from the buyer's scale ticket. Rollout levels:
   0. collector photographs the ticket, a vision model extracts the fields, an operator confirms;
   1. collection-center staff send the photo over WhatsApp;
@@ -106,7 +111,8 @@ silently.
 
 | Hop | Expected | Tolerance |
 |---|---|---|
-| Deposits into a container vs. its next emptying | equal (same scale) | tight |
+| Container weight when a collection opens vs. what the previous one left plus every deposit since | equal (same scale) | 50 g or 2 % |
+| What left the container vs. the bags and residue weighed | equal (same scale) | 50 g or 2 % |
 | Grams put into a bag vs. buyer's weight for that bag | equal | moisture and rejected material |
 
 A breach opens an incident for the operator. Nothing is settled from a bag with an open incident.

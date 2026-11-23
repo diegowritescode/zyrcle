@@ -8,12 +8,13 @@ moves the containers where the layout below puts them, so earlier demo deposits 
 import pathlib
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from zyrcle_protocol import load_public_key
 
+from .collection import new_bag_code
 from .config import get_settings
 from .db import make_engine, make_sessionmaker
-from .models import Container, Device, Host, MaterialPrice, Site
+from .models import Bag, Container, Device, Host, MaterialPrice, Site
 
 HOST = "Universidad Demo Zyrcle"
 LEGACY_SITE = "Conjunto demo Zyrcle"  # the single residence of deployments before ADR 0011
@@ -25,6 +26,8 @@ CONTAINERS = {
     "ctr-0003": ("Contenedor de vidrio", ["glass"], "Campus Centro"),
     "ctr-0004": ("Contenedor de papel y cartón", ["paper", "cardboard"], "Campus Centro"),
 }
+# Empty bags kept ready per material, standing in for printed labels (docs/adr/0012).
+DEMO_BAGS_PER_MATERIAL = 2
 # Reference prices for testnet demos only (COP/kg), not market data.
 TEST_PRICES = {
     "pet": 1_000,
@@ -72,6 +75,15 @@ async def seed(keys_dir: pathlib.Path, devices: list[str]) -> list[str]:
             elif container.site_id != sites[campus].id:
                 container.site_id = sites[campus].id
                 done.append(f"container {device_id} moved to {campus}")
+        for material in TEST_PRICES:
+            ready = await db.scalar(
+                select(func.count(Bag.id)).where(
+                    Bag.material == material, Bag.status == "open", Bag.collector_id.is_(None)
+                )
+            )
+            for _ in range(DEMO_BAGS_PER_MATERIAL - (ready or 0)):
+                db.add(Bag(id=uuid.uuid4(), code=new_bag_code(), material=material, status="open"))
+                done.append(f"bag {material}")
         for material, price in TEST_PRICES.items():
             if await db.get(MaterialPrice, material) is None:
                 db.add(MaterialPrice(material=material, cop_per_kg=price, source="manual"))

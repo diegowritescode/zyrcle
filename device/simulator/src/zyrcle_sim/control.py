@@ -3,10 +3,11 @@
     GET  /containers                       state of every container
     GET  /items                            the item catalog
     POST /containers/{id}/deposit          {"item": "pet_bottle", "count": 3}
+    POST /containers/{id}/take-out         {"kind": "pet"}, or {} for everything left
 
-In the real world nobody "deposits over HTTP": a person drops material into the bin. This panel
-stands in for that person. The API's demo router is the only client, and it checks that the caller
-owns the session first.
+In the real world nobody "deposits over HTTP": a person drops material into the bin, and a collector
+takes it out by hand. This panel stands in for those hands. The API's demo router is the only
+client, and it checks that the caller owns the session first.
 """
 
 from fastapi import FastAPI, HTTPException
@@ -19,6 +20,10 @@ from .runner import DeviceRunner
 class DepositIn(BaseModel):
     item: str
     count: int = Field(default=1, ge=1, le=20)
+
+
+class TakeOutIn(BaseModel):
+    kind: str | None = Field(default=None, max_length=32)
 
 
 def create_control_app(runners: dict[str, DeviceRunner]) -> FastAPI:
@@ -44,6 +49,7 @@ def create_control_app(runners: dict[str, DeviceRunner]) -> FastAPI:
                 "lid_open": r.c.lid_open,
                 "session_id": r.c.session.session_id if r.c.session else None,
                 "connected": r.connected.is_set(),
+                "contents_g": r.c.contents(),
             }
             for device_id, r in runners.items()
         ]
@@ -60,5 +66,16 @@ def create_control_app(runners: dict[str, DeviceRunner]) -> FastAPI:
         except LidClosed:
             raise HTTPException(409, "the lid is closed") from None
         return {"ok": True, "session_id": runner.c.session.session_id if runner.c.session else None}
+
+    @app.post("/containers/{device_id}/take-out")
+    def take_out(device_id: str, body: TakeOutIn) -> dict:
+        runner = runners.get(device_id)
+        if runner is None:
+            raise HTTPException(404, "unknown container")
+        try:
+            grams = runner.c.take_out(body.kind)
+        except LidClosed:
+            raise HTTPException(409, "the lid is closed") from None
+        return {"ok": True, "kind": body.kind, "grams": grams, "contents_g": runner.c.contents()}
 
     return app

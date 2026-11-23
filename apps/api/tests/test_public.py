@@ -58,10 +58,12 @@ async def test_a_paid_deposit_shows_up_in_stats_dashboard_and_history(
 
     host = (await client.get(f"/v1/hosts/{site['host']['id']}/dashboard?days=7")).json()
     assert host["host"]["kind"] == "university"
-    assert [s["name"] for s in host["sites"]] == ["Torres del Río"]
-    # One site: the host's totals are that site's.
-    assert host["totals"] == host["sites"][0]["totals"] == dash["totals"]
-    assert host["activity"] == dash["activity"]
+    torres = next(s for s in host["sites"] if s["name"] == "Torres del Río")
+    assert torres["totals"] == dash["totals"]
+    # A host's totals add up its sites' (people are counted once, so they are not added).
+    for key in ("containers", "deposits_verified", "payouts_confirmed", "paid_cop"):
+        assert host["totals"][key] == sum(s["totals"][key] for s in host["sites"])
+    assert len(host["activity"]) == len(host["payouts"]) == 7
 
     me = (await client.get("/v1/me", headers=headers(resident))).json()
     latest = me["sessions"][0]
@@ -87,7 +89,8 @@ async def test_hosts_list_their_sites(client, devices):
     hosts = (await client.get("/v1/hosts")).json()
     host = next(h for h in hosts if h["name"] == "Universidad del Río")
     assert host["kind"] == "university"
-    assert host["sites"][0]["name"] == "Torres del Río" and host["sites"][0]["containers"] == 3
+    torres = next(s for s in host["sites"] if s["name"] == "Torres del Río")
+    assert torres["containers"] == 3
 
 
 async def test_residence_routes_remain_as_deprecated_aliases(client, devices):

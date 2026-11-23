@@ -24,6 +24,7 @@ from .chain import WEI_PER_COP
 from .config import Settings
 from .errors import SessionError
 from .models import (
+    Collector,
     Container,
     DepositSession,
     Device,
@@ -245,6 +246,7 @@ async def me(resident: Resident, request: Request) -> dict[str, Any]:
                 .limit(20)
             )
         ).all()
+        collector = await db.get(Collector, resident)
     chain = request.app.state.chain
     balance = None
     if chain is not None:
@@ -257,6 +259,8 @@ async def me(resident: Resident, request: Request) -> dict[str, Any]:
         "address": row.address,
         "owner": row.owner_address,
         "email": row.email,
+        # Set when the operator named this participant a collector (docs/adr/0012).
+        "collector": collector.name if collector is not None and collector.active else None,
         "balance_cop": None if balance is None else balance / WEI_PER_COP,
         "payouts": [
             {

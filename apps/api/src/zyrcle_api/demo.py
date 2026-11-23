@@ -1,9 +1,10 @@
-"""Demo routes: let a visitor play the part of the resident in front of a simulated container.
+"""Demo routes: let a visitor play the part of the resident, or of the collector, in front of a
+simulated container.
 
 Mounted only when ZYRCLE_DEMO_SIMULATOR_URL is set. A real resident scans the QR on a physical
-container and drops material into it; here the page reads the QR from the API and asks the
-simulator to drop the items. The drop goes through the API so it can check the visitor owns the
-session.
+container and drops material into it, and a collector takes it out by hand; here the page reads the
+QR from the API and asks the simulator to drop or take out the items. Both go through the API so it
+can check the visitor owns the session or the collection.
 """
 
 import uuid
@@ -17,8 +18,9 @@ from zyrcle_protocol import qr_payload
 
 from .api import Resident, Service
 from .auth import utcnow
+from .collection import bag_view
 from .domain.session_machine import State
-from .models import Container, Device
+from .models import Bag, Collection, Container, Device
 from .public import busy_containers, is_online
 
 router = APIRouter(prefix="/v1/demo", tags=["demo"])
@@ -34,6 +36,13 @@ Simulator = Annotated[httpx.AsyncClient, Depends(simulator_dep)]
 class DropIn(BaseModel):
     item: str = Field(max_length=40)
     count: int = Field(default=1, ge=1, le=20)
+
+
+class TakeOutIn(BaseModel):
+    """The kind of material to take out (a camera label: pet, hdpe, metal, ...); null for
+    everything left."""
+
+    kind: str | None = Field(default=None, max_length=32)
 
 
 @router.get("/containers")
@@ -60,6 +69,19 @@ async def containers(request: Request) -> list[dict[str, Any]]:
             }
         )
     return sorted(out, key=lambda c: c["id"])
+
+
+@router.get("/bags")
+async def bags(request: Request) -> list[dict[str, Any]]:
+    """Empty bags nobody has started, with their QR: they stand in for printed labels."""
+    async with request.app.state.maker() as db:
+        rows = await db.scalars(
+            select(Bag)
+            .where(Bag.status == "open", Bag.collector_id.is_(None))
+            .order_by(Bag.material, Bag.created_at)
+            .limit(30)
+        )
+        return [bag_view(b) for b in rows]
 
 
 @router.get("/items")
@@ -92,3 +114,25 @@ async def drop(
     if r.status_code != 200:
         raise HTTPException(r.status_code, {"code": "simulator", "detail": r.json().get("detail")})
     return {"ok": True}
+
+
+@router.post("/collections/{collection_id}/take-out")
+async def take_out(
+    collection_id: uuid.UUID,
+    body: TakeOutIn,
+    resident: Resident,
+    simulator: Simulator,
+    request: Request,
+) -> dict[str, Any]:
+    async with request.app.state.maker() as db:
+        c = await db.get(Collection, collection_id)
+        if c is None or c.collector_id != resident:
+            raise HTTPException(404, {"code": "not_found", "detail": "unknown collection"})
+        if c.state != "open":
+            raise HTTPException(409, {"code": "conflict", "detail": "the lid is not open"})
+        container = await db.get(Container, c.container_id)
+    assert container is not None
+    r = await simulator.post(f"/containers/{container.device_id}/take-out", json=body.model_dump())
+    if r.status_code != 200:
+        raise HTTPException(r.status_code, {"code": "simulator", "detail": r.json().get("detail")})
+    return r.json()

@@ -68,6 +68,10 @@ fills. `camera_label` is the vision model's material label for the deposit, or n
 A container ignores commands past `expires_ts` (late delivery after a reconnect), an `unlock` while
 a session is open, and a `lock` for a session that is not the open one.
 
+A session is either a participant's deposit or a collector's emptying
+([ADR 0012](adr/0012-collection-and-bags.md)). The container does not need to know which: it opens,
+streams readings and measures the same way, and the backend weighs each bag from the readings.
+
 ## Sequence of a deposit
 
 ```

@@ -1,10 +1,13 @@
+import { useQuery } from "@tanstack/react-query";
 import { pesos, shortHex } from "@zyrcle/client";
 import * as Clipboard from "expo-clipboard";
 import Constants from "expo-constants";
 import * as WebBrowser from "expo-web-browser";
-import { Bell, BellOff, BookOpen, Check, Copy, ExternalLink, KeyRound, LayoutDashboard } from "lucide-react-native";
+import { router } from "expo-router";
+import { Bell, BellOff, BookOpen, Check, Copy, ExternalLink, KeyRound, LayoutDashboard, Truck } from "lucide-react-native";
 import { useState } from "react";
 import { Linking, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { api } from "@/lib/api";
 import { CHAIN_ID, REPO_URL, WEB_URL } from "@/lib/config";
 import { REMINDER_MINUTES, sendTestNotification, type PushSupport } from "@/lib/notifications";
 import { RecoveryAlerts } from "@/account/RecoveryAlerts";
@@ -29,6 +32,11 @@ function LinkRow({ icon, label, url }: { icon: React.ReactNode; label: string; u
 export default function Account() {
   const wallet = useWallet();
   const [copied, setCopied] = useState(false);
+  const me = useQuery({
+    queryKey: ["me", wallet.token],
+    queryFn: () => api.me(wallet.token!),
+    enabled: wallet.token !== null,
+  });
 
   const copy = async () => {
     if (!wallet.address) return;
@@ -66,6 +74,14 @@ export default function Account() {
         </Pressable>
         <Muted>Saldo: {wallet.balance === null ? "—" : pesos(wallet.balance)} en ZYR</Muted>
       </Card>
+
+      {me.data?.collector && (
+        <Card style={{ gap: space(3) }}>
+          <Heading>Recolección</Heading>
+          <Body>Eres recolector de Zyrcle: vacías contenedores en bolsas que pesa el propio contenedor.</Body>
+          <Button title="Abrir recolección" icon={<Truck color={colors.white} size={18} />} onPress={() => router.push("/collect")} />
+        </Card>
+      )}
 
       <RecoveryEmailCard />
       <RecoverCard />

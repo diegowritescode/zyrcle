@@ -122,8 +122,61 @@ export interface Me {
   /** The phone key that controls the account. */
   owner: string;
   email: string | null;
+  /** Their collector name, when the operator named them a collector (docs/adr/0012). */
+  collector: string | null;
   balance_cop: number | null;
   sessions: HistoryEntry[];
+}
+
+/** A bag with a printed QR, holding one material (docs/adr/0012). */
+export interface Bag {
+  id: string;
+  code: string;
+  qr: string;
+  material: string;
+  status: "open" | "sealed" | "sold" | "settled";
+  /** What the containers' scales measured into it. */
+  grams: number;
+  created_at: string;
+  sealed_at: string | null;
+}
+
+/** One material taken out during a collection: into a bag, or as residue. */
+export interface CollectionFill {
+  id: string;
+  bag_code: string | null;
+  material: string | null;
+  residue: boolean;
+  start_g: number;
+  end_g: number | null;
+  grams: number | null;
+  done: boolean;
+}
+
+/** A collector emptying one container (docs/adr/0012). */
+export interface Collection {
+  id: string;
+  container_id: string;
+  container_name: string;
+  accepted_materials: string[];
+  state: "authorized" | "open" | "closing" | "closed" | "expired" | "failed";
+  tare_g: number | null;
+  /** The scale's latest reading. */
+  weight_g: number | null;
+  final_g: number | null;
+  expected_g: number | null;
+  /** What left the container: opening weight minus closing weight. */
+  removed_g: number | null;
+  fills: CollectionFill[];
+  open_fill_id: string | null;
+  created_at: string;
+  closed_at: string | null;
+}
+
+export interface CollectorHome {
+  name: string;
+  current: Collection | null;
+  bags: Bag[];
 }
 
 export interface SignIn {
@@ -301,11 +354,28 @@ export function createApi(baseUrl: string) {
     cancelBooking: (token: string, id: string) =>
       call<Booking>(`/v1/bookings/${id}`, { method: "DELETE" }, token),
 
+    collector: (token: string) => call<CollectorHome>("/v1/collector", {}, token),
+    startCollection: (token: string, qr: string) => call<Collection>("/v1/collections", post({ qr }), token),
+    collection: (token: string, id: string) => call<Collection>(`/v1/collections/${id}`, {}, token),
+    /** Start filling the bag with this QR or code; null takes out residue. */
+    addFill: (token: string, id: string, bag: string | null) =>
+      call<Collection>(`/v1/collections/${id}/fills`, post({ bag }), token),
+    finishFill: (token: string, id: string, fillId: string) =>
+      call<Collection>(`/v1/collections/${id}/fills/${fillId}/done`, post(), token),
+    finishCollection: (token: string, id: string) =>
+      call<Collection>(`/v1/collections/${id}/finish`, post(), token),
+    sealBag: (token: string, code: string) => call<Bag>(`/v1/bags/${encodeURIComponent(code)}/seal`, post(), token),
+
     demo: {
       containers: () => call<DemoContainer[]>("/v1/demo/containers"),
       items: () => call<DemoItem[]>("/v1/demo/items"),
       drop: (token: string, sessionId: string, item: string) =>
         call<{ ok: true }>(`/v1/demo/sessions/${sessionId}/drop`, post({ item }), token),
+      /** Empty bags with their QR, standing in for printed labels. */
+      bags: () => call<Bag[]>("/v1/demo/bags"),
+      /** The collector's hands: take one kind of material out (null: everything left). */
+      takeOut: (token: string, collectionId: string, kind: string | null) =>
+        call<{ grams: number }>(`/v1/demo/collections/${collectionId}/take-out`, post({ kind }), token),
     },
   };
 
