@@ -51,4 +51,4 @@ cd chain && ../.slither/bin/slither . --filter-paths "test|lib|dependencies" --e
   it does not recompute the CID. Fetching the same CID from another gateway or an own IPFS node
   removes that trust (ADR 0027, amendment).
 - A Pinata key from 2025 sat in a public `VITE_*` variable of the old web app ([history](history.md)).
-  It must be revoked in Pinata's dashboard; the rebuild uses a new JWT that stays on the VPS.
+  Diego revoked it on 2026-11-23; the rebuild uses a new JWT that stays on the VPS.
