@@ -9,7 +9,7 @@ export const CHAIN_ID: number = Number(env.VITE_CHAIN_ID || 20261121);
 /** The domain residents sign in to (SIWE). Must match the API's ZYRCLE_SIWE_DOMAIN. */
 export const SIWE_DOMAIN: string = env.VITE_SIWE_DOMAIN || "zyrcle.deviego.xyz";
 export const TREASURY_ADDRESS: string =
-  env.VITE_TREASURY_ADDRESS || "0xBc5035341C075CBd75508ff1a3a5EC0241e58201";
+  env.VITE_TREASURY_ADDRESS || "0xd7052201140224018b123ecFF7b83B4251790Aeb";
 /** Where the browser reads a certificate's copy on IPFS (docs/adr/0027, amendment 2026-11-22).
  * Its origin must be in the Content-Security-Policy's connect-src (security-headers.conf). */
 export const IPFS_GATEWAY: string = env.VITE_IPFS_GATEWAY || "https://gateway.pinata.cloud/ipfs/";

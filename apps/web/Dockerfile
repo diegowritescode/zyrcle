@@ -11,7 +11,7 @@ ARG VITE_API_URL=https://zyrcle-backend.deviego.xyz
 ARG VITE_SIWE_DOMAIN=zyrcle.deviego.xyz
 ARG VITE_CHAIN_ID=20261121
 ARG VITE_RPC_URL=https://rpc.zyrcle.deviego.xyz/ext/bc/hXdnq6H8N9gH3o5cpKWGMzspesNyogKjuDwZESQhQNNtM5jN8/rpc
-ARG VITE_TREASURY_ADDRESS=0xBc5035341C075CBd75508ff1a3a5EC0241e58201
+ARG VITE_TREASURY_ADDRESS=0xd7052201140224018b123ecFF7b83B4251790Aeb
 # Its origin must also be in security-headers.conf (connect-src).
 ARG VITE_IPFS_GATEWAY=https://gateway.pinata.cloud/ipfs/
 ENV VITE_API_URL=$VITE_API_URL VITE_SIWE_DOMAIN=$VITE_SIWE_DOMAIN VITE_CHAIN_ID=$VITE_CHAIN_ID \
