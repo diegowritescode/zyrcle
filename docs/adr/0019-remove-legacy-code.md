@@ -16,3 +16,7 @@ them invited confusion about what is live.
 ## Consequences
 - One backend, one web app, one contracts folder. The README's layout is the truth.
 - The old repositories (`zyrcle-backend`, `zyrcle-frontend`) still exist and are not archived yet.
+
+## Amendments
+- **2026-11-22, with Diego's approval:** both original repositories got a notice pointing to this
+  monorepo and were archived (read-only).

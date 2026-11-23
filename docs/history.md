@@ -101,7 +101,7 @@ Fuji. The backend moved to FastAPI with Pydantic v2 on Python 3.13. It still ser
 | What | Where |
 |---|---|
 | The hackathon code, as imported | tag `v0-hackathon` |
-| The two original repositories | `github.com/diegowritescode/zyrcle-frontend`, `zyrcle-backend` (public, not archived yet) |
+| The two original repositories | `github.com/diegowritescode/zyrcle-frontend`, `zyrcle-backend`: archived on 2026-11-22, each with a notice pointing here |
 | Hackathon contracts (2026 rebuild of them) | Fuji C-Chain, addresses in `contracts/deployments.json` at tag `v0-hackathon` |
 | ZyrcleChain v1 (2025) | Fuji P-Chain, inactive |
 | Treasury before the host share | `0xB843946A42F2791B8b932F8c0205C9D277E351B1` on ZyrcleChain v2, replaced on 2026-11-22 by `0xBc5035341C075CBd75508ff1a3a5EC0241e58201` (ADR 0013) |
