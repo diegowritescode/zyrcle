@@ -1,0 +1,222 @@
+/**
+ * A day on campus, every party in a real browser (ADR 0031): a university with two campuses, a
+ * participant recycling, an operator in the console, a collector emptying a container from the
+ * phone, the sale settled on chain, an impact certificate verified against the chain and its IPFS
+ * copy, and a campus merchant paid from a phone who then redeems ZYR for pesos.
+ *
+ * The steps build on each other and run in order.
+ */
+import { expect, test, type Page } from "@playwright/test";
+import { API, Errors, MOB, WEB, emailCode, openPage, ops, overflow, phone, rpc, sleep } from "./helpers";
+
+test.describe.configure({ mode: "serial" });
+
+const errors = new Errors();
+let desk: Page;
+let collector: { page: Page; address: string };
+const operatorEmail = `diego-${Date.now().toString(36)}@zyrcle.test`;
+
+test.beforeAll(async ({ browser }) => {
+  desk = await openPage(browser, errors, "desk");
+  // The first admin, added with the shared token.
+  const r = await fetch(`${API}/v1/operator/operators`, { method: "POST", headers: ops(), body: JSON.stringify({ email: operatorEmail, name: "Diego", role: "admin" }) });
+  expect(r.status).toBe(201);
+});
+
+test.afterEach(() => {
+  expect(errors.list, "browser errors").toEqual([]);
+});
+
+test("the university's dashboard shows its campuses and their containers", async () => {
+  await desk.goto(`${WEB}/sites`, { waitUntil: "networkidle" });
+  await expect(desk.getByText("Universidad Demo Zyrcle").first()).toBeVisible();
+  await expect(desk.getByRole("button", { name: "Todas las sedes" })).toBeVisible();
+  await desk.getByRole("group", { name: "Sede" }).getByRole("button", { name: "Campus Norte" }).click();
+  await expect(desk.getByText("Contenedores inteligentes")).toBeVisible();
+});
+
+test("a participant recycles PET twice on the web and is paid an advance each time", async () => {
+  await desk.goto(`${WEB}/recycling`, { waitUntil: "networkidle" });
+  await expect(desk.getByText("sesión iniciada con tu firma")).toBeVisible({ timeout: 30_000 });
+  for (const bottles of [6, 4]) {
+    const card = desk
+      .locator("div.rounded-xl", { hasText: "Contenedor PET y HDPE" })
+      .filter({ has: desk.getByRole("button", { name: "Usar este contenedor" }) })
+      .last();
+    await card.locator("img").first().waitFor();
+    await card.getByRole("button", { name: "Usar este contenedor" }).click();
+    await desk.getByRole("button", { name: "Abrir contenedor" }).click();
+    await expect(desk.getByText("Tapa abierta en").first()).toBeVisible();
+    for (let i = 0; i < bottles; i++) await desk.getByRole("button", { name: /Botella PET/ }).click();
+    await expect(desk.getByText("Recibiendo material").first()).toBeVisible();
+    await sleep(1_200);
+    await desk.getByRole("button", { name: "Terminé" }).click();
+    await expect(desk.getByText("pagado en la cadena")).toBeVisible({ timeout: 60_000 });
+    await desk.getByRole("button", { name: /Reciclar otra vez|Volver|Otro depósito/ }).first().click().catch(() => desk.reload({ waitUntil: "networkidle" }));
+    await sleep(500);
+  }
+});
+
+test("an operator signs in to the console with an emailed code", async ({ browser }) => {
+  collector = await phone(browser, errors, "collector");
+  await desk.goto(`${WEB}/console`, { waitUntil: "networkidle" });
+  await desk.getByLabel("Correo").fill(operatorEmail);
+  await desk.getByRole("button", { name: "Enviarme un código" }).click();
+  await expect(desk.getByText(/le llegó un código/)).toBeVisible();
+  await desk.getByRole("textbox", { name: "Código" }).fill(await emailCode(operatorEmail));
+  await desk.getByRole("button", { name: "Entrar" }).click();
+  await expect(desk.getByRole("heading", { name: "Pendientes" })).toBeVisible();
+  await expect(desk.getByRole("heading", { name: "Tesorería" })).toBeVisible();
+});
+
+test("the operator names a collector and prints bag labels", async () => {
+  await desk.getByRole("tab", { name: "Recolección" }).click();
+  await desk.getByLabel("Dirección de su cuenta").fill(collector.address);
+  await desk.getByLabel("Nombre").first().fill("Rosa Recicladora");
+  await desk.getByRole("button", { name: "Nombrar" }).click();
+  await expect(desk.getByText("Rosa Recicladora").first()).toBeVisible();
+  await desk.getByLabel("Cuántas").fill("4");
+  await desk.getByRole("button", { name: "Crear etiquetas" }).click();
+  await expect(desk.getByText("4 etiquetas nuevas")).toBeVisible();
+});
+
+test("the collector empties the container into a sealed bag and every gram is accounted for", async () => {
+  const p = collector.page;
+  await p.reload({ waitUntil: "networkidle" });
+  await p.getByRole("tab", { name: /Cuenta/ }).click();
+  await p.getByRole("button", { name: "Abrir recolección" }).click();
+  await expect(p.getByText("Vaciar un contenedor")).toBeVisible();
+  const row = p.locator("div", { hasText: "Contenedor PET y HDPE" }).filter({ has: p.getByRole("button", { name: "Usar" }) }).last();
+  await row.getByRole("button", { name: "Usar" }).click();
+  await expect(p.getByText("Abierto", { exact: true })).toBeVisible();
+  await p.getByRole("button", { name: "Escanear una bolsa" }).click();
+  await p.getByRole("button", { name: /^PET · / }).first().click();
+  await expect(p.getByText(/Saca solo el PET/)).toBeVisible();
+  const before = await p.getByLabel(/^Peso /).getAttribute("aria-label");
+  await p.getByRole("button", { name: "Demo: sacar el PET" }).click();
+  await p.waitForFunction((b) => document.querySelector('[aria-label^="Peso "]')?.getAttribute("aria-label") !== b, before);
+  await sleep(1_200);
+  await p.getByRole("button", { name: "Listo" }).click();
+  await p.getByRole("button", { name: "Sacar residuo" }).click();
+  await p.getByRole("button", { name: "Demo: sacar todo lo demás" }).click();
+  await sleep(1_500);
+  await p.getByRole("button", { name: "Listo" }).click();
+  await p.getByRole("button", { name: "Terminar y cerrar" }).click();
+  // A fresh container held only these deposits, so both mass balances must close.
+  await expect(p.getByText("Cuadra: todo lo que salió quedó pesado")).toBeVisible();
+  await p.getByRole("button", { name: "Cerrar", exact: true }).first().click();
+  await expect(p.getByText("Cerrada", { exact: true }).first()).toBeVisible();
+  expect(await overflow(p)).toBe(0);
+});
+
+test("a sale confirmed against the bank settles the participants, the collector and the host on chain", async () => {
+  await desk.getByRole("tab", { name: "Sedes" }).click();
+  const hostAddress = "0x" + [...crypto.getRandomValues(new Uint8Array(20))].map((b) => b.toString(16).padStart(2, "0")).join("");
+  await desk.getByLabel("Dirección de pago (ZyrcleChain)").first().fill(hostAddress);
+  await desk.getByRole("button", { name: "Guardar" }).first().click();
+  await sleep(800);
+  await desk.getByRole("tab", { name: "Ventas" }).click();
+  await desk.getByLabel("Comprador").fill("Centro de acopio La 80");
+  await desk.getByLabel("Número del tiquete").fill("T-0001");
+  await desk.getByRole("checkbox").first().click();
+  await desk.getByLabel("Pago por la bolsa").first().fill("20000");
+  await desk.getByRole("button", { name: "Registrar venta" }).click();
+  await expect(desk.getByText("Por confirmar").first()).toBeVisible();
+  await desk.getByLabel("Referencia del banco").first().fill("BANCO-0001");
+  await desk.getByLabel("Monto recibido (COP)").first().fill("20000");
+  await desk.getByRole("button", { name: "Confirmar pago" }).click();
+  await expect(desk.getByText(/· Liquidada/).first()).toBeVisible({ timeout: 60_000 });
+  await desk.getByRole("button", { name: "Reparto" }).first().click();
+  await expect(desk.getByText("Le toca")).toBeVisible();
+  const split = await desk.locator("table").last().innerText();
+  for (const party of ["Recolector", "Depósito", "Anfitrión"]) expect(split).toContain(party);
+});
+
+test("the console fits a phone screen", async () => {
+  await desk.setViewportSize({ width: 390, height: 844 });
+  await desk.goto(`${WEB}/console`, { waitUntil: "networkidle" });
+  await expect(desk.getByRole("heading", { name: "Pendientes" })).toBeVisible();
+  expect(await overflow(desk)).toBe(0);
+  await desk.setViewportSize({ width: 1280, height: 900 });
+});
+
+test("the host's dashboard draws the activity after the sale", async () => {
+  await desk.goto(`${WEB}/sites`, { waitUntil: "networkidle" });
+  await expect(desk.getByText("Actividad de reciclaje")).toBeVisible();
+  await sleep(2_500); // the charts animate in
+  const areas = await desk.locator(".recharts-area-area").evaluateAll((els) => els.map((e) => (e.getAttribute("d") || "").length));
+  expect(areas.length).toBeGreaterThan(0);
+  expect(Math.min(...areas)).toBeGreaterThan(0);
+});
+
+test("the console shows the system's health", async () => {
+  await desk.goto(`${WEB}/console`, { waitUntil: "networkidle" });
+  await expect(desk.getByRole("heading", { name: "Estado del sistema" })).toBeVisible();
+});
+
+test("an impact certificate is anchored with its IPFS copy and anyone can verify both", async () => {
+  test.setTimeout(240_000);
+  await desk.getByRole("tab", { name: "Certificados" }).click();
+  await desk.getByRole("combobox").first().click();
+  await desk.getByRole("option", { name: "Universidad Demo Zyrcle" }).click();
+  await desk.getByLabel("Mes").fill(new Date().toLocaleDateString("en-CA").slice(0, 7));
+  await desk.getByRole("button", { name: "Ver qué entra" }).click();
+  await desk.getByRole("button", { name: "Emitir certificado" }).click();
+  await expect(desk.getByText("Anclado").first()).toBeVisible({ timeout: 60_000 });
+
+  const certificates = await (await fetch(`${API}/v1/operator/certificates`, { headers: ops() })).json();
+  expect(certificates[0].ipfs_cid).toBeTruthy();
+  await desk.goto(`${WEB}/certificates/${certificates[0].id}`, { waitUntil: "networkidle" });
+  await desk.getByRole("button", { name: "Verificar" }).click();
+  await expect(desk.getByText(/Coincide\..*la copia permanente en IPFS da la misma raíz/)).toBeVisible();
+  await expect(desk.getByRole("link", { name: /Copia permanente en IPFS/ })).toHaveAttribute("href", new RegExp(`${certificates[0].ipfs_cid}$`));
+
+  await desk.goto(`${WEB}/sites`, { waitUntil: "networkidle" });
+  await expect(desk.getByText("Certificados de impacto")).toBeVisible();
+  await expect(desk.getByRole("link", { name: "Ver y verificar" }).first()).toBeVisible();
+});
+
+test("a campus merchant charges with a QR, a participant pays from the phone, and the merchant redeems for pesos", async ({ browser }) => {
+  test.setTimeout(240_000);
+  const shop = await phone(browser, errors, "shop");
+  const customer = await phone(browser, errors, "customer");
+  await customer.page.getByRole("button", { name: "Acepto" }).click();
+  await expect(customer.page.getByRole("button", { name: "Acepto" })).toHaveCount(0);
+  await rpc("anvil_setBalance", [customer.address, "0x" + (5_000n * 10n ** 18n).toString(16)]);
+
+  await desk.goto(`${WEB}/console`, { waitUntil: "networkidle" });
+  await desk.getByRole("tab", { name: "Comercios" }).click();
+  await desk.getByLabel("Dirección de su cuenta").fill(shop.address);
+  await desk.getByLabel("Nombre del negocio").fill("Cafetería Central");
+  await desk.getByLabel("NIT").fill("900123456-7");
+  await desk.getByRole("button", { name: "Agregar" }).click();
+  await expect(desk.getByRole("cell", { name: "Cafetería Central" }).first()).toBeVisible();
+
+  await shop.page.reload({ waitUntil: "networkidle" });
+  await shop.page.getByRole("tab", { name: /Cuenta/ }).click();
+  await shop.page.getByRole("button", { name: "Abrir comercio" }).click();
+  await shop.page.getByLabel("Valor del cobro").fill("2500");
+  await shop.page.getByLabel("Concepto").fill("Almuerzo");
+  const created = shop.page.waitForResponse((r) => r.url().endsWith("/v1/merchant/charges") && r.request().method() === "POST");
+  await shop.page.getByRole("button", { name: "Generar QR" }).click();
+  const charge = await (await created).json();
+  await expect(shop.page.getByLabel("Código QR del cobro")).toBeVisible();
+
+  // What the QR carries is zyrcle://p/<id>; the scanner routes it to /pay?id=.
+  await customer.page.goto(`${MOB}/pay?id=${charge.id}`, { waitUntil: "networkidle" });
+  await customer.page.getByRole("button", { name: /Pagar/ }).click();
+  await expect(customer.page.getByText("Pagado.")).toBeVisible({ timeout: 60_000 });
+  await expect(shop.page.getByText(/Recibiste/)).toBeVisible();
+  expect(await overflow(customer.page)).toBe(0);
+
+  await shop.page.getByLabel("Valor a cambiar").fill("2000");
+  await shop.page.getByRole("button", { name: "Solicitar el cambio" }).click();
+  await expect(shop.page.getByText("Esperando la transferencia")).toBeVisible({ timeout: 60_000 });
+  await desk.reload({ waitUntil: "networkidle" });
+  await desk.getByRole("tab", { name: "Comercios" }).click();
+  await desk.getByLabel("Referencia de la transferencia").first().fill("BANCO-CAFE-001");
+  await desk.getByRole("button", { name: "Ya pagué" }).first().click();
+  await expect(desk.getByText("Pagado", { exact: true }).first()).toBeVisible();
+  await expect(shop.page.getByText("Pagado en pesos")).toBeVisible();
+  expect(await overflow(shop.page)).toBe(0);
+});

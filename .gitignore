@@ -9,3 +9,10 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 .hypothesis/
+
+# End-to-end tests: stack state, reports
+e2e/.stack/
+e2e/test-results/
+e2e/playwright-report/
+.coverage
+coverage/

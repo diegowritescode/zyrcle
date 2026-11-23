@@ -46,10 +46,10 @@ M17 Keys: own guardian key, admin powers behind a multisig
 ### M8. Safety net: the whole system tested in CI
 - **What:** the browser walkthroughs that today live outside the repository (deposit, collection,
   sale, settlement, certificate with its IPFS copy, merchant payment and redemption) become
-  Playwright tests in `e2e/`. A CI job starts the real Docker images of the commit with Postgres,
-  the broker, a local chain (anvil with the NativeMinter mock), the simulator and stand-ins for
-  Pinata, Resend and Expo, then runs every walkthrough in Chromium against the web app and the
-  mobile app exported for the web. Unit tests for web and mobile components that hold logic. Test
+  Playwright tests in `e2e/`. A CI job starts the whole system from the commit's code with Postgres,
+  the broker, a local chain (anvil with the NativeMinter mock), the simulator and a Pinata
+  stand-in (emails go to the API's log), then runs every walkthrough in Chromium against the web
+  app and the mobile app exported for the web. The Docker images keep their own build job. Unit tests for web and mobile components that hold logic. Test
   coverage measured for the API (pytest-cov), the shared client and the web app (Vitest), shown in
   each CI run, with a floor at today's level that only goes up.
 - **Why this first:** it is a full copy of production, rebuilt for every commit, without paying for

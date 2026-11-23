@@ -56,6 +56,7 @@ code format. If a number in the code changes how money, weight or trust is handl
 | [0028](0028-pilot-readiness.md) | Pilot readiness: backups, alerts, consent, production switches | accepted 2026-11-23 | Claude proposed (v1 block 2, M7); Diego confirmed it; several items still wait for him |
 | [0029](0029-closed-loop-payments.md) | Paying campus merchants; redeeming ZYR for pesos; Treasury v3 | accepted 2026-11-23 | Claude proposed (v1 block 2, M6, after ADR 0004); Diego confirmed it |
 | [0030](0030-blocks-3-and-4.md) | Blocks 3 and 4: foundations and operations first, then every party | accepted 2026-11-23 | Diego asked for one large plan in two blocks and confirmed it; Claude proposed the split, order and designs |
+| [0031](0031-testing-and-the-pre-production-check.md) | Every party's journey tested in CI; coverage floors that only go up | proposed 2026-11-23 | Claude (block 3, M8); not yet confirmed |
 
 Records 0016 to 0024 describe decisions taken before this log existed. They were written on
 2026-11-22 from the code, the commit history and the conversations, and keep the date each decision

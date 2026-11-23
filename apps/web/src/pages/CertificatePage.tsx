@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { CheckCircle2, Download, ExternalLink, Leaf, Loader2, Printer, ShieldCheck, XCircle } from "lucide-react";
-import { MATERIALS, certificateRoot, kg, parseAnchor, type Certificate, type CertificateDocument } from "@zyrcle/client";
+import { MATERIALS, kg, type Certificate } from "@zyrcle/client";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { api } from "@/lib/api";
 import { IPFS_GATEWAY, RPC_URL } from "@/lib/config";
+import { verifyCertificate, type Check } from "@/lib/verifyCertificate";
 
 const MONTHS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 const monthLabel = (period: string) => {
@@ -18,42 +19,6 @@ const monthLabel = (period: string) => {
     return `${MONTHS[m - 1]} de ${y}`;
 };
 const kgOf = (grams: number) => kg(grams / 1000, 2);
-
-type Check = { state: "idle" | "checking" | "ok" | "bad"; detail?: string };
-const short = (h: string) => `${h.slice(0, 10)}…`;
-
-/** Recompute the root from the leaves and compare it with the anchor transaction (ADR 0027). When
- * the anchor names an IPFS copy, read that copy by the CID written on chain (not the one our server
- * reports) and check that its own leaves give the anchored root too. */
-async function verify(c: Certificate): Promise<Check> {
-    const root = await certificateRoot(c.leaves ?? []);
-    if (root !== c.merkle_root) return { state: "bad", detail: "Las hojas publicadas no dan la raíz del certificado." };
-    if (!c.anchor_tx) return { state: "bad", detail: "El certificado aún no está anclado en la cadena." };
-    const res = await fetch(RPC_URL, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_getTransactionByHash", params: [c.anchor_tx] }),
-    });
-    const tx = (await res.json()).result;
-    if (!tx) return { state: "bad", detail: "No encontramos la transacción de anclaje en ZyrcleChain." };
-    const anchor = parseAnchor(String(tx.input));
-    if (!anchor || anchor.certificateId !== c.id || anchor.root !== root) return { state: "bad", detail: "La transacción ancla otra raíz." };
-    const onChain = `Raíz ${short(root)} anclada en la transacción ${short(c.anchor_tx)}`;
-    if (!anchor.cid) return { state: "ok", detail: `${onChain}.` };
-    if (anchor.cid !== c.ipfs_cid) return { state: "bad", detail: "La copia en IPFS que nombra la cadena no es la que muestra esta página." };
-    let copy: CertificateDocument;
-    try {
-        const r = await fetch(`${IPFS_GATEWAY.replace(/\/?$/, "/")}${anchor.cid}`);
-        if (!r.ok) throw new Error(String(r.status));
-        copy = await r.json();
-    } catch {
-        return { state: "ok", detail: `${onChain}. No pudimos abrir la copia en IPFS en este momento; inténtalo más tarde.` };
-    }
-    if (copy.id !== c.id || (await certificateRoot(copy.leaves ?? [])) !== root) {
-        return { state: "bad", detail: "La copia en IPFS no da la raíz anclada." };
-    }
-    return { state: "ok", detail: `${onChain}, y la copia permanente en IPFS da la misma raíz.` };
-}
 
 function downloadCsv(c: Certificate) {
     const rows = [["deposito", "material", "gramos"], ...(c.leaves ?? []).map((l) => [l.deposit_id, l.material, String(l.grams)])];
@@ -72,7 +37,7 @@ const CertificatePage = () => {
         if (!c) return;
         setCheck({ state: "checking" });
         try {
-            setCheck(await verify(c));
+            setCheck(await verifyCertificate(c, { rpcUrl: RPC_URL, ipfsGateway: IPFS_GATEWAY }));
         } catch (e) {
             setCheck({ state: "bad", detail: e instanceof Error ? e.message : String(e) });
         }

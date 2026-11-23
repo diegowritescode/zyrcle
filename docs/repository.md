@@ -27,12 +27,14 @@ zyrcle/
 ├── infra/
 │   └── l1/             ZyrcleChain: genesis, validator container, scripts, fuji.env (addresses)
 ├── deploy/             Production compose stack, deploy script, broker config
+├── e2e/                Playwright: every party's journey against the whole system (ADR 0031)
 ├── docs/               This documentation (map in docs/README.md)
 └── .github/workflows/  CI and image release
 ```
 
 Folders that hold generated or local state are ignored: `node_modules`, `.venv`, `dist`, `out`,
-`cache`, `.expo`, `apps/api/dev/.local` (local keys for anvil).
+`cache`, `.expo`, `apps/api/dev/.local` (local keys for anvil), `e2e/.stack` (the end-to-end stack's
+state and logs), `e2e/test-results` and `e2e/playwright-report`.
 
 ## Where a change goes
 
@@ -44,7 +46,7 @@ Folders that hold generated or local state are ignored: `node_modules`, `.venv`,
 | A contract | `chain/` tests, then `python chain/export-artifacts.py` (CI fails on ABI drift), [infrastructure.md](infrastructure.md) |
 | A setting or a service | `config.py`, `deploy/compose.yml`, `deploy/.env.example`, [infrastructure.md](infrastructure.md) |
 | A rule, a default, a number that moves money, weight or trust | an ADR or an amendment ([adr/README.md](adr/README.md)) |
-| A user-visible flow | [flows.md](flows.md) |
+| A user-visible flow | [flows.md](flows.md), and its step in `e2e/tests` |
 
 ## Conventions
 
@@ -94,8 +96,11 @@ cd chain && forge soldeer install && forge test
 
 # Shared client, web, mobile
 cd packages/client && npm ci && npm test
-cd apps/web && npm ci && npm run dev
-cd apps/mobile && npm ci && npx expo start
+cd apps/web && npm ci && npm test && npm run dev
+cd apps/mobile && npm ci && npm test && npx expo start
+
+# Every party's journey in a browser (e2e/README.md)
+e2e/stack/up.sh && e2e/stack/apps.sh && (cd e2e && npm ci && npx playwright test); e2e/stack/down.sh
 ```
 
 A full local stack (anvil as the chain, the simulator, the API, the web app) is described in

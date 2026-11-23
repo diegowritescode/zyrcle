@@ -64,7 +64,73 @@ jobs:
         run: |
           alembic upgrade head
           alembic check
-      - run: pytest -q
+      # The floor is the coverage measured on 2026-11-23 (ADR 0031); raise it, never lower it.
+      - run: pytest -q --cov --cov-report=term --cov-fail-under=75
+
+  e2e:
+    name: End to end (the whole system in a browser)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: zyrcle
+          POSTGRES_PASSWORD: zyrcle
+          POSTGRES_DB: zyrcle
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U zyrcle" --health-interval 2s --health-retries 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            e2e/package-lock.json
+            apps/web/package-lock.json
+            apps/mobile/package-lock.json
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.5.1
+      - name: Start Mosquitto with the development ACL
+        working-directory: apps/api
+        run: |
+          dev/mosquitto/make-passwd.sh
+          docker run -d --name mosquitto -p 1883:1883 \
+            -v "$PWD/dev/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro" \
+            -v "$PWD/dev/mosquitto/acl:/mosquitto/config/acl:ro" \
+            -v "$PWD/dev/mosquitto/passwd:/mosquitto/config/passwd:ro" eclipse-mosquitto:2
+      - name: Install the API, the simulator and the apps
+        run: |
+          (cd apps/api && pip install -r requirements-dev.txt)
+          echo "E2E_PY=$(dirname "$(which python)")" >> "$GITHUB_ENV"
+          (cd apps/web && npm ci)
+          (cd apps/mobile && npm ci)
+          (cd e2e && npm ci && npx playwright install --with-deps chromium)
+      - name: Start the stack (chain, database, simulator, API, Pinata stand-in)
+        run: e2e/stack/up.sh
+      - name: Build and serve the web app and the mobile app
+        run: e2e/stack/apps.sh
+      - name: Every party's journey
+        working-directory: e2e
+        run: |
+          npx tsc --noEmit
+          npx playwright test
+      - name: Keep the logs and the Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-${{ github.sha }}
+          path: |
+            e2e/.stack/*.log
+            e2e/test-results/
+            e2e/playwright-report/
+          retention-days: 14
 
   chain:
     name: Treasury (Foundry tests + ABI drift)
@@ -127,7 +193,7 @@ jobs:
           cache-dependency-path: packages/client/package-lock.json
       - run: npm ci
       - run: npm run typecheck
-      - run: npm test
+      - run: npx vitest run --coverage --coverage.reporter=text-summary --coverage.thresholds.lines=50
 
   mobile:
     name: Mobile (typecheck + lint + iOS/Android bundles)
@@ -145,6 +211,7 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npx expo lint
+      - run: npm test
       - run: npx expo export --platform ios --platform android --output-dir /tmp/mobile-export
 
   web:
@@ -163,6 +230,7 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npx eslint .
+      - run: npx vitest run --coverage
       - run: npm run build
 
   infra:

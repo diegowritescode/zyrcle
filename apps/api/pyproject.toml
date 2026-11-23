@@ -24,7 +24,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.3", "pytest-asyncio>=1.5", "httpx>=0.28", "asgi-lifespan>=2.1", "hypothesis>=6.120", "ruff>=0.8"]
+dev = ["pytest>=8.3", "pytest-asyncio>=1.5", "httpx>=0.28", "asgi-lifespan>=2.1", "hypothesis>=6.120", "ruff>=0.8", "pytest-cov>=7.0"]
 
 [project.scripts]
 zyrcle-api = "zyrcle_api.cli:main"
@@ -52,3 +52,11 @@ asyncio_default_fixture_loop_scope = "session"
 asyncio_default_test_loop_scope = "session"
 filterwarnings = ["ignore:enable_cleanup_closed ignored:DeprecationWarning:aiohttp"]
 markers = ["integration: needs Postgres and Mosquitto (docker compose -f dev/compose.yml up -d)"]
+
+[tool.coverage.run]
+source = ["zyrcle_api"]
+omit = ["*/zyrcle_api/contracts/*"]
+
+[tool.coverage.report]
+skip_covered = true
+show_missing = true
