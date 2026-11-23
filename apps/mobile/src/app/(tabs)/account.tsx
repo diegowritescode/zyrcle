@@ -4,7 +4,7 @@ import * as Clipboard from "expo-clipboard";
 import Constants from "expo-constants";
 import * as WebBrowser from "expo-web-browser";
 import { router } from "expo-router";
-import { Bell, BellOff, BookOpen, Check, Copy, ExternalLink, KeyRound, LayoutDashboard, Truck } from "lucide-react-native";
+import { Bell, BellOff, BookOpen, Check, Copy, ExternalLink, KeyRound, LayoutDashboard, Store, Truck } from "lucide-react-native";
 import { useState } from "react";
 import { Linking, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { api } from "@/lib/api";
@@ -80,6 +80,14 @@ export default function Account() {
           <Heading>Recolección</Heading>
           <Body>Eres recolector de Zyrcle: vacías contenedores en bolsas que pesa el propio contenedor.</Body>
           <Button title="Abrir recolección" icon={<Truck color={colors.white} size={18} />} onPress={() => router.push("/collect")} />
+        </Card>
+      )}
+
+      {me.data?.merchant && (
+        <Card style={{ gap: space(3) }}>
+          <Heading>{me.data.merchant}</Heading>
+          <Body>Tu comercio cobra en ZYR con un QR y cambia el saldo a pesos con Zyrcle.</Body>
+          <Button title="Abrir comercio" icon={<Store color={colors.white} size={18} />} onPress={() => router.push("/shop")} />
         </Card>
       )}
 

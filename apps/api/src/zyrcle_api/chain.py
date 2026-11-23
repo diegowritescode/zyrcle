@@ -85,6 +85,11 @@ def sale_id(line_id: uuid.UUID) -> bytes:
     return keccak(b"zyrcle-sale-line:" + line_id.bytes)
 
 
+def redemption_ref(request_id: uuid.UUID) -> bytes:
+    """The Treasury's bytes32 reference for a redemption request (docs/adr/0029)."""
+    return keccak(b"zyrcle-redemption:" + request_id.bytes)
+
+
 def load_account(key_hex: str) -> LocalAccount:
     key = key_hex.strip()
     return Account.from_key(key if key.startswith("0x") else "0x" + key)
@@ -426,6 +431,53 @@ class Chain:
 
     def _account(self, address: str):
         return self.w3.eth.contract(address=to_checksum_address(address), abi=self._account_abi)
+
+    # ------------------------------------------------------------------ payments (ADR 0029)
+
+    async def account_nonce(self, address: str) -> int:
+        """The nonce the next signed Execute must carry: 0 while the account is not deployed."""
+        if not await self.is_deployed(address):
+            return 0
+        return await self._account(address).functions.nonce().call()
+
+    async def execute_signed(
+        self,
+        relayer: LocalAccount,
+        account: str,
+        calls: list[tuple[str, int, bytes]],
+        deadline: int,
+        signature: bytes,
+    ) -> str:
+        """Relay the owner's signed Execute; the relayer pays the gas."""
+        receipt = await self._send(
+            relayer,
+            self._account(account).functions.executeSigned(
+                [(to_checksum_address(t), v, d) for t, v, d in calls], deadline, signature
+            ),
+        )
+        return receipt["transactionHash"].to_0x_hex()
+
+    def redeem_calldata(self, ref: bytes) -> bytes:
+        assert self.treasury is not None
+        return bytes.fromhex(self.treasury.encode_abi("redeem", args=[ref]).removeprefix("0x"))
+
+    async def redemption(self, ref: bytes) -> tuple[str, int, int]:
+        """(merchant, amount in wei, status: 0 none, 1 pending, 2 settled, 3 refunded)."""
+        assert self.treasury is not None
+        merchant, amount, status = await self.treasury.functions.redemptions(ref).call()
+        return merchant.lower(), amount, status
+
+    async def settle_redemption(self, operator: LocalAccount, ref: bytes, bank_ref: bytes) -> str:
+        assert self.treasury is not None
+        receipt = await self._send(
+            operator, self.treasury.functions.settleRedemption(ref, bank_ref)
+        )
+        return receipt["transactionHash"].to_0x_hex()
+
+    async def refund_redemption(self, operator: LocalAccount, ref: bytes) -> str:
+        assert self.treasury is not None
+        receipt = await self._send(operator, self.treasury.functions.refundRedemption(ref))
+        return receipt["transactionHash"].to_0x_hex()
 
     async def account_owner(self, address: str) -> str:
         return (await self._account(address).functions.owner().call()).lower()

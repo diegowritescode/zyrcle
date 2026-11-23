@@ -11,6 +11,7 @@ https://zyrcle.deviego.xyz.
 | `/sites` | A host's dashboard across its sites, or one site's: totals, kilos per day and material, pesos paid per day, each site's numbers or each container's fill level and weight. `/residence` redirects here | `GET /v1/hosts/{id}/dashboard`, `GET /v1/sites/{id}/dashboard` |
 | `/console` | Operations console ([ADR 0014](../../docs/adr/0014-operator-accounts.md)): sign-in by email code, review queue, incidents, collectors and printable bag labels, sales with the bank match and settlement report, hosts and sites, prices, operators | `/v1/operator/*` |
 | `/certificates/:id` | A host's impact certificate ([ADR 0027](../../docs/adr/0027-impact-certificates.md)): totals per material, CO2e avoided, print view, CSV of the deposits, and "Verificar", which recomputes the root in the browser and compares it with the anchor transaction on ZyrcleChain | `GET /v1/certificates/{id}`, the public RPC |
+| `/privacidad`, `/terminos` | The data-processing policy and terms of use, drafts for legal review ([ADR 0028](../../docs/adr/0028-pilot-readiness.md)) | none |
 | `/container/:id` | A container's screen, simulated: the QR whose code rotates every 30 s | `GET /v1/demo/containers` |
 | `/collectors`, `/validator`, `/marketplace`, `/my-certificates` | What comes next (phase 4 and later) | none |
 

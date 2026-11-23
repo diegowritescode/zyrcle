@@ -85,6 +85,36 @@ contract Handler is Test {
         } catch {}
     }
 
+    bytes32[] public redemptionRefs;
+
+    function redeem(uint256 who, uint256 pesos) external {
+        address r = residents[who % residents.length];
+        uint256 amount = bound(pesos, 1, 10_000) * COP;
+        if (r.balance < amount) return;
+        bytes32 ref = bytes32(++nonce);
+        vm.prank(r);
+        t.redeem{value: amount}(ref);
+        redemptionRefs.push(ref);
+        ghostMintedToActors -= amount; // no longer in the actors' hands
+    }
+
+    function settleRedemption(uint256 seed) external {
+        if (redemptionRefs.length == 0) return;
+        vm.prank(operator);
+        try t.settleRedemption(redemptionRefs[seed % redemptionRefs.length], bytes32(0)) {} catch {}
+    }
+
+    function refundRedemption(uint256 seed) external {
+        if (redemptionRefs.length == 0) return;
+        bytes32 ref = redemptionRefs[seed % redemptionRefs.length];
+        (address merchant, uint128 amount,) = t.redemptions(ref);
+        vm.prank(operator);
+        try t.refundRedemption(ref) {
+            ghostMintedToActors += amount;
+            merchant; // the ZYR is back with whoever sent it
+        } catch {}
+    }
+
     function warp(uint256 secondsAhead) external {
         vm.warp(block.timestamp + bound(secondsAhead, 0, 2 days));
     }
@@ -103,15 +133,21 @@ contract TreasuryInvariantTest is TreasuryBase {
         targetContract(address(handler));
     }
 
-    /// The core rule: no ZYR exists without pesos behind it.
-    function invariant_minted_never_exceeds_backing() public view {
-        assertLe(treasury.minted(), treasury.backing());
+    /// The core rule: no ZYR circulates without pesos behind it (retired ZYR no longer circulates).
+    function invariant_circulating_never_exceeds_backing() public view {
+        assertLe(treasury.minted() - treasury.retired(), treasury.backing());
     }
 
-    /// Every ZYR the precompile created went through the Treasury's books, and reached residents.
+    /// The Treasury holds exactly the ZYR of pending and settled redemptions.
+    function invariant_treasury_holds_redeemed_zyr() public view {
+        assertEq(address(treasury).balance, treasury.pendingRedemptions() + treasury.retired());
+    }
+
+    /// Every ZYR the precompile created went through the Treasury's books; what is not in the actors'
+    /// hands is held by the Treasury for redemptions.
     function invariant_books_match_the_chain() public view {
         assertEq(minter.totalMinted(), treasury.minted());
-        assertEq(handler.ghostMintedToActors(), treasury.minted());
+        assertEq(handler.ghostMintedToActors() + treasury.pendingRedemptions() + treasury.retired(), treasury.minted());
     }
 
     function invariant_sales_never_overpay_their_parts() public view {
@@ -137,6 +173,6 @@ contract TreasuryInvariantTest is TreasuryBase {
             (, uint128 residentsPart, uint128 collectorPart, uint128 hostPart,,,,) = treasury.sales(handler.saleIds(i));
             distributable += uint256(residentsPart) + collectorPart + hostPart;
         }
-        assertEq(treasury.backing(), treasury.seedCapital() + distributable);
+        assertEq(treasury.backing() + treasury.retired(), treasury.seedCapital() + distributable);
     }
 }

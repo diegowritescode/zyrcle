@@ -35,6 +35,8 @@ export default function RootLayout() {
             <Stack.Screen name="c/[containerId]" options={{ headerShown: false }} />
             <Stack.Screen name="recover" options={{ title: "Recuperar tu cuenta" }} />
             <Stack.Screen name="collect" options={{ title: "Recolección" }} />
+            <Stack.Screen name="pay" options={{ title: "Pagar" }} />
+            <Stack.Screen name="shop" options={{ title: "Comercio" }} />
           </Stack>
           </RetiredGate>
         </NotificationsProvider>

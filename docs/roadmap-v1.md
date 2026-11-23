@@ -125,7 +125,7 @@ H  Weighing station: hardware track, in parallel
   - Only businesses go through KYC.
 - **Done when:** in the demo, a participant buys something at a simulated campus merchant, and the
   merchant's redemption appears in the Treasury and the reconciliation.
-- **Decision:** an ADR on closed-loop payments.
+- **Decision:** [ADR 0029](adr/0029-closed-loop-payments.md). Built in block 2; needs the Treasury redeployed.
 
 ### M7. Pilot readiness
 - **Why:** none of the above should touch a real person's data or money without this.

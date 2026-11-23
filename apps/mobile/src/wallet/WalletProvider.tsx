@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ApiError, buildSiweMessage, isFresh } from "@zyrcle/client";
+import { ApiError, buildSiweMessage, isFresh, type SignedExecute, type TypedExecute } from "@zyrcle/client";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Address } from "viem";
 import type { PrivateKeyAccount } from "viem/accounts";
@@ -117,6 +117,25 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     queryClient.clear();
   }, [queryClient]);
 
+  const signExecute = useCallback(
+    async (typed: TypedExecute): Promise<SignedExecute> => {
+      if (!key) throw new Error("La llave de este teléfono aún no está lista.");
+      const m = typed.message;
+      const signature = await key.signTypedData({
+        domain: { ...typed.domain, verifyingContract: typed.domain.verifyingContract as Address },
+        types: { Execute: typed.types.Execute, Call: typed.types.Call },
+        primaryType: "Execute",
+        message: {
+          calls: m.calls.map((c) => ({ target: c.target as Address, value: BigInt(c.value), data: c.data as `0x${string}` })),
+          nonce: BigInt(m.nonce),
+          deadline: BigInt(m.deadline),
+        },
+      });
+      return { signature, deadline: Number(m.deadline), nonce: Number(m.nonce) };
+    },
+    [key],
+  );
+
   const value = useMemo<Wallet>(
     () => ({
       address,
@@ -128,8 +147,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       ensureToken,
       refreshBalance,
       reset,
+      signExecute,
     }),
-    [address, key, balance.data, token, signingIn, retired, ensureToken, refreshBalance, reset],
+    [address, key, balance.data, token, signingIn, retired, ensureToken, refreshBalance, reset, signExecute],
   );
 
   return <WalletContext.Provider value={value}>{children}</WalletContext.Provider>;

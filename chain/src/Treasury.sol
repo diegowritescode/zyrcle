@@ -28,6 +28,11 @@ interface INativeMinter {
 ///
 ///         Each sale is split between residents, the collector who brought the bag, the hosts whose
 ///         sites the material came from (docs/adr/0013), and operations.
+///
+///         Merchants redeem ZYR for pesos (docs/adr/0029): `redeem` holds the ZYR as pending; once the
+///         operator paid the pesos, `settleRedemption` lowers `backing` and counts the ZYR as retired.
+///         Invariant: `minted - retired <= backing` (ZYR in circulation never exceeds the pesos
+///         behind it); a pending redemption frees no minting capacity.
 contract Treasury is AccessControl, Pausable {
     INativeMinter public constant NATIVE_MINTER = INativeMinter(0x0200000000000000000000000000000000000001);
 
@@ -63,6 +68,10 @@ contract Treasury is AccessControl, Pausable {
     uint256 public seedCapital;
     /// @notice The operations share of sales: stays in pesos, never minted, not part of `backing`.
     uint256 public operationsRevenue;
+    /// @notice ZYR redeemed by merchants whose pesos were paid: out of circulation for good.
+    uint256 public retired;
+    /// @notice ZYR held for redemptions not settled or refunded yet.
+    uint256 public pendingRedemptions;
 
     Shares public shares;
     uint256 public maxAdvancePerDeposit;
@@ -73,6 +82,21 @@ contract Treasury is AccessControl, Pausable {
     mapping(bytes32 depositId => bool) public depositSettled;
     mapping(address resident => mapping(uint256 day => uint256)) public advancedOn;
     mapping(bytes32 saleId => Sale) public sales;
+
+    enum RedemptionStatus {
+        None,
+        Pending,
+        Settled,
+        Refunded
+    }
+
+    struct Redemption {
+        address merchant;
+        uint128 amount;
+        RedemptionStatus status;
+    }
+
+    mapping(bytes32 ref => Redemption) public redemptions;
 
     event SeedCapitalRecorded(bytes32 indexed ref, uint256 amount);
     event SaleRecorded(
@@ -92,6 +116,9 @@ contract Treasury is AccessControl, Pausable {
     event CollectorPaid(bytes32 indexed saleId, address indexed collector, uint256 amount);
     event HostPaid(bytes32 indexed saleId, address indexed host, uint256 amount);
     event SharesChanged(uint16 residents, uint16 collector, uint16 host, uint16 operations);
+    event RedemptionRequested(bytes32 indexed ref, address indexed merchant, uint256 amount);
+    event RedemptionSettled(bytes32 indexed ref, address indexed merchant, uint256 amount, bytes32 bankRef);
+    event RedemptionRefunded(bytes32 indexed ref, address indexed merchant, uint256 amount);
     event AdvanceLimitsChanged(uint256 maxAdvancePerDeposit, uint256 dailyAdvanceCap);
 
     error ZeroAmount();
@@ -106,6 +133,9 @@ contract Treasury is AccessControl, Pausable {
     error ResidentsPartExceeded(bytes32 saleId, uint256 wouldBe, uint256 part);
     error CollectorPartExceeded(bytes32 saleId, uint256 wouldBe, uint256 part);
     error HostPartExceeded(bytes32 saleId, uint256 wouldBe, uint256 part);
+    error NotPending(bytes32 ref);
+    error BackingTooLow(uint256 amount, uint256 backing);
+    error RefundFailed(bytes32 ref);
     error InvalidShares();
     error InvalidLimits();
     error LengthMismatch();
@@ -189,15 +219,18 @@ contract Treasury is AccessControl, Pausable {
         Sale storage sale = sales[saleId];
         if (sale.amount == 0) revert UnknownSale(saleId);
 
+        // Books first, mints after (checks-effects-interactions; docs/security.md).
         uint256 totalShares;
-        uint256 totalPayout;
         for (uint256 i; i < depositIds.length; ++i) {
             totalShares += shareAmounts[i];
-            totalPayout += _settleDeposit(saleId, depositIds[i], residents[i], shareAmounts[i]);
         }
         uint256 settled = sale.residentsSettled + totalShares;
         if (settled > sale.residentsPart) revert ResidentsPartExceeded(saleId, settled, sale.residentsPart);
         sale.residentsSettled = SafeCast.toUint128(settled);
+        uint256 totalPayout;
+        for (uint256 i; i < depositIds.length; ++i) {
+            totalPayout += _settleDeposit(saleId, depositIds[i], residents[i], shareAmounts[i]);
+        }
         emit ResidentsSettled(saleId, totalShares, totalPayout, reportHash);
     }
 
@@ -231,6 +264,43 @@ contract Treasury is AccessControl, Pausable {
         emit HostPaid(saleId, host, amount);
     }
 
+    // ------------------------------------------------------------------ redemptions (ADR 0029)
+
+    /// @notice A merchant hands in ZYR to be paid in pesos. Held until the operator settles or refunds.
+    function redeem(bytes32 ref) external payable {
+        if (msg.value == 0) revert ZeroAmount();
+        if (redemptions[ref].status != RedemptionStatus.None) revert AlreadyRecorded(ref);
+        redemptions[ref] =
+            Redemption({merchant: msg.sender, amount: SafeCast.toUint128(msg.value), status: RedemptionStatus.Pending});
+        pendingRedemptions += msg.value;
+        emit RedemptionRequested(ref, msg.sender, msg.value);
+    }
+
+    /// @notice The operator paid the pesos: they leave the backing and the ZYR is retired.
+    function settleRedemption(bytes32 ref, bytes32 bankRef) external onlyRole(OPERATOR_ROLE) {
+        Redemption storage r = redemptions[ref];
+        if (r.status != RedemptionStatus.Pending) revert NotPending(ref);
+        uint256 amount = r.amount;
+        if (amount > backing) revert BackingTooLow(amount, backing);
+        r.status = RedemptionStatus.Settled;
+        pendingRedemptions -= amount;
+        retired += amount;
+        backing -= amount;
+        emit RedemptionSettled(ref, r.merchant, amount, bankRef);
+    }
+
+    /// @notice The operator will not pay this one: the ZYR goes back to whoever sent it.
+    function refundRedemption(bytes32 ref) external onlyRole(OPERATOR_ROLE) {
+        Redemption storage r = redemptions[ref];
+        if (r.status != RedemptionStatus.Pending) revert NotPending(ref);
+        uint256 amount = r.amount;
+        r.status = RedemptionStatus.Refunded;
+        pendingRedemptions -= amount;
+        emit RedemptionRefunded(ref, r.merchant, amount);
+        (bool ok,) = r.merchant.call{value: amount}("");
+        if (!ok) revert RefundFailed(ref);
+    }
+
     // ------------------------------------------------------------------ administration
 
     function setShares(Shares calldata newShares) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -251,7 +321,7 @@ contract Treasury is AccessControl, Pausable {
 
     /// @notice ZYR that can still be minted.
     function available() external view returns (uint256) {
-        return backing - minted;
+        return backing - (minted - retired);
     }
 
     // ------------------------------------------------------------------ internals
@@ -271,7 +341,8 @@ contract Treasury is AccessControl, Pausable {
 
     function _mint(address to, uint256 amount) private {
         if (amount == 0) return;
-        if (minted + amount > backing) revert UnbackedMint(amount, backing - minted);
+        uint256 circulating = minted - retired;
+        if (circulating + amount > backing) revert UnbackedMint(amount, backing - circulating);
         minted += amount;
         NATIVE_MINTER.mintNativeCoin(to, amount);
     }

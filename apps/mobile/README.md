@@ -6,13 +6,15 @@ SIWE message through [`@zyrcle/client`](../../packages/client).
 
 | Screen | What it does |
 |---|---|
-| Inicio | Balance in pesos, the next turn, a banner to go back to a deposit left open, "Reciclar ahora", how it works, last deposits, demo totals |
+| Inicio | The data-policy consent until accepted ([ADR 0028](../../docs/adr/0028-pilot-readiness.md)), balance in pesos, the next turn, a banner to go back to a deposit left open, "Reciclar ahora", how it works, last deposits, demo totals |
 | Turnos | Book an hour at a container (up to 7 days ahead), see and cancel your turns ([ADR 0009](../../docs/adr/0009-time-slots.md)) |
 | Escanear | Camera QR scanning (`expo-camera`), typed code fallback, the demo's simulated containers |
 | Reciclar | Choose the material, open the lid, live weight over the WebSocket, "Terminé", verdict and the advance paid on chain |
 | Depósitos | The resident's last 20 deposits and their payments: the advance, plus what each got when its bag was sold ([ADR 0013](../../docs/adr/0013-sale-and-settlement.md)) |
 | Cuenta | The account address, the recovery email, "¿Perdiste tu teléfono anterior?", notifications, network, links, and (testnet) a new account |
 | Recolección | For collectors only ([ADR 0012](../../docs/adr/0012-collection-and-bags.md)): open a container, scan a bag, take one material out while the container's scale weighs it, residue, close; seal full bags. Reached from Cuenta |
+| Pagar | Pay a campus merchant's QR from the account: the phone signs, the backend relays and pays the gas ([ADR 0029](../../docs/adr/0029-closed-loop-payments.md)). Reached from Escanear |
+| Comercio | For merchants only: charge with a QR, see payments, and turn ZYR into pesos. Reached from Cuenta |
 | Recuperar tu cuenta | Bring an older account to this phone with the code sent to its recovery email ([ADR 0010](../../docs/adr/0010-smart-accounts-and-recovery.md)) |
 
 ## Wallet and account

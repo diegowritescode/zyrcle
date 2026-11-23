@@ -1,4 +1,5 @@
 import { createContext, useContext } from "react";
+import type { SignedExecute, TypedExecute } from "@zyrcle/client";
 import type { Address } from "viem";
 
 export interface Wallet {
@@ -18,6 +19,8 @@ export interface Wallet {
   refreshBalance: () => void;
   /** Replace this phone's key with a new one: a new, empty account. */
   reset: () => Promise<void>;
+  /** Sign an `Execute` for this phone's smart account (docs/adr/0029). The key never leaves. */
+  signExecute: (typed: TypedExecute) => Promise<SignedExecute>;
 }
 
 export const WalletContext = createContext<Wallet | null>(null);

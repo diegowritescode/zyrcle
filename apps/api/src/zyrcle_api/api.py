@@ -29,6 +29,7 @@ from .models import (
     Device,
     Host,
     MaterialPrice,
+    Merchant,
     Payout,
     PushToken,
     Settlement,
@@ -255,6 +256,7 @@ async def me(resident: Resident, request: Request) -> dict[str, Any]:
             )
         ).all()
         collector = await db.get(Collector, resident)
+        merchant = await db.get(Merchant, resident)
         # What each deposit got when its bag was sold (docs/adr/0013), on top of the advance.
         settled = {
             ref: paid
@@ -283,6 +285,8 @@ async def me(resident: Resident, request: Request) -> dict[str, Any]:
         "privacy_current": request.app.state.settings.privacy_version,
         # Set when the operator named this participant a collector (docs/adr/0012).
         "collector": collector.name if collector is not None and collector.active else None,
+        # Set when the operator named this participant a merchant (docs/adr/0029).
+        "merchant": merchant.name if merchant is not None and merchant.active else None,
         "balance_cop": None if balance is None else balance / WEI_PER_COP,
         "payouts": [
             {

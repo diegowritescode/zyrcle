@@ -5,7 +5,7 @@ Foundry project for the contracts that run on ZyrcleChain. Design and reasons:
 
 | Contract | Purpose |
 |---|---|
-| `src/Treasury.sol` | Mints ZYR (native coin, 1 ZYR = 1 COP) only against recorded seed capital and confirmed sales; pays advances and settlements |
+| `src/Treasury.sol` | Mints ZYR (native coin, 1 ZYR = 1 COP) only against recorded seed capital and confirmed sales; pays advances, settlements, collectors and hosts; holds merchants' redemptions until the operator pays the pesos (ADR 0029) |
 | `src/ZyrcleAccount.sol` | A resident's account: holds their ZYR, obeys their phone key, and moves to a new key after a 48-hour guardian recovery the owner can cancel ([ADR 0010](../docs/adr/0010-smart-accounts-and-recovery.md)) |
 | `src/AccountFactory.sol` | Creates accounts as CREATE2 clones whose address depends only on the first owner key; names the guardian of every account |
 

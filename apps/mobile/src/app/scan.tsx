@@ -1,4 +1,4 @@
-import { ApiError, containerQr, parseContainerQr, parseManualCode } from "@zyrcle/client";
+import { ApiError, containerQr, parseContainerQr, parseManualCode, parsePaymentQr } from "@zyrcle/client";
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from "expo-camera";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
@@ -11,7 +11,8 @@ import { Body, Button, Card, Heading, Muted, Notice } from "@/ui/kit";
 import { Screen } from "@/ui/Screen";
 import { colors, radius, space } from "@/ui/theme";
 
-/** Read the container's QR (camera, typed code or a demo container) and go choose the material. */
+/** Read the container's QR (camera, typed code or a demo container) and go choose the material,
+ * or a merchant's charge QR and go pay it. */
 export default function Scan() {
   const [permission, requestPermission] = useCameraPermissions();
   const [manual, setManual] = useState("");
@@ -25,6 +26,12 @@ export default function Scan() {
     setBusy(true);
     setError(null);
     try {
+      // A merchant's charge: pay it (docs/adr/0029).
+      const paymentId = parsePaymentQr(raw);
+      if (paymentId) {
+        router.replace({ pathname: "/pay", params: { id: paymentId } });
+        return;
+      }
       const parsed = parseContainerQr(raw) ?? parseManualCode(raw);
       if (!parsed) {
         setError("Ese no es un código de Zyrcle. Escanea el QR de la pantalla del contenedor.");

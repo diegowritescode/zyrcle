@@ -24,6 +24,8 @@ from .mail import EmailWorker, LogMail, ResendMail
 from .mqtt import MqttBridge
 from .notifications import ExpoPush, NotificationWorker
 from .operator_auth import router as operator_router
+from .payment_routes import router as payment_router
+from .payments import PaymentService, RelayWorker
 from .payouts import PayoutWorker
 from .public import router as public_router
 from .recovery import RecoveryWorker
@@ -74,6 +76,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 settings.account_factory_address,
             )
         app.state.chain = chain
+        app.state.payments = PaymentService(maker, settings, chain)
         app.state.simulator = (
             httpx.AsyncClient(base_url=settings.demo_simulator_url, timeout=5)
             if settings.demo_simulator_url
@@ -148,6 +151,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             )
         if chain is not None and settings.accounts_enabled:
             guardian = load_account_file(settings.guardian_key_file or settings.oracle_key_file)  # type: ignore[arg-type]
+            # The guardian relays signed payments too: it may deploy accounts (docs/adr/0029).
+            relays = RelayWorker(maker, chain, guardian)
+            app.state.relays = relays
+            tasks.append(
+                asyncio.create_task(_every(settings.relay_interval_s, relays.run_once, "relays"))
+            )
             recoveries = RecoveryWorker(maker, chain, guardian, settings)
             app.state.recoveries = recoveries
             tasks.append(
@@ -197,6 +206,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(sale_router)
     app.include_router(operator_router)
     app.include_router(impact_router)
+    app.include_router(payment_router)
     if settings.demo_simulator_url:
         from .demo import router as demo_router
 

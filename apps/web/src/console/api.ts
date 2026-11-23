@@ -1,6 +1,6 @@
 /** The operator API (docs/adr/0014), used only by the console. Participants' calls live in
  * packages/client. Every call carries the operator's session token. */
-import type { Bag, Certificate, Collection, Session } from "@zyrcle/client";
+import type { Bag, Certificate, Collection, Redemption, Session } from "@zyrcle/client";
 import { API_URL } from "@/lib/config";
 
 export class OperatorApiError extends Error {
@@ -157,6 +157,20 @@ export interface Health {
     chain: { block?: number; block_age_s?: number; available_cop?: number; keys: Record<string, { address: string; zyr: number }>; error?: string } | null;
 }
 
+export interface MerchantRow {
+    resident_id: string;
+    address: string;
+    name: string;
+    nit: string;
+    host_id: string | null;
+    active: boolean;
+}
+
+export interface OperatorRedemption extends Redemption {
+    merchant: string;
+    nit: string;
+}
+
 export interface ContainerBalance {
     container_id: string;
     name: string;
@@ -232,6 +246,13 @@ export function operatorApi(token: string | null, onUnauthorized: () => void) {
             call<CertificatePreview>("/v1/operator/certificates/preview", json("POST", { host_id, site_id, period })),
         issueCertificate: (host_id: string, site_id: string | null, period: string) =>
             call<Certificate>("/v1/operator/certificates", json("POST", { host_id, site_id, period })),
+
+        merchants: () => call<MerchantRow[]>("/v1/operator/merchants"),
+        nameMerchant: (body: { address: string; name: string; nit: string; host_id: string | null; active?: boolean }) =>
+            call<MerchantRow>("/v1/operator/merchants", json("POST", body)),
+        redemptions: (status?: string) => call<OperatorRedemption[]>(`/v1/operator/redemptions${status ? `?status=${status}` : ""}`),
+        settleRedemption: (id: string, bank_ref: string) => call<Redemption>(`/v1/operator/redemptions/${id}/settle`, json("POST", { bank_ref })),
+        refundRedemption: (id: string) => call<Redemption>(`/v1/operator/redemptions/${id}/refund`, json("POST")),
 
         prices: () => call<Price[]>("/v1/operator/prices"),
         setPrice: (material: string, cop_per_kg: number) => call<Price>(`/v1/operator/prices/${material}`, json("PUT", { cop_per_kg })),

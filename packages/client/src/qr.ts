@@ -48,3 +48,11 @@ export function parseBagQr(raw: string): string | null {
 export function bagQr(code: string): string {
   return `zyrcle://b/${code}`;
 }
+
+/** A merchant's charge: `zyrcle://p/<payment id>` (docs/adr/0029). */
+const PAYMENT = /^zyrcle:\/\/p\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
+
+export function parsePaymentQr(raw: string): string | null {
+  const m = PAYMENT.exec(raw.trim());
+  return m ? m[1].toLowerCase() : null;
+}

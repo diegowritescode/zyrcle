@@ -741,6 +741,19 @@ null) and `privacy_current` (in force).
 With `require_consent` on, `POST /v1/sessions` answers 403 `consent_required` until the participant
 accepts the policy in force.
 
+#### Paying a campus merchant
+
+[ADR 0029](adr/0029-closed-loop-payments.md), [`payment_routes.py`](../apps/api/src/zyrcle_api/payment_routes.py).
+The phone signs an EIP-712 `Execute` for its own smart account; the backend relays it.
+
+| Method and path | Body | Returns |
+|---|---|---|
+| `GET /v1/payments/{id}` | | The charge: merchant, `amount_cop`, `concept`, `status` (`open`, `paying`, `paid`, `failed`, `expired`), `qr`, `tx_hash` |
+| `POST /v1/payments/{id}/intent` | | The typed data to sign: domain `Zyrcle Account` v1 with the payer's account as verifying contract, one call sending the amount to the merchant, `nonce`, `deadline` (10 min). Numbers as strings. 409 if the charge is not open or the balance is short; 422 for a merchant's own charge |
+| `POST /v1/payments/{id}/pay` | `{signature, deadline, nonce}` | The charge, now `paying`. 403 if the signature is not from the payer's key; 409 if another payment of theirs is in flight |
+
+`GET /v1/me` also returns `merchant` (business name or null).
+
 ### 3.4 Collector
 
 A collector is a participant with an active collector row, named by an operator
@@ -1080,6 +1093,25 @@ The worker runs only when the chain and `ZYRCLE_OPERATOR_KEY_FILE` are configure
 `residents_cop`, `collector_cop`, `host_cop`, `report_hash`, `txs` (`[{step, tx, at}]`),
 `settled_at`.
 
+
+#### Merchants (participants with the role)
+
+| Method and path | Body | Returns |
+|---|---|---|
+| `GET /v1/merchant` | | `{name, charges: [Payment], redemptions: [Redemption]}`. 403 for non-merchants |
+| `POST /v1/merchant/charges` | `{amount_cop, concept?}` | 201, the charge with its QR `zyrcle://p/<id>`, valid 10 minutes |
+| `POST /v1/merchant/redemptions` | `{amount_cop}` | 201, `{id, typed_data}`: an `Execute` that sends that ZYR to the Treasury's `redeem(ref)` |
+| `POST /v1/merchant/redemptions/{id}/sign` | `{signature, deadline, nonce}` | The redemption, `requested`; the relay worker puts it on chain (`pending`) |
+
+#### Merchants and redemptions (operator)
+
+| Method and path | Body | Returns |
+|---|---|---|
+| `POST /v1/operator/merchants` | `{address, name, nit, host_id?, active?}` | 201, the merchant. The NIT is the KYC reference, checked off line |
+| `GET /v1/operator/merchants` | | Every merchant |
+| `GET /v1/operator/redemptions` | `?status=` | Redemptions with merchant name and NIT |
+| `POST /v1/operator/redemptions/{id}/settle` | `{bank_ref}` | The pesos were transferred: `settleRedemption` on chain lowers `backing` and retires the ZYR. 409 unless `pending` |
+| `POST /v1/operator/redemptions/{id}/refund` | | `refundRedemption` returns the ZYR to the merchant's account |
 
 #### Health
 

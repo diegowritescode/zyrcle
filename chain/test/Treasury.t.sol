@@ -189,6 +189,66 @@ contract TreasuryTest is TreasuryBase {
         treasury.payHost(SALE, ana, 1 * COP);
     }
 
+    // ----------------------------------------------------------- redemptions (ADR 0029)
+
+    function test_a_merchant_redeems_and_the_operator_settles_it() public {
+        address shop = makeAddr("shop");
+        _seed(10_000);
+        vm.prank(oracle);
+        treasury.payAdvance(DEP1, shop, 3_000 * COP); // the shop got ZYR from customers
+        bytes32 ref = keccak256("redeem-1");
+        vm.prank(shop);
+        treasury.redeem{value: 1_000 * COP}(ref);
+        assertEq(shop.balance, 2_000 * COP);
+        assertEq(treasury.pendingRedemptions(), 1_000 * COP);
+        // A pending redemption frees no minting capacity.
+        assertEq(treasury.available(), 7_000 * COP);
+
+        vm.prank(operator);
+        treasury.settleRedemption(ref, keccak256("BANCO-1"));
+        assertEq(treasury.backing(), 9_000 * COP); // the pesos left the bank
+        assertEq(treasury.retired(), 1_000 * COP);
+        assertEq(treasury.pendingRedemptions(), 0);
+        assertEq(treasury.available(), 7_000 * COP); // still 9,000 backing for 2,000 in circulation
+        assertEq(address(treasury).balance, 1_000 * COP); // retired ZYR stays here
+        vm.prank(operator);
+        vm.expectRevert(abi.encodeWithSelector(Treasury.NotPending.selector, ref));
+        treasury.settleRedemption(ref, bytes32(0));
+    }
+
+    function test_a_refused_redemption_returns_the_zyr() public {
+        address shop = makeAddr("shop");
+        vm.deal(shop, 500 * COP);
+        bytes32 ref = keccak256("redeem-2");
+        vm.prank(shop);
+        treasury.redeem{value: 500 * COP}(ref);
+        vm.prank(oracle);
+        vm.expectRevert();
+        treasury.refundRedemption(ref); // only the operator decides
+        vm.prank(operator);
+        treasury.refundRedemption(ref);
+        assertEq(shop.balance, 500 * COP);
+        assertEq(treasury.pendingRedemptions(), 0);
+        (,, Treasury.RedemptionStatus status) = treasury.redemptions(ref);
+        assertEq(uint256(status), uint256(Treasury.RedemptionStatus.Refunded));
+    }
+
+    function test_redemptions_need_value_a_fresh_ref_and_enough_backing() public {
+        address shop = makeAddr("shop");
+        vm.deal(shop, 2_000 * COP);
+        vm.startPrank(shop);
+        vm.expectRevert(Treasury.ZeroAmount.selector);
+        treasury.redeem(keccak256("r"));
+        treasury.redeem{value: 1_000 * COP}(keccak256("r"));
+        vm.expectRevert(abi.encodeWithSelector(Treasury.AlreadyRecorded.selector, keccak256("r")));
+        treasury.redeem{value: 1 * COP}(keccak256("r"));
+        vm.stopPrank();
+        // Nothing backs this ZYR (it did not come from the Treasury): the operator cannot settle it.
+        vm.prank(operator);
+        vm.expectRevert(abi.encodeWithSelector(Treasury.BackingTooLow.selector, 1_000 * COP, 0));
+        treasury.settleRedemption(keccak256("r"), bytes32(0));
+    }
+
     function test_unknown_sale_and_length_mismatch() public {
         vm.startPrank(oracle);
         vm.expectRevert(abi.encodeWithSelector(Treasury.UnknownSale.selector, SALE));

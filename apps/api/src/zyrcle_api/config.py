@@ -49,6 +49,7 @@ class Settings(BaseSettings):
     # bank match (docs/adr/0013). Without it, confirmed sales wait.
     operator_key_file: str | None = None
     settlement_interval_s: float = 3.0
+    relay_interval_s: float = 2.0
 
     # Pilot readiness (docs/adr/0028). Interactive API docs are for development; production turns
     # them off.

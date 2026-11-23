@@ -9,6 +9,7 @@ import { Certificates } from "@/components/console/Certificates";
 import { Collection } from "@/components/console/Collection";
 import { Incidents } from "@/components/console/Incidents";
 import { Login } from "@/components/console/Login";
+import { Merchants } from "@/components/console/Merchants";
 import { Operators, Places, Prices } from "@/components/console/Places";
 import { Review } from "@/components/console/Review";
 import { Sales } from "@/components/console/Sales";
@@ -49,6 +50,7 @@ function ConsoleBody() {
                                         <TabsTrigger value="collection">Recolección</TabsTrigger>
                                         <TabsTrigger value="sales">Ventas</TabsTrigger>
                                         <TabsTrigger value="certificates">Certificados</TabsTrigger>
+                                        <TabsTrigger value="merchants">Comercios</TabsTrigger>
                                         <TabsTrigger value="places">Sedes</TabsTrigger>
                                         <TabsTrigger value="prices">Precios</TabsTrigger>
                                         {me.data?.role === "admin" && <TabsTrigger value="operators">Operadores</TabsTrigger>}
@@ -64,6 +66,7 @@ function ConsoleBody() {
                             <TabsContent value="collection" className="m-0"><Collection /></TabsContent>
                             <TabsContent value="sales" className="m-0"><Sales /></TabsContent>
                             <TabsContent value="certificates" className="m-0"><Certificates /></TabsContent>
+                            <TabsContent value="merchants" className="m-0"><Merchants /></TabsContent>
                             <TabsContent value="places" className="m-0"><Places /></TabsContent>
                             <TabsContent value="prices" className="m-0"><Prices /></TabsContent>
                             {me.data?.role === "admin" && <TabsContent value="operators" className="m-0"><Operators /></TabsContent>}

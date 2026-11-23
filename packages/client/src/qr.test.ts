@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bagQr, containerQr, manualCode, parseBagQr, parseContainerQr, parseManualCode } from "./qr";
+import { bagQr, containerQr, manualCode, parseBagQr, parseContainerQr, parseManualCode, parsePaymentQr } from "./qr";
 
 describe("container QR", () => {
   it("round-trips what the container's screen shows", () => {
@@ -37,5 +37,13 @@ describe("bag QR", () => {
     expect(parseBagQr("zyrcle://c/ctr-0001?code=7KQ2MX")).toBeNull();
     expect(parseBagQr("7KQ2MXA")).toBeNull(); // too short
     expect(parseBagQr("ILOU1234")).toBeNull(); // not Crockford
+  });
+});
+
+describe("payment QR", () => {
+  it("reads a merchant's charge and nothing else", () => {
+    expect(parsePaymentQr("zyrcle://p/3F1C2B8E-0000-4000-8000-000000000001")).toBe("3f1c2b8e-0000-4000-8000-000000000001");
+    expect(parsePaymentQr("zyrcle://c/ctr-0001?code=7KQ2MX")).toBeNull();
+    expect(parsePaymentQr("zyrcle://p/not-a-uuid")).toBeNull();
   });
 });

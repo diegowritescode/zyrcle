@@ -11,6 +11,7 @@ scale and sensors (simulated until hardware exists). Treasury = the contract tha
 - [Collection](#collection)
 - [Sale and settlement](#sale-and-settlement)
 - [Impact certificate](#impact-certificate)
+- [Paying a campus merchant](#paying-a-campus-merchant)
 - [Lost-phone recovery](#lost-phone-recovery)
 - [Push notifications](#push-notifications)
 - [The money](#the-money)
@@ -199,6 +200,43 @@ sequenceDiagram
     V->>V: same root? verified
 ```
 
+## Paying a campus merchant
+
+ADR 0029. The participant needs no gas and no deployed account; the backend cannot change what was
+signed.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor M as Merchant
+    actor P as Participant
+    participant App as Participant's app
+    participant API
+    participant R as Relay worker (guardian key)
+    participant A as Participant's smart account
+    participant T as Treasury
+    M->>API: POST /v1/merchant/charges {amount, concept}
+    API-->>M: QR zyrcle://p/<id> (10 min)
+    P->>App: scans the QR
+    App->>API: POST /v1/payments/{id}/intent
+    API-->>App: EIP-712 Execute: send amount to the merchant's account, nonce, deadline
+    App->>App: sign with the phone key
+    App->>API: POST /v1/payments/{id}/pay {signature}
+    API->>API: recover the signer, must be the payer's key
+    R->>A: deploy the account first if needed (factory)
+    R->>A: executeSigned(calls, deadline, signature)
+    A->>A: check owner signature and nonce, transfer ZYR to the merchant
+    API-->>M: push "Recibiste"
+    Note over M,T: later, to get pesos
+    M->>API: redeem X (signed Execute calling Treasury.redeem)
+    R->>A: executeSigned
+    A->>T: redeem(ref) with X ZYR: pending
+    actor Op as Operator
+    Op->>Op: transfers X pesos to the merchant's bank
+    Op->>API: settle {bank_ref}
+    API->>T: settleRedemption(ref): backing -X, X retired
+```
+
 ## Lost-phone recovery
 
 ADR 0010. The balance never moves; only the key that controls the smart account changes.
@@ -259,7 +297,9 @@ flowchart LR
     Adv & Set --> Acc[Participant smart accounts]
     Col --> CA[Collector account]
     H --> HA[Host address]
-    Acc -->|v1 M6, planned| M[Campus merchants redeem ZYR for pesos]
+    Acc -->|pay with a QR| M[Campus merchants]
+    M -->|redeem| T2[Treasury: ZYR retired, backing lowered when the pesos are paid]
 ```
 
-The Treasury refuses any mint that would make `minted` exceed `backing` (ADR 0007).
+The Treasury refuses any mint that would put more ZYR in circulation (`minted - retired`) than
+`backing` (ADR 0007, ADR 0029).

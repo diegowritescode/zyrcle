@@ -92,6 +92,53 @@ export interface Certificate {
   leaves?: { deposit_id: string; material: string; grams: number }[];
 }
 
+/** A merchant's charge, paid with a participant's signed transfer (docs/adr/0029). */
+export interface Payment {
+  id: string;
+  qr: string;
+  merchant: string;
+  amount_cop: number;
+  concept: string;
+  status: "open" | "paying" | "paid" | "failed" | "expired";
+  tx_hash: string | null;
+  expires_at: string;
+  created_at: string;
+  paid_at: string | null;
+}
+
+export interface Redemption {
+  id: string;
+  amount_cop: number;
+  status: "requested" | "pending" | "settled" | "refunded" | "failed";
+  request_tx: string | null;
+  decision_tx: string | null;
+  bank_ref: string | null;
+  decided_by: string | null;
+  last_error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MerchantHome {
+  name: string;
+  charges: Payment[];
+  redemptions: Redemption[];
+}
+
+/** The EIP-712 `Execute` a smart account's owner signs (docs/adr/0029); big numbers as strings. */
+export interface TypedExecute {
+  types: Record<string, { name: string; type: string }[]>;
+  primaryType: "Execute";
+  domain: { name: string; version: string; chainId: number; verifyingContract: string };
+  message: { calls: { target: string; value: string; data: string }[]; nonce: string; deadline: string };
+}
+
+export interface SignedExecute {
+  signature: string;
+  deadline: number;
+  nonce: number;
+}
+
 /** A host and its sites (GET /v1/hosts). */
 export interface HostSummary extends HostRef {
   sites: (SiteRef & { containers: number })[];
@@ -153,6 +200,8 @@ export interface Me {
   /** The data-processing policy they accepted, and the one in force (Ley 1581, docs/adr/0028). */
   privacy_version: string | null;
   privacy_current: string;
+  /** Their business name, when the operator named them a merchant (docs/adr/0029). */
+  merchant: string | null;
   /** On-chain balance, in pesos; may carry fractions of a peso. */
   balance_cop: number | null;
   payouts: { session_id: string; kind: string; amount_cop: number; status: string; tx_hash: string | null; created_at: string }[];
@@ -401,6 +450,17 @@ export function createApi(baseUrl: string) {
       call<Collection>(`/v1/collections/${id}/finish`, post(), token),
     sealBag: (token: string, code: string) => call<Bag>(`/v1/bags/${encodeURIComponent(code)}/seal`, post(), token),
 
+    payment: (token: string, id: string) => call<Payment>(`/v1/payments/${id}`, {}, token),
+    paymentIntent: (token: string, id: string) => call<TypedExecute>(`/v1/payments/${id}/intent`, post(), token),
+    pay: (token: string, id: string, signed: SignedExecute) => call<Payment>(`/v1/payments/${id}/pay`, post(signed), token),
+    merchant: (token: string) => call<MerchantHome>("/v1/merchant", {}, token),
+    charge: (token: string, amount_cop: number, concept: string) =>
+      call<Payment>("/v1/merchant/charges", post({ amount_cop, concept }), token),
+    redemptionIntent: (token: string, amount_cop: number) =>
+      call<{ id: string; typed_data: TypedExecute }>("/v1/merchant/redemptions", post({ amount_cop }), token),
+    signRedemption: (token: string, id: string, signed: SignedExecute) =>
+      call<Redemption>(`/v1/merchant/redemptions/${id}/sign`, post(signed), token),
+
     demo: {
       containers: () => call<DemoContainer[]>("/v1/demo/containers"),
       items: () => call<DemoItem[]>("/v1/demo/items"),
@@ -515,4 +575,18 @@ export function accountErrorMessage(e: unknown): string {
     default:
       return e.status === 0 ? e.message : "No pudimos completar el paso. Intenta de nuevo.";
   }
+}
+
+/** Spanish message for a failed payment or redemption (docs/adr/0029). */
+export function paymentErrorMessage(e: unknown): string {
+  if (!(e instanceof ApiError)) return "Algo salió mal. Intenta de nuevo.";
+  const d = e.message;
+  if (e.status === 0) return d;
+  if (/not enough ZYR/.test(d)) return "No tienes saldo suficiente.";
+  if (/no longer open/.test(d)) return "Este cobro ya no está abierto. Pide al comercio uno nuevo.";
+  if (/another payment in progress/.test(d)) return "Tienes otro pago en curso. Espera a que termine.";
+  if (/own charge/.test(d)) return "No puedes pagar tu propio cobro.";
+  if (/signature/.test(d)) return "La firma no coincide con este teléfono.";
+  if (/only merchants/.test(d)) return "Esta función es para comercios.";
+  return d;
 }
