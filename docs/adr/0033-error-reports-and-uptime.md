@@ -1,8 +1,8 @@
 # ADR 0033: Error reports to Sentry without personal data, and an uptime check from outside
 
-- Status: proposed (2026-11-23)
-- Decided by: Claude, building block 3 (M10) under ADR 0030, which Diego confirmed. Not yet
-  confirmed.
+- Status: accepted (2026-11-23)
+- Decided by: Claude, building block 3 (M10) under ADR 0030, which Diego confirmed. Diego confirmed
+  it on 2026-11-23: "confirmo todos los adrs".
 
 ## Context
 The health report (ADR 0028) sees queues, the chain and gas from inside the API, and emails admins.

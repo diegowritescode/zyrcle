@@ -1,8 +1,9 @@
 # ADR 0036: Split modules by responsibility, not by line count
 
-- Status: proposed (2026-11-23)
-- Decided by: Claude, building block 3 (M13) under ADR 0030, which Diego confirmed. Not yet
-  confirmed. It narrows M13's first target ("no module over about 400 lines").
+- Status: accepted (2026-11-23)
+- Decided by: Claude, building block 3 (M13) under ADR 0030, which Diego confirmed. It narrows M13's
+  first target ("no module over about 400 lines"). Diego confirmed it on 2026-11-23: "confirmo todos
+  los adrs".
 
 ## Context
 Six backend modules had grown past 550 lines: `models.py` (870), `recovery.py` (768), `sessions.py`

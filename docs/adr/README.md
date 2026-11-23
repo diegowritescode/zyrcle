@@ -56,16 +56,16 @@ code format. If a number in the code changes how money, weight or trust is handl
 | [0028](0028-pilot-readiness.md) | Pilot readiness: backups, alerts, consent, production switches | accepted 2026-11-23 | Claude proposed (v1 block 2, M7); Diego confirmed it; several items still wait for him |
 | [0029](0029-closed-loop-payments.md) | Paying campus merchants; redeeming ZYR for pesos; Treasury v3 | accepted 2026-11-23 | Claude proposed (v1 block 2, M6, after ADR 0004); Diego confirmed it |
 | [0030](0030-blocks-3-and-4.md) | Blocks 3 and 4: foundations and operations first, then every party | accepted 2026-11-23 | Diego asked for one large plan in two blocks and confirmed it; Claude proposed the split, order and designs |
-| [0031](0031-testing-and-the-pre-production-check.md) | Every party's journey tested in CI; coverage floors that only go up | proposed 2026-11-23 | Claude (block 3, M8); not yet confirmed |
-| [0032](0032-deploys-pinned-recorded-and-backed-up.md) | Deploys pinned by digest, recorded, backed up before migrating; base images pinned | proposed 2026-11-23 | Claude (block 3, M9); not yet confirmed |
-| [0033](0033-error-reports-and-uptime.md) | Error reports to Sentry without personal data; uptime check from outside | proposed 2026-11-23 | Claude (block 3, M10); not yet confirmed |
-| [0034](0034-encrypted-off-site-backups.md) | Encrypted copies off the VPS: database, validator identity, keys | proposed 2026-11-23 | Claude (block 3, M11); not yet confirmed; needs Diego's bucket and age key |
-| [0035](0035-rate-limits.md) | Rate limits on the whole API, per account, per address only for codes and sign-in | proposed 2026-11-23 | Claude (block 3, M12); not yet confirmed |
-| [0036](0036-module-boundaries.md) | Split modules by responsibility, not by line count | proposed 2026-11-23 | Claude (block 3, M13); not yet confirmed |
-| [0037](0037-prices-per-collection-center.md) | A reference price per collection center; suggestions from its recent sales | proposed 2026-11-23 | Claude (block 3, M14), after Diego's point on prices per center; not yet confirmed |
-| [0038](0038-reading-scale-tickets-with-ai.md) | Reading the scale ticket from a photo with Claude; a person confirms | proposed 2026-11-23 | Claude (block 3, M15); not yet confirmed; needs Diego's Anthropic key |
-| [0039](0039-bank-statement-matching.md) | Matching the bank statement to sales and redemptions, one click each | proposed 2026-11-23 | Claude (block 3, M16); not yet confirmed |
-| [0040](0040-keys-guardian-and-multisig.md) | The guardian gets its own key; admin powers move to a 2-of-3 Safe | proposed 2026-11-23 | Claude (block 3, M17); guardian part built; multisig waits for Diego's signers |
+| [0031](0031-testing-and-the-pre-production-check.md) | Every party's journey tested in CI; coverage floors that only go up | accepted 2026-11-23 | Claude (block 3, M8); Diego confirmed it |
+| [0032](0032-deploys-pinned-recorded-and-backed-up.md) | Deploys pinned by digest, recorded, backed up before migrating; base images pinned | accepted 2026-11-23 | Claude (block 3, M9); Diego confirmed it |
+| [0033](0033-error-reports-and-uptime.md) | Error reports to Sentry without personal data; uptime check from outside | accepted 2026-11-23 | Claude (block 3, M10); Diego confirmed it |
+| [0034](0034-encrypted-off-site-backups.md) | Encrypted copies off the VPS: database, validator identity, keys | accepted 2026-11-23 | Claude (block 3, M11); Diego confirmed it; needs his bucket and age key |
+| [0035](0035-rate-limits.md) | Rate limits on the whole API, per account, per address only for codes and sign-in | accepted 2026-11-23 | Claude (block 3, M12); Diego confirmed it |
+| [0036](0036-module-boundaries.md) | Split modules by responsibility, not by line count | accepted 2026-11-23 | Claude (block 3, M13); Diego confirmed it |
+| [0037](0037-prices-per-collection-center.md) | A reference price per collection center; suggestions from its recent sales | accepted 2026-11-23 | Claude (block 3, M14), after Diego's point on prices per center; Diego confirmed it |
+| [0038](0038-reading-scale-tickets-with-ai.md) | Reading the scale ticket from a photo with Claude; a person confirms | accepted 2026-11-23 | Claude (block 3, M15); Diego confirmed it; needs his Anthropic key |
+| [0039](0039-bank-statement-matching.md) | Matching the bank statement to sales and redemptions, one click each | accepted 2026-11-23 | Claude (block 3, M16); Diego confirmed it |
+| [0040](0040-keys-guardian-and-multisig.md) | The guardian gets its own key; admin powers move to a 2-of-3 Safe | accepted 2026-11-23 | Claude (block 3, M17); guardian part built; multisig waits for Diego's signers |
 
 Records 0016 to 0024 describe decisions taken before this log existed. They were written on
 2026-11-22 from the code, the commit history and the conversations, and keep the date each decision

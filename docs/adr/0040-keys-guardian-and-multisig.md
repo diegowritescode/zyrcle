@@ -1,8 +1,10 @@
 # ADR 0040: The guardian gets its own key; admin powers move to a 2-of-3 Safe
 
-- Status: proposed (2026-11-23)
-- Decided by: Claude, building block 3 (M17) under ADR 0030, which Diego confirmed. Not yet
-  confirmed. The guardian part is built; the multisig part waits for Diego's choice of signers.
+- Status: accepted (2026-11-23)
+- Decided by: Claude, building block 3 (M17) under ADR 0030, which Diego confirmed. The guardian
+  part is built; the multisig part follows, with the signers he chose. Diego confirmed it on
+  2026-11-23: "confirmo todos los adrs". For the multisig he chose the signers the same day: "vamos
+  con la opcion 3, una mezlca entre mi metamask, mi celular y una clave en papel".
 
 ## Context
 One L1 admin key, kept on the VPS, holds every admin power on ZyrcleChain:

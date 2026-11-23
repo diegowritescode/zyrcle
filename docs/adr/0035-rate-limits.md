@@ -1,8 +1,8 @@
 # ADR 0035: Rate limits on the whole API, per account, and per address only where needed
 
-- Status: proposed (2026-11-23)
-- Decided by: Claude, building block 3 (M12) under ADR 0030, which Diego confirmed. Not yet
-  confirmed.
+- Status: accepted (2026-11-23)
+- Decided by: Claude, building block 3 (M12) under ADR 0030, which Diego confirmed. Diego confirmed
+  it on 2026-11-23: "confirmo todos los adrs".
 
 ## Context
 Only emailed codes had limits in the API (per address and per day). Traefik limits each source

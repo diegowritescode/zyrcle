@@ -1,9 +1,10 @@
 # ADR 0037: A reference price per collection center
 
-- Status: proposed (2026-11-23)
+- Status: accepted (2026-11-23)
 - Decided by: Claude, building block 3 (M14) under ADR 0030, which Diego confirmed. It follows
-  Diego's point of the same day that the price depends on the collection center the material goes
-  to and on what each container takes (ADR 0023, amendment). Not yet confirmed.
+  Diego's point of the same day that the price depends on the collection center the material goes to
+  and on what each container takes (ADR 0023, amendment). Diego confirmed it on 2026-11-23:
+  "confirmo todos los adrs".
 
 ## Context
 Final payments already follow the real sale: each bag is settled from what its buyer paid

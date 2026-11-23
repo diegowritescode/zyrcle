@@ -1,8 +1,8 @@
 # ADR 0038: Reading the scale ticket from a photo with Claude, and a person confirms
 
-- Status: proposed (2026-11-23)
-- Decided by: Claude, building block 3 (M15) under ADR 0030, which Diego confirmed. Not yet
-  confirmed. Needs Diego's Anthropic API key.
+- Status: accepted (2026-11-23)
+- Decided by: Claude, building block 3 (M15) under ADR 0030, which Diego confirmed. Needs Diego's
+  Anthropic API key. Diego confirmed it on 2026-11-23: "confirmo todos los adrs".
 
 ## Context
 Every sale starts from the collection center's scale ticket (ADR 0013). The operator typed it by

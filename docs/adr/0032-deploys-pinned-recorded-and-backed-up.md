@@ -1,8 +1,8 @@
 # ADR 0032: Deploys pinned by digest, recorded, and backed up before migrating
 
-- Status: proposed (2026-11-23)
-- Decided by: Claude, building block 3 (M9) under ADR 0030, which Diego confirmed. Not yet
-  confirmed.
+- Status: accepted (2026-11-23)
+- Decided by: Claude, building block 3 (M9) under ADR 0030, which Diego confirmed. Diego confirmed
+  it on 2026-11-23: "confirmo todos los adrs".
 
 ## Context
 `deploy.sh` (ADR 0020) ran images by tag, took `compose.yml` from whatever the checkout held, kept no

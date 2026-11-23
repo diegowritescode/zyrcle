@@ -1,8 +1,8 @@
 # ADR 0039: Matching the bank statement to sales and redemptions, one click each
 
-- Status: proposed (2026-11-23)
-- Decided by: Claude, building block 3 (M16) under ADR 0030, which Diego confirmed. Not yet
-  confirmed.
+- Status: accepted (2026-11-23)
+- Decided by: Claude, building block 3 (M16) under ADR 0030, which Diego confirmed. Diego confirmed
+  it on 2026-11-23: "confirmo todos los adrs".
 
 ## Context
 Every sale waits for its bank match before anything goes on chain (ADR 0013), and every redemption

@@ -1,8 +1,9 @@
 # ADR 0034: Encrypted copies off the VPS: database, validator identity, keys
 
-- Status: proposed (2026-11-23)
-- Decided by: Claude, building block 3 (M11) under ADR 0030, which Diego confirmed. Not yet
-  confirmed. The bucket and the age key pair need Diego's accounts.
+- Status: accepted (2026-11-23)
+- Decided by: Claude, building block 3 (M11) under ADR 0030, which Diego confirmed. The bucket and
+  the age key pair need Diego's accounts. Diego confirmed it on 2026-11-23: "confirmo todos los
+  adrs".
 
 ## Context
 The daily dump (ADR 0028) stays on the VPS, and nothing backed up the validator's identity, the key

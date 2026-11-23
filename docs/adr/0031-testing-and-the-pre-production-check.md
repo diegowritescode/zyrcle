@@ -1,8 +1,8 @@
 # ADR 0031: Every party's journey tested in CI, and coverage that only goes up
 
-- Status: proposed (2026-11-23)
-- Decided by: Claude, building block 3 (M8) under ADR 0030, which Diego confirmed. Not yet
-  confirmed.
+- Status: accepted (2026-11-23)
+- Decided by: Claude, building block 3 (M8) under ADR 0030, which Diego confirmed. Diego confirmed
+  it on 2026-11-23: "confirmo todos los adrs".
 
 ## Context
 Until block 3 the backend and the contracts had thorough tests, but the web and mobile apps had none
