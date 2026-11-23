@@ -21,6 +21,7 @@ from zyrcle_protocol import EnvelopeError, command, load_public_key, open_envelo
 from zyrcle_protocol.topics import parse_up_topic
 
 from . import bookings
+from .centers import reference_price
 from .config import Settings
 from .domain.session_machine import ACTIVE, CREDITED, Event, InvalidTransition, State, transition
 from .domain.verification import MAX_BULK_DENSITY_G_PER_ML, Measurement, Outcome, Rules, verify
@@ -41,7 +42,6 @@ from .models import (
     DepositSession,
     Device,
     DeviceMessage,
-    MaterialPrice,
     Payout,
     Resident,
     SessionEvent,
@@ -494,11 +494,12 @@ class SessionService:
             await notify_session(db, session, "deposit_approved", self._now())
 
     async def _queue_advance(self, db: AsyncSession, session: DepositSession) -> bool:
-        """Queue the advance in the payout outbox, in the transaction that credits the deposit."""
-        price = await db.get(MaterialPrice, session.declared_material)
+        """Queue the advance in the payout outbox, in the transaction that credits the deposit. The
+        price is the one of the center the site sells to, else the general table (ADR 0037)."""
+        price = await reference_price(db, session.container_id, session.declared_material)
         amount = advance_cop(
             session.deposited_g or 0,
-            price.cop_per_kg if price else 0,
+            price or 0,
             self._s.advance_ratio_bps,
             self._s.max_advance_cop,
         )

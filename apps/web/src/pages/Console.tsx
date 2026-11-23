@@ -10,6 +10,7 @@ import { Collection } from "@/components/console/Collection";
 import { Incidents } from "@/components/console/Incidents";
 import { Login } from "@/components/console/Login";
 import { Merchants } from "@/components/console/Merchants";
+import { Centers } from "@/components/console/Centers";
 import { Operators, Places, Prices } from "@/components/console/Places";
 import { Review } from "@/components/console/Review";
 import { Sales } from "@/components/console/Sales";
@@ -68,7 +69,7 @@ function ConsoleBody() {
                             <TabsContent value="certificates" className="m-0"><Certificates /></TabsContent>
                             <TabsContent value="merchants" className="m-0"><Merchants /></TabsContent>
                             <TabsContent value="places" className="m-0"><Places /></TabsContent>
-                            <TabsContent value="prices" className="m-0"><Prices /></TabsContent>
+                            <TabsContent value="prices" className="m-0"><div className="space-y-6"><Centers /><Prices /></div></TabsContent>
                             {me.data?.role === "admin" && <TabsContent value="operators" className="m-0"><Operators /></TabsContent>}
                         </Tabs>
                     )}

@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .account_routes import router as account_router
 from .api import router
 from .booking_routes import router as booking_router
+from .center_routes import router as center_router
 from .chain import Chain, load_account_file
 from .collection import CollectionService
 from .collection_routes import router as collection_router
@@ -220,6 +221,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(public_router)
     app.include_router(booking_router)
     app.include_router(setup_router)
+    app.include_router(center_router)
     app.include_router(account_router)
     app.include_router(collection_router)
     app.include_router(sale_router)

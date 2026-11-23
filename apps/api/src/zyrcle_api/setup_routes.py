@@ -216,7 +216,14 @@ async def list_sites(_: Operator, request: Request) -> list[dict[str, Any]]:
     """Every site with its schedule and host, for the console."""
     async with request.app.state.maker() as db:
         rows = await db.execute(select(Site, Host).join(Host).order_by(Host.name, Site.name))
-        return [{**site_schedule(site), "host_name": host.name} for site, host in rows]
+        return [
+            {
+                **site_schedule(site),
+                "host_name": host.name,
+                "center_id": str(site.center_id) if site.center_id else None,
+            }
+            for site, host in rows
+        ]
 
 
 @router.get("/v1/operator/health")

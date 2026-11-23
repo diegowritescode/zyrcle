@@ -37,6 +37,10 @@ class Sale(Base):
     )
     id: Mapped[uuid.UUID] = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
     buyer: Mapped[str] = mapped_column(String(200))
+    # The collection center that bought, when it is one on record (ADR 0037).
+    center_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("collection_center.id"), index=True
+    )
     ticket_ref: Mapped[str] = mapped_column(String(100))
     sold_on: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     total_cop: Mapped[int] = mapped_column(BigInteger)

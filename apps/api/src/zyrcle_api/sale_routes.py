@@ -15,7 +15,7 @@ from .auth import utcnow
 from .collection import parse_bag
 from .deps import Operator
 from .errors import Invalid
-from .models import Bag, Host, Incident, Sale, SaleLine, Settlement
+from .models import Bag, CollectionCenter, Host, Incident, Sale, SaleLine, Settlement
 from .setup_routes import host_view
 
 router = APIRouter(prefix="/v1/operator", tags=["sales"])
@@ -37,6 +37,8 @@ class LineIn(BaseModel):
 
 class SaleIn(BaseModel):
     buyer: str = Field(min_length=1, max_length=200)
+    # The center on record that bought, when it is one (docs/adr/0037).
+    center_id: uuid.UUID | None = None
     ticket_ref: str = Field(min_length=1, max_length=100)
     sold_on: date
     lines: list[LineIn] = Field(min_length=1, max_length=100)
@@ -83,6 +85,7 @@ async def sale_view(db, sale: Sale) -> dict[str, Any]:
     return {
         "id": str(sale.id),
         "buyer": sale.buyer,
+        "center_id": str(sale.center_id) if sale.center_id else None,
         "ticket_ref": sale.ticket_ref,
         "sold_on": sale.sold_on.date().isoformat(),
         "total_cop": sale.total_cop,
@@ -150,9 +153,16 @@ async def record_sale(body: SaleIn, operator: Operator, request: Request) -> dic
                     409,
                     {"code": "conflict", "detail": f"bag {code} has an open incident to resolve"},
                 )
+        if body.center_id is not None:
+            center = await db.get(CollectionCenter, body.center_id)
+            if center is None or not center.active:
+                raise HTTPException(
+                    404, {"code": "not_found", "detail": "unknown or inactive collection center"}
+                )
         sale = Sale(
             id=uuid.uuid4(),
             buyer=body.buyer,
+            center_id=body.center_id,
             ticket_ref=body.ticket_ref,
             sold_on=datetime.combine(body.sold_on, time(12), tzinfo=tz),
             total_cop=sum(line.amount_cop for line in body.lines),

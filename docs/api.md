@@ -1138,6 +1138,23 @@ The worker runs only when the chain and `ZYRCLE_OPERATOR_KEY_FILE` are configure
 
 Interactive docs (`/docs`, `/redoc`, `/openapi.json`) are off in production (`ZYRCLE_DOCS_ENABLED=false`).
 
+#### Collection centers (operator)
+
+[ADR 0037](adr/0037-prices-per-collection-center.md),
+[`center_routes.py`](../apps/api/src/zyrcle_api/center_routes.py). A site's advances use the price
+of the center it sells to, else the general table (`/v1/operator/prices`).
+
+| Method and path | Body | Returns |
+|---|---|---|
+| `GET /v1/operator/centers` | | Every center: `{id, name, tax_id, address, contact, active, prices: {material: {cop_per_kg, source, updated_by, updated_at}}, sites: [{id, name}]}` |
+| `POST /v1/operator/centers` | `{name, tax_id?, address?, contact?}` | 201, the center. 409 `conflict` if the name exists |
+| `PUT /v1/operator/centers/{id}/prices/{material}` | `{cop_per_kg, source?: "manual" \| "sales"}` | The center. `sales` means the operator took the suggested median. 404, 422 for an unknown material |
+| `GET /v1/operator/centers/{id}/suggested-prices` | | `{material: {cop_per_kg, lines}}`: the median COP per kg in the center's confirmed sales of the last 90 days, from the buyer's weights |
+| `PUT /v1/operator/sites/{site_id}/center` | `{center_id \| null}` | `{site_id, center_id}` |
+
+`POST /v1/operator/sales` takes an optional `center_id` (404 if unknown or inactive), and sales and
+`GET /v1/operator/sites` show it.
+
 #### Impact certificates (operator)
 
 | Method and path | Body | Returns |

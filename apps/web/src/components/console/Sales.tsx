@@ -5,6 +5,7 @@ import { Banknote, ChevronDown, ChevronUp, Receipt } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -43,6 +44,8 @@ function NewSale() {
     const queryClient = useQueryClient();
     const sealed = useQuery({ queryKey: ["op", "bags", "sealed"], queryFn: () => api.bags("sealed"), refetchInterval: 15_000 });
     const [buyer, setBuyer] = useState("");
+    const centers = useQuery({ queryKey: ["op", "centers"], queryFn: api.centers });
+    const [centerId, setCenterId] = useState<string | null>(null);
     const [ticket, setTicket] = useState("");
     // Today in the operator's own time zone (toISOString would give tomorrow's date at night in Colombia).
     const [soldOn, setSoldOn] = useState(() => new Date().toLocaleDateString("en-CA"));
@@ -68,6 +71,7 @@ function NewSale() {
         try {
             await api.recordSale({
                 buyer: buyer.trim(),
+                center_id: centerId,
                 ticket_ref: ticket.trim(),
                 sold_on: soldOn,
                 lines: picked.map(([bag, d]) => ({ bag, buyer_g: Number(d.buyer_g), amount_cop: Number(d.amount_cop) })),
@@ -88,7 +92,21 @@ function NewSale() {
             <div className="grid gap-3 sm:grid-cols-3 mb-4">
                 <div className="space-y-1">
                     <Label htmlFor="sale-buyer">Comprador</Label>
-                    <Input id="sale-buyer" placeholder="Centro de acopio…" value={buyer} onChange={(e) => setBuyer(e.target.value)} />
+                    <Input id="sale-buyer" placeholder="Centro de acopio…" value={buyer} onChange={(e) => { setBuyer(e.target.value); setCenterId(null); }} />
+                    {(centers.data ?? []).length > 0 && (
+                        <Select
+                            value={centerId ?? ""}
+                            onValueChange={(id) => {
+                                setCenterId(id);
+                                setBuyer(centers.data?.find((c) => c.id === id)?.name ?? "");
+                            }}
+                        >
+                            <SelectTrigger aria-label="Centro de acopio registrado"><SelectValue placeholder="o elige un centro registrado" /></SelectTrigger>
+                            <SelectContent>
+                                {(centers.data ?? []).filter((c) => c.active).map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    )}
                 </div>
                 <div className="space-y-1">
                     <Label htmlFor="sale-ticket">Número del tiquete</Label>

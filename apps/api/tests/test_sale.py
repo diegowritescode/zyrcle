@@ -4,6 +4,7 @@ Uses the collection container (ctr-0004) and runs after test_collection, startin
 """
 
 import uuid
+from datetime import date
 
 import pytest
 from eth_account import Account
@@ -14,6 +15,7 @@ from zyrcle_api.models import Notification
 
 from .collecting import bags, incidents, open_collection, take, wait_collection
 from .helpers import OPS, headers, sign_in, wait_for, wait_state
+from .test_centers import new_center
 from .test_chain_e2e import deposit, wait_payout
 
 pytestmark = pytest.mark.integration
@@ -260,3 +262,43 @@ async def test_an_advance_paid_by_an_earlier_treasury_is_not_paid_twice(
     owed = 6_500 - paid.amount_cop - 700
     assert share["paid_cop"] == owed
     assert await balance(chain, person["address"]) - before == owed
+
+
+async def test_the_console_suggests_the_median_price_of_a_centers_recent_sales(
+    client, settings, bin4, collector
+):
+    center = await new_center(client)
+    person = await sign_in(client, settings)
+    s = await deposit(client, person, bin4, "pet", "pet_bottle", 4)
+    await wait_state(client, person, s["id"], "verified")
+    bag = await fill_and_seal(client, collector, bin4, "pet")
+    await host_with_address(client)
+    r = await client.post(
+        "/v1/operator/sales",
+        headers=OPS,
+        json={
+            "buyer": center["name"],
+            "center_id": center["id"],
+            "ticket_ref": f"T-{uuid.uuid4().hex[:6]}",
+            "sold_on": date.today().isoformat(),
+            "lines": [{"bag": bag["code"], "buyer_g": bag["grams"], "amount_cop": 2_000}],
+        },
+    )
+    assert r.status_code == 201, r.text
+    assert r.json()["center_id"] == center["id"]
+    await client.post(
+        f"/v1/operator/sales/{r.json()['id']}/confirm",
+        headers=OPS,
+        json={"bank_ref": "BANCO-centro", "received_cop": 2_000},
+    )
+    await wait_line(client, r.json()["id"], "settled", "failed")
+    got = await client.get(f"/v1/operator/centers/{center['id']}/suggested-prices", headers=OPS)
+    assert got.json() == {"pet": {"cop_per_kg": 2_000 * 1_000 // bag["grams"], "lines": 1}}
+
+    unknown = {**r.json(), "center_id": str(uuid.uuid4())}
+    bad = await client.post(
+        "/v1/operator/sales",
+        headers=OPS,
+        json={"buyer": "x", "center_id": unknown["center_id"], "ticket_ref": "T", "lines": []},
+    )
+    assert bad.status_code in (404, 422)

@@ -80,6 +80,20 @@ test("the operator names a collector and prints bag labels", async () => {
   await expect(desk.getByText("4 etiquetas nuevas")).toBeVisible();
 });
 
+test("the operator records the collection center, its PET price, and the campus that sells to it", async () => {
+  await desk.getByRole("tab", { name: "Precios" }).click();
+  await desk.getByLabel("Nombre del centro").fill("Centro de acopio La 80");
+  await desk.getByLabel("NIT").fill("900555111-2");
+  await desk.getByRole("button", { name: "Agregar centro" }).click();
+  await expect(desk.getByText("NIT 900555111-2")).toBeVisible();
+  await desk.getByLabel("Precio de pet en Centro de acopio La 80").fill("1800");
+  await desk.getByRole("row", { name: /PET/ }).filter({ has: desk.getByLabel("Precio de pet en Centro de acopio La 80") }).getByRole("button", { name: "Guardar" }).click();
+  await expect(desk.getByText(/Centro de acopio La 80, .*1\.800 por kilo/)).toBeVisible();
+  await desk.getByRole("combobox", { name: "Agregar una sede a Centro de acopio La 80" }).click();
+  await desk.getByRole("option", { name: /Campus Norte/ }).click();
+  await expect(desk.getByRole("button", { name: "Quitar Campus Norte" })).toBeVisible();
+});
+
 test("the collector empties the container into a sealed bag and every gram is accounted for", async () => {
   const p = collector.page;
   await p.reload({ waitUntil: "networkidle" });
@@ -116,7 +130,9 @@ test("a sale confirmed against the bank settles the participants, the collector 
   await desk.getByRole("button", { name: "Guardar" }).first().click();
   await sleep(800);
   await desk.getByRole("tab", { name: "Ventas" }).click();
-  await desk.getByLabel("Comprador").fill("Centro de acopio La 80");
+  await desk.getByRole("combobox", { name: "Centro de acopio registrado" }).click();
+  await desk.getByRole("option", { name: "Centro de acopio La 80" }).click();
+  await expect(desk.locator("#sale-buyer")).toHaveValue("Centro de acopio La 80");
   await desk.getByLabel("Número del tiquete").fill("T-0001");
   await desk.getByRole("checkbox").first().click();
   await desk.getByLabel("Pago por la bolsa").first().fill("20000");
@@ -130,6 +146,8 @@ test("a sale confirmed against the bank settles the participants, the collector 
   await expect(desk.getByText("Le toca")).toBeVisible();
   const split = await desk.locator("table").last().innerText();
   for (const party of ["Recolector", "Depósito", "Anfitrión"]) expect(split).toContain(party);
+  const sales = await (await fetch(`${API}/v1/operator/sales`, { headers: ops() })).json();
+  expect(sales[0].center_id).toBeTruthy(); // the sale names the center on record
 });
 
 test("the console fits a phone screen", async () => {

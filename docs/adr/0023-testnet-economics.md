@@ -32,4 +32,4 @@ On Fuji, ZYR has no real value, but the Treasury still mints only against record
     container is set where it stands.
   - The reference price is one per material for the whole deployment. A price per collection center
     or per host, or one computed from confirmed sales (architecture, section 8), is a later decision
-    to take before a pilot with real money.
+    to take before a pilot with real money. (Taken the same day: ADR 0037, a price per center.)

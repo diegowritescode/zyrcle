@@ -128,6 +128,20 @@ export interface SiteRow {
     opens_hour: number;
     closes_hour: number;
     slot_capacity: number;
+    /** The collection center this site sells to (docs/adr/0037). */
+    center_id: string | null;
+}
+
+/** A collection center and what it pays per material (docs/adr/0037). */
+export interface Center {
+    id: string;
+    name: string;
+    tax_id: string | null;
+    address: string | null;
+    contact: string | null;
+    active: boolean;
+    prices: Record<string, { cop_per_kg: number; source: "manual" | "sales"; updated_by: string; updated_at: string }>;
+    sites: { id: string; name: string }[];
 }
 
 export interface Price {
@@ -232,7 +246,13 @@ export function operatorApi(token: string | null, onUnauthorized: () => void) {
 
         sales: () => call<Sale[]>("/v1/operator/sales"),
         sale: (id: string) => call<Sale>(`/v1/operator/sales/${id}`),
-        recordSale: (body: { buyer: string; ticket_ref: string; sold_on: string; lines: { bag: string; buyer_g: number; amount_cop: number }[] }) =>
+        centers: () => call<Center[]>("/v1/operator/centers"),
+        createCenter: (body: { name: string; tax_id?: string | null }) => call<Center>("/v1/operator/centers", json("POST", body)),
+        setCenterPrice: (id: string, material: string, cop_per_kg: number, source: "manual" | "sales") =>
+            call<Center>(`/v1/operator/centers/${id}/prices/${material}`, json("PUT", { cop_per_kg, source })),
+        centerSuggestions: (id: string) => call<Record<string, { cop_per_kg: number; lines: number }>>(`/v1/operator/centers/${id}/suggested-prices`),
+        setSiteCenter: (siteId: string, center_id: string | null) => call<unknown>(`/v1/operator/sites/${siteId}/center`, json("PUT", { center_id })),
+        recordSale: (body: { buyer: string; center_id?: string | null; ticket_ref: string; sold_on: string; lines: { bag: string; buyer_g: number; amount_cop: number }[] }) =>
             call<Sale>("/v1/operator/sales", json("POST", body)),
         confirmSale: (id: string, bank_ref: string, received_cop: number) => call<Sale>(`/v1/operator/sales/${id}/confirm`, json("POST", { bank_ref, received_cop })),
 

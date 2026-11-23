@@ -60,6 +60,10 @@ class Site(Base):
     closes_hour: Mapped[int] = mapped_column(SmallInteger, default=24, server_default=text("24"))
     # Participants per container per hour (docs/adr/0009-time-slots.md).
     slot_capacity: Mapped[int] = mapped_column(SmallInteger, default=20, server_default=text("20"))
+    # The collection center this site sells to; its prices size the advances here (ADR 0037).
+    center_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("collection_center.id"), index=True
+    )
     created_at: Mapped[datetime] = _now()
 
 
