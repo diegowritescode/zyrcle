@@ -95,6 +95,19 @@ Fuji. The backend moved to FastAPI with Pydantic v2 on Python 3.13. It still ser
   Treasury, the WebSocket key check, clearer errors).
 - **Block 1 deployed** with Diego's approval: Treasury with the host share on Fuji, migrations
   `0005` to `0008`, the demo turned into a university with two campuses, Diego's console account.
+  The fixes found while documenting followed (migration `0009`). The two original repositories
+  were archived.
+
+## 23 November 2026: block 2 of v1, built locally
+
+- **M5, impact certificates** (`1dec632`, ADR 0027): monthly per host or site, sold material only,
+  EPA WARM v16 factors, one claim per gram, the Merkle root anchored on ZyrcleChain and verified in
+  the browser.
+- **M7, pilot readiness** (`bce7113`, ADR 0028): backups with a restore check, health and email
+  alerts, consent under Ley 1581 with the policy and terms as drafts, API docs off in production,
+  Slither review ([security.md](security.md)).
+- **M6, spending on campus** (`b393faa`, ADR 0029): merchants, QR payments signed by the phone and
+  relayed without gas, redemptions of ZYR for pesos, and a Treasury with redemptions (to deploy).
 
 ## Where the old things are
 
