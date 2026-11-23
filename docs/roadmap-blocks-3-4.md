@@ -1,6 +1,6 @@
 # Blocks 3 and 4: from a working loop to a product every party relies on
 
-> Status: **planned** (2026-11-23). v1 blocks 1 and 2 are deployed ([roadmap-v1.md](roadmap-v1.md)).
+> Status: block 3 **deployed** (2026-11-23), except the multisig of M17; block 4 planned. v1 blocks 1 and 2 are deployed ([roadmap-v1.md](roadmap-v1.md)).
 > Scope and order: [ADR 0030](adr/0030-blocks-3-and-4.md).
 
 ## Why

@@ -121,6 +121,19 @@ restoring it; Treasury v3 with redemptions deployed on ZyrcleChain
 keys; the two earlier Treasuries taken off the NativeMinter allow list; the daily backup installed in
 cron. Diego placed the Pinata JWT on the server himself.
 
+## 23 November 2026: block 3 built and deployed
+
+Diego asked for everything missing, for every party and for the engineering, in two large blocks
+(ADR 0030). Block 3 was built the same day: every party's journey tested in a browser in CI (ADR
+0031), deploys pinned by digest and backed up before migrating (0032), error reports and an uptime
+check (0033), encrypted off-site backups (0034), rate limits (0035), modules split by responsibility
+(0036), prices per collection center (0037), scale tickets read from a photo with Claude (0038), the
+bank statement matched to sales and redemptions (0039), and the guardian's own key (0040). A false
+"chain stalled" alert the night before led to a health check that tells a quiet chain from a
+stalled one (ADR 0028, amendment). Diego confirmed every record, chose the multisig signers (his
+MetaMask, his phone and a paper key) and authorized the merge and the deploy: commit `ac09179`,
+migrations `0014` to `0016`, images pinned by digest and recorded in `deploy/history.log`.
+
 ## Where the old things are
 
 | What | Where |
