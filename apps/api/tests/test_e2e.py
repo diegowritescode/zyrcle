@@ -210,3 +210,25 @@ async def test_websocket_rejects_other_residents(client, devices, resident, sett
     assert refused.value.response.status_code == 403
     await client.post(f"/v1/sessions/{session['id']}/finish", headers=headers(resident))
     await wait_state(client, resident, session["id"], "empty")
+
+
+async def test_nobody_learns_whether_someone_elses_session_exists(
+    client, devices, resident, settings
+):
+    from .helpers import sign_in
+
+    stranger = await sign_in(client, settings)
+    session = await deposit_start(client, resident, devices["ctr-0001"])
+    r = await client.post(f"/v1/sessions/{session['id']}/finish", headers=headers(stranger))
+    assert r.status_code == 404
+    await client.post(f"/v1/sessions/{session['id']}/finish", headers=headers(resident))
+    await wait_state(client, resident, session["id"], "empty", "verified")
+
+
+async def deposit_start(client, resident, runner) -> dict:
+    r = await client.post(
+        "/v1/sessions", json={"qr": qr(runner), "material": "pet"}, headers=headers(resident)
+    )
+    assert r.status_code == 201, r.text
+    await wait_state(client, resident, r.json()["id"], "open")
+    return r.json()

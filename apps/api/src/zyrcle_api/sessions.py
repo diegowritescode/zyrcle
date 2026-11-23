@@ -179,7 +179,7 @@ class SessionService:
         async with self._maker() as db:
             session = await self._locked(db, session_id)
             if session.resident_id != resident_id:
-                raise Forbidden("not your session")
+                raise NotFound("unknown session")  # do not tell whether it exists
             device_id = await self._device_of(db, session)
             outbox: list[tuple[str, dict[str, Any]]] = []
             await self._apply(

@@ -14,14 +14,14 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from sqlalchemy import Date, cast, distinct, func, select
+from sqlalchemy import Date, String, cast, distinct, func, select
 from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .auth import utcnow
 from .config import Settings
 from .domain.session_machine import ACTIVE, CREDITED
-from .models import Container, DepositSession, Device, Host, Payout, Site
+from .models import Container, DepositSession, Device, Host, Payout, SaleLine, Settlement, Site
 
 router = APIRouter(prefix="/v1", tags=["public"])
 
@@ -48,6 +48,17 @@ def _kg(grams: int | None) -> float:
     return round((grams or 0) / 1000, 3)
 
 
+def _settled():
+    """Pesos deposits received when their bag was sold, on top of the advance (docs/adr/0013),
+    joined to the deposit and its container so callers can filter by site or container."""
+    return (
+        select(DepositSession.container_id, func.sum(Settlement.paid_cop).label("cop"))
+        .join(DepositSession, cast(DepositSession.id, String) == Settlement.party_ref)
+        .join(Container, Container.id == DepositSession.container_id)
+        .where(Settlement.party == "deposit", Settlement.paid_cop.is_not(None))
+    )
+
+
 async def _totals(db: AsyncSession, site_ids: list[uuid.UUID] | None = None) -> dict[str, Any]:
     deposits = (
         select(
@@ -65,12 +76,16 @@ async def _totals(db: AsyncSession, site_ids: list[uuid.UUID] | None = None) -> 
         .where(Payout.status == "confirmed")
     )
     containers = select(func.count(Container.id))
+    settled = _settled().group_by(DepositSession.container_id)
     if site_ids is not None:
         deposits = deposits.where(Container.site_id.in_(site_ids))
         paid = paid.where(Container.site_id.in_(site_ids))
         containers = containers.where(Container.site_id.in_(site_ids))
+        settled = settled.where(Container.site_id.in_(site_ids))
     count, grams, residents = (await db.execute(deposits)).one()
     payouts, cop = (await db.execute(paid)).one()
+    # Paid = advances plus what sales added on top of them.
+    cop = int(cop) + sum(int(c or 0) for _, c in await db.execute(settled))
     return {
         "containers": await db.scalar(containers) or 0,
         "deposits_verified": count,
@@ -248,10 +263,24 @@ async def _daily(
     for day, material, grams in activity_rows:
         if day in kg_by_day:
             kg_by_day[day][material] = _kg(grams)
+    settled_day = cast(func.timezone(settings.timezone, SaleLine.settled_at), Date)
+    settled_rows = await db.execute(
+        select(settled_day, func.sum(Settlement.paid_cop))
+        .join(SaleLine, SaleLine.id == Settlement.line_id)
+        .join(DepositSession, cast(DepositSession.id, String) == Settlement.party_ref)
+        .join(Container, Container.id == DepositSession.container_id)
+        .where(
+            Settlement.party == "deposit",
+            Settlement.paid_cop.is_not(None),
+            Container.site_id.in_(site_ids),
+            SaleLine.settled_at >= since,
+        )
+        .group_by(settled_day)
+    )
     cop_by_day: dict[date, int] = {d: 0 for d in day_list}
-    for day, cop in payout_rows:
+    for day, cop in [*payout_rows, *settled_rows]:
         if day in cop_by_day:
-            cop_by_day[day] = int(cop)
+            cop_by_day[day] += int(cop or 0)
     return {
         "activity": [{"day": d.isoformat(), "kg": kg_by_day[d]} for d in day_list],
         "payouts": [{"day": d.isoformat(), "cop": cop_by_day[d]} for d in day_list],
@@ -334,6 +363,12 @@ async def site_dashboard(
                 )
             ).all()
         )
+        for cid, cop in await db.execute(
+            _settled()
+            .where(DepositSession.container_id.in_(ids))
+            .group_by(DepositSession.container_id)
+        ):
+            paid_per_container[cid] = int(paid_per_container.get(cid) or 0) + int(cop or 0)
         # The latest closed lid of each container tells how full it is and what it weighs, whether
         # or not that deposit was paid: rejected material is still physically inside.
         latest = {

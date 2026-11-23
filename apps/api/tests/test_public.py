@@ -101,3 +101,24 @@ async def test_residence_routes_remain_as_deprecated_aliases(client, devices):
     assert old["containers"] == 3
     dash = (await client.get(f"/v1/residences/{old['id']}/dashboard?days=3")).json()
     assert dash["residence"] == dash["site"] == {"id": old["id"], "name": "Torres del Río"}
+
+
+async def test_registering_a_container_answers_clearly(client, devices):
+    from .helpers import OPS
+
+    site = (await client.get("/v1/sites")).json()[0]
+    body = {
+        "id": "ctr-x1",
+        "site_id": site["id"],
+        "device_id": "no-such-device",
+        "name": "X",
+        "accepted_materials": ["pet"],
+        "area_mm2": 250_000,
+        "depth_mm": 900,
+    }
+    r = await client.post("/v1/operator/containers", headers=OPS, json=body)
+    assert r.status_code == 404  # unknown device, not a 500
+    r = await client.post(
+        "/v1/operator/containers", headers=OPS, json={**body, "device_id": "ctr-0001"}
+    )
+    assert r.status_code == 409  # that device is already a container

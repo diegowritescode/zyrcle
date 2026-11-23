@@ -18,7 +18,7 @@ https://zyrcle.deviego.xyz.
 Visitors get an embedded wallet: a key generated in the browser and kept in `localStorage`, so the
 flow works without installing anything (testnet only). From the wallet menu they can switch to
 MetaMask or Core instead, and add ZyrcleChain to it. Either way the API session comes from a
-Sign-In with Ethereum signature ([`src/lib/siwe.ts`](src/lib/siwe.ts)), made only when a page needs
+Sign-In with Ethereum signature ([`packages/client/src/siwe.ts`](../../packages/client/src/siwe.ts)), made only when a page needs
 it, and cached for the tab.
 
 ZYR is the L1's native coin and 1 ZYR = 1 COP, so balances and payments are shown in pesos.

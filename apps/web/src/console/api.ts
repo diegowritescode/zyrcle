@@ -201,9 +201,9 @@ export function operatorApi(token: string | null, onUnauthorized: () => void) {
         createHost: (name: string, kind: HostRow["kind"]) => call<HostRow>("/v1/operator/hosts", json("POST", { name, kind })),
         setHostAddress: (id: string, payout_address: string | null) => call<HostRow>(`/v1/operator/hosts/${id}`, json("PATCH", { payout_address })),
         sites: () => call<SiteRow[]>("/v1/operator/sites"),
-        createSite: (host_id: string, name: string) => call<SiteRow>("/v1/operator/sites", json("POST", { host_id, name })),
+        createSite: (host_id: string, name: string) => call<Omit<SiteRow, "host_name">>("/v1/operator/sites", json("POST", { host_id, name })),
         setSchedule: (id: string, opens_hour: number, closes_hour: number, slot_capacity: number) =>
-            call<SiteRow>(`/v1/operator/sites/${id}/schedule`, json("PUT", { opens_hour, closes_hour, slot_capacity })),
+            call<Omit<SiteRow, "host_name">>(`/v1/operator/sites/${id}/schedule`, json("PUT", { opens_hour, closes_hour, slot_capacity })),
 
         prices: () => call<Price[]>("/v1/operator/prices"),
         setPrice: (material: string, cop_per_kg: number) => call<Price>(`/v1/operator/prices/${material}`, json("PUT", { cop_per_kg })),

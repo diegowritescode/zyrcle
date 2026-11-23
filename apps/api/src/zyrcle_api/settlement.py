@@ -60,6 +60,9 @@ class Share:
     address: str | None
     grams: int
     cop: int
+    # The advance this deposit was paid, as the database records it. It may have been paid by an
+    # earlier Treasury, which the current one does not know about (ADR 0013, amendments).
+    advance: int = 0
 
 
 @dataclass
@@ -233,9 +236,27 @@ class SettlementWorker:
                 )
             ).all()
         )
+        advances = dict(
+            (
+                await db.execute(
+                    select(Payout.session_id, Payout.amount_cop).where(
+                        Payout.session_id.in_([s.id for s in credited]),
+                        Payout.kind == "advance",
+                        Payout.status == "confirmed",
+                    )
+                )
+            ).all()
+        )
         amounts = pro_rata(split.residents, [s.deposited_g or 0 for s in credited])
         plan.deposits = [
-            Share("deposit", str(s.id), addresses[s.resident_id], s.deposited_g or 0, cop)
+            Share(
+                "deposit",
+                str(s.id),
+                addresses[s.resident_id],
+                s.deposited_g or 0,
+                cop,
+                advances.get(s.id, 0),
+            )
             for s, cop in zip(credited, amounts, strict=True)
         ]
 
@@ -279,23 +300,32 @@ class SettlementWorker:
             )
             await self._log_tx(line_id, "recordSale", tx)
 
-        pending = [
-            s
-            for s in plan.deposits
-            if s.cop > 0 and not await self._chain.deposit_settled(uuid.UUID(s.ref))
-        ]
-        for i in range(0, len(pending), CHUNK):
-            chunk = pending[i : i + CHUNK]
+        # The contract subtracts the advances it paid itself. An advance paid by an earlier Treasury
+        # is subtracted here, from the share sent, so nobody is paid it twice.
+        pending: list[tuple[Share, int]] = []
+        for s in plan.deposits:
+            if s.cop <= 0 or await self._chain.deposit_settled(uuid.UUID(s.ref)):
+                continue
+            elsewhere = max(s.advance - await self._chain.advance_of(uuid.UUID(s.ref)), 0)
+            pending.append((s, max(s.cop - elsewhere, 0)))
+        sending = [(s, cop) for s, cop in pending if cop > 0]
+        for i in range(0, len(sending), CHUNK):
+            chunk = sending[i : i + CHUNK]
             tx = await self._chain.settle_residents(
                 self._oracle,
                 line_id,
-                [(uuid.UUID(s.ref), s.address, s.cop) for s in chunk],  # type: ignore[misc]
+                [(uuid.UUID(s.ref), s.address, cop) for s, cop in chunk],  # type: ignore[misc]
                 report,
             )
             await self._log_tx(line_id, "settleResidents", tx)
-            await self._mark_deposits(line_id, chunk, tx)
+            await self._mark_deposits(line_id, [s for s, _ in chunk], tx)
+        # Shares the earlier advance already covered: nothing to send.
+        await self._mark_deposits(line_id, [s for s, cop in pending if cop == 0], None)
+        pending_refs = {s.ref for s, _ in pending}
         # Deposits settled by an earlier attempt whose bookkeeping did not get saved.
-        await self._mark_deposits(line_id, [s for s in plan.deposits if s not in pending], None)
+        await self._mark_deposits(
+            line_id, [s for s in plan.deposits if s.ref not in pending_refs], None
+        )
 
         onchain = await self._chain.sale(line_id)
         collector = plan.collector
@@ -360,7 +390,7 @@ class SettlementWorker:
 
     async def _mark_deposits(self, line_id: uuid.UUID, shares: list[Share], tx: str | None) -> None:
         for s in shares:
-            advance = await self._chain.advance_of(uuid.UUID(s.ref))
+            advance = max(s.advance, await self._chain.advance_of(uuid.UUID(s.ref)))
             await self._mark(line_id, s, max(s.cop - advance, 0), tx)
 
     async def _mark(self, line_id: uuid.UUID, s: Share, paid: int, tx: str | None) -> None:

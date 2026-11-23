@@ -49,3 +49,15 @@ describe("account error messages", () => {
     expect(bookingErrorMessage(e)).toMatch(/esperando tu cuenta anterior/);
   });
 });
+
+describe("start errors while a container is busy", () => {
+  it("speaks Spanish when it is being emptied or another deposit is open", () => {
+    expect(startErrorMessage(new ApiError(409, "this container is being emptied; try again in a few minutes", "conflict"))).toBe(
+      "Están vaciando este contenedor. Intenta en unos minutos.",
+    );
+    expect(startErrorMessage(new ApiError(409, "you already have an open session", "conflict"))).toBe(
+      "Ya tienes un depósito abierto. Termínalo antes de abrir otro.",
+    );
+  });
+});
+

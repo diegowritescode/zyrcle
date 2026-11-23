@@ -215,3 +215,48 @@ async def test_a_bag_the_buyer_weighs_differently_waits_for_the_operator(
     assert r.status_code == 200
     done = await wait_line(client, sale["id"], "settled", "failed", timeout=60)
     assert done["lines"][0]["status"] == "settled", done["lines"][0]["reason"]
+
+
+async def test_an_advance_paid_by_an_earlier_treasury_is_not_paid_twice(
+    app, client, settings, chain_env, bin4, collector
+):
+    """After the Treasury is replaced, the new one does not know the advances the old one paid.
+    The settlement subtracts them from what it sends (ADR 0013, amendments)."""
+    from zyrcle_api.models import Payout
+
+    chain = chain_env["chain"]
+    person = await sign_in(client, settings)
+    s = await deposit(client, person, bin4, "pet", "pet_bottle", 12)  # 300 g
+    await wait_state(client, person, s["id"], "verified")
+    paid = await wait_payout(app, s["id"])
+    async with app.state.maker() as db:  # the old Treasury had also paid 700 pesos
+        row = await db.get(Payout, paid.id)
+        row.amount_cop = paid.amount_cop + 700
+        await db.commit()
+    bag = await fill_and_seal(client, collector, bin4, "pet")
+    await host_with_address(client)
+    before = await balance(chain, person["address"])
+    r = await client.post(
+        "/v1/operator/sales",
+        headers=OPS,
+        json={
+            **sale_payload(bag),
+            "ticket_ref": "T-legacy",
+            "lines": [{"bag": bag["code"], "buyer_g": bag["grams"], "amount_cop": 10_000}],
+        },
+    )
+    assert r.status_code == 201, r.text
+    sale = r.json()
+    await client.post(
+        f"/v1/operator/sales/{sale['id']}/confirm",
+        headers=OPS,
+        json={"bank_ref": "BANCO-legacy", "received_cop": 10_000},
+    )
+    done = await wait_line(client, sale["id"], "settled", "failed")
+    line = done["lines"][0]
+    assert line["status"] == "settled", line["reason"]
+    share = next(r for r in line["settlements"] if r["ref"] == s["id"])
+    assert share["share_cop"] == 6_500  # the only deposit in the bag
+    owed = 6_500 - paid.amount_cop - 700
+    assert share["paid_cop"] == owed
+    assert await balance(chain, person["address"]) - before == owed

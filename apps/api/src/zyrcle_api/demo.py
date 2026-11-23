@@ -20,6 +20,7 @@ from .api import Resident, Service
 from .auth import utcnow
 from .collection import bag_view
 from .domain.session_machine import State
+from .errors import SessionError
 from .models import Bag, Collection, Container, Device
 from .public import busy_containers, is_online
 
@@ -86,8 +87,13 @@ async def bags(request: Request) -> list[dict[str, Any]]:
 
 @router.get("/items")
 async def items(simulator: Simulator) -> list[dict[str, Any]]:
-    r = await simulator.get("/items")
-    r.raise_for_status()
+    try:
+        r = await simulator.get("/items")
+        r.raise_for_status()
+    except httpx.HTTPError:
+        raise HTTPException(
+            503, {"code": "unavailable", "detail": "the simulator is not answering"}
+        ) from None
     return r.json()
 
 
@@ -100,7 +106,10 @@ async def drop(
     simulator: Simulator,
     request: Request,
 ) -> dict[str, Any]:
-    session = await service.get(session_id)
+    try:
+        session = await service.get(session_id)
+    except SessionError:
+        raise HTTPException(404, {"code": "not_found", "detail": "unknown session"}) from None
     if session.resident_id != resident:
         raise HTTPException(404, {"code": "not_found", "detail": "unknown session"})
     if session.state not in (State.OPEN.value, State.DEPOSITING.value):

@@ -13,6 +13,7 @@ rpc="http://127.0.0.1:9650/ext/bc/${BLOCKCHAIN_ID}/rpc"
 run() {
   docker run -i --rm --network host --user "$(id -u):$(id -g)" -e HOME=/tmp \
     -e ZYRCLE_CHAIN_RPC_URL="$rpc" -e ZYRCLE_TREASURY_ADDRESS="$TREASURY" \
+    -e ZYRCLE_ACCOUNT_FACTORY_ADDRESS="${ACCOUNT_FACTORY:-}" \
     -v "$repo:/repo" -v "$HOME/.avalanche-cli/key:/keys:ro" -w /repo/apps/api \
     python:3.13-slim "$@"
 }

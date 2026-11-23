@@ -174,7 +174,8 @@ async def request_code(body: EmailIn, request: Request) -> dict[str, Any]:
             created_at=now,
         )
         db.add(row)
-        if op is not None and op.active:
+        # With email off the code is never sent, so it is not written to the outbox either.
+        if op is not None and op.active and settings.email_enabled:
             title = "Tu código para entrar a la consola de Zyrcle"
             paragraphs = [
                 "Escribe este código en la consola de operación:",

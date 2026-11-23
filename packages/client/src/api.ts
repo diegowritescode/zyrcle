@@ -126,7 +126,9 @@ export interface Me {
   email: string | null;
   /** Their collector name, when the operator named them a collector (docs/adr/0012). */
   collector: string | null;
+  /** On-chain balance, in pesos; may carry fractions of a peso. */
   balance_cop: number | null;
+  payouts: { session_id: string; kind: string; amount_cop: number; status: string; tx_hash: string | null; created_at: string }[];
   sessions: HistoryEntry[];
 }
 
@@ -417,6 +419,8 @@ export function startErrorMessage(e: unknown): string {
   if (/invalid or expired/.test(d)) return "El código del QR ya cambió. Escanéalo de nuevo.";
   if (/offline/.test(d)) return "El contenedor está sin conexión.";
   if (/busy/.test(d)) return "Otra persona está usando este contenedor. Espera un momento.";
+  if (/being emptied/.test(d)) return "Están vaciando este contenedor. Intenta en unos minutos.";
+  if (/already have an open session/.test(d)) return "Ya tienes un depósito abierto. Termínalo antes de abrir otro.";
   if (/does not accept/.test(d)) return "Este contenedor no recibe ese material.";
   if (/could not reach/.test(d)) return "No pudimos comunicarnos con el contenedor. Intenta de nuevo.";
   if (/unknown container/.test(d)) return "Ese contenedor no existe.";

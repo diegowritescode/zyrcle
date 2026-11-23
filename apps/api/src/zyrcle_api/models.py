@@ -101,8 +101,12 @@ class Container(Base):
     device_id: Mapped[str] = mapped_column(ForeignKey("device.id"), unique=True)
     name: Mapped[str] = mapped_column(String(200))
     accepted_materials: Mapped[list[str]] = mapped_column(ARRAY(String(32)))
-    area_mm2: Mapped[int] = mapped_column(Integer, CheckConstraint("area_mm2 > 0"))
-    depth_mm: Mapped[int] = mapped_column(Integer, CheckConstraint("depth_mm > 0"))
+    area_mm2: Mapped[int] = mapped_column(
+        Integer, CheckConstraint("area_mm2 > 0", name="container_area_mm2_check")
+    )
+    depth_mm: Mapped[int] = mapped_column(
+        Integer, CheckConstraint("depth_mm > 0", name="container_depth_mm_check")
+    )
     created_at: Mapped[datetime] = _now()
 
 
@@ -167,7 +171,7 @@ class DepositSession(Base):
     deposited_g: Mapped[int | None] = mapped_column(Integer)
     score: Mapped[float | None] = mapped_column(Float)
     reasons: Mapped[list[str] | None] = mapped_column(JSONB)
-    reviewed_by: Mapped[str | None] = mapped_column(String(64))
+    reviewed_by: Mapped[str | None] = mapped_column(String(254))
     review_note: Mapped[str | None] = mapped_column(Text)
     # The collection that took this deposit's material out of the container (docs/adr/0012).
     collection_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("collection.id"), index=True)
@@ -204,8 +208,10 @@ class MaterialPrice(Base):
 
     __tablename__ = "material_price"
     material: Mapped[str] = mapped_column(String(32), primary_key=True)
-    cop_per_kg: Mapped[int] = mapped_column(Integer, CheckConstraint("cop_per_kg >= 0"))
-    source: Mapped[str] = mapped_column(String(16))  # manual | sales
+    cop_per_kg: Mapped[int] = mapped_column(
+        Integer, CheckConstraint("cop_per_kg >= 0", name="material_price_cop_per_kg_check")
+    )
+    source: Mapped[str] = mapped_column(String(16))  # manual (sales: planned, not written yet)
     updated_at: Mapped[datetime] = _now()
 
 
@@ -390,7 +396,7 @@ class AccountRecovery(Base):
     new_owner: Mapped[str] = mapped_column(String(42))
     status: Mapped[str] = mapped_column(String(16))
     ready_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    cancelled_by: Mapped[str | None] = mapped_column(String(16))  # owner | new_phone | chain
+    cancelled_by: Mapped[str | None] = mapped_column(String(16))  # owner|new_phone|chain|replaced
     start_tx: Mapped[str | None] = mapped_column(String(66))
     finish_tx: Mapped[str | None] = mapped_column(String(66))
     cancel_tx: Mapped[str | None] = mapped_column(String(66))
@@ -513,7 +519,8 @@ class Collection(Base):
 
 class CollectionFill(Base):
     """One material taken out of the container during a collection: into a bag, or as residue
-    (`bag_id` None). Weighed by the container's scale: `start_g - end_g`."""
+    (`bag_id` None). Weighed by the container's scale: `start_g - end_g`, or 0 when that is below
+    the scale's noise threshold (`weight_change_g`, docs/adr/0012 amendments)."""
 
     __tablename__ = "collection_fill"
     __table_args__ = (
@@ -569,7 +576,7 @@ class Incident(Base):
     detail: Mapped[dict | None] = mapped_column(JSONB)
     created_at: Mapped[datetime] = _now()
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    resolved_by: Mapped[str | None] = mapped_column(String(64))
+    resolved_by: Mapped[str | None] = mapped_column(String(254))
     resolution_note: Mapped[str | None] = mapped_column(Text)
 
 
@@ -597,9 +604,9 @@ class Sale(Base):
     # sha256 of the ticket's canonical JSON: the evidence each on-chain sale carries.
     evidence_hash: Mapped[str] = mapped_column(String(66))
     status: Mapped[str] = mapped_column(String(16))
-    recorded_by: Mapped[str] = mapped_column(String(64))
+    recorded_by: Mapped[str] = mapped_column(String(254))
     bank_ref: Mapped[str | None] = mapped_column(String(100))
-    confirmed_by: Mapped[str | None] = mapped_column(String(64))
+    confirmed_by: Mapped[str | None] = mapped_column(String(254))
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = _now()
 
@@ -607,7 +614,9 @@ class Sale(Base):
 class SaleLine(Base):
     """One bag of a sale, settled on chain as a sale of its own (docs/adr/0013).
 
-    pending -> waiting (a precondition is not met yet) -> settling -> settled | failed
+    pending | waiting -> settling (claimed by the worker) -> settled | waiting | pending | failed
+    settling goes to waiting when a precondition is not met yet, back to pending after a network
+    error, and is claimed again if a worker died while it was settling.
     """
 
     __tablename__ = "sale_line"

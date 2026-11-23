@@ -47,6 +47,7 @@ from .models import (
     RECOVERY_LIVE,
     AccountRecovery,
     Booking,
+    Collector,
     DepositSession,
     EmailCode,
     Notification,
@@ -705,6 +706,14 @@ class RecoveryWorker:
                         .values(resident_id=target.id)
                     )
                 await db.execute(delete(Notification).where(Notification.resident_id == new_id))
+                # A collector role given to the new phone moves to the account (docs/adr/0012).
+                if await db.get(Collector, target.id) is None:
+                    await db.execute(
+                        update(Collector)
+                        .where(Collector.resident_id == new_id)
+                        .values(resident_id=target.id)
+                    )
+                await db.execute(delete(Collector).where(Collector.resident_id == new_id))
                 rec.new_resident_id = None
                 await db.flush()
                 await db.execute(delete(Resident).where(Resident.id == new_id))

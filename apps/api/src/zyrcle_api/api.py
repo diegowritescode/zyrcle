@@ -188,9 +188,17 @@ async def live(websocket: WebSocket, session_id: uuid.UUID) -> None:
     """Live readings and state changes. Auth: ?token=<JWT> (browsers cannot set WS headers)."""
     app = websocket.app
     try:
-        resident = auth.read_token(app.state.settings, websocket.query_params.get("token", ""))
+        resident, key = auth.read_claims(
+            app.state.settings, websocket.query_params.get("token", "")
+        )
         session = await app.state.sessions.get(session_id)
     except (auth.AuthError, SessionError):
+        await websocket.close(code=4401)
+        return
+    # Like resident_dep: a key whose account moved to another phone has no session any more.
+    async with app.state.maker() as db:
+        owner = await db.scalar(select(ResidentRow.owner_address).where(ResidentRow.id == resident))
+    if owner is None or (key is not None and key != owner):
         await websocket.close(code=4401)
         return
     if session.resident_id != resident:
@@ -200,6 +208,9 @@ async def live(websocket: WebSocket, session_id: uuid.UUID) -> None:
     queue = app.state.hub.subscribe(str(session_id))
     try:
         await websocket.send_json({"type": "state", **session_view(session)})
+        if session.state not in ("authorized", "open", "depositing", "closing"):
+            await websocket.close()  # nothing more will happen to a finished session
+            return
         while True:
             event = await queue.get()
             await websocket.send_json(event)
@@ -447,6 +458,15 @@ async def create_container(body: ContainerIn, _: Operator, request: Request) -> 
     async with request.app.state.maker() as db:
         if await db.get(Site, body.site_id) is None:
             raise HTTPException(404, {"code": "not_found", "detail": "unknown site"})
+        if await db.get(Device, body.device_id) is None:
+            raise HTTPException(404, {"code": "not_found", "detail": "unknown device"})
+        if await db.get(Container, body.id) is not None:
+            raise HTTPException(409, {"code": "conflict", "detail": "that container id exists"})
+        taken = await db.scalar(select(Container.id).where(Container.device_id == body.device_id))
+        if taken is not None:
+            raise HTTPException(
+                409, {"code": "conflict", "detail": f"that device is already container {taken}"}
+            )
         db.add(Container(**body.model_dump()))
         await db.commit()
     return {"id": body.id}
