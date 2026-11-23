@@ -17,8 +17,8 @@ abstract contract TreasuryBase is Test {
         address precompile = 0x0200000000000000000000000000000000000001;
         vm.etch(precompile, type(MockNativeMinter).runtimeCode);
         minter = MockNativeMinter(precompile);
-        // 70% residents, 15% collector, 15% operations; advances up to 5,000 COP, 20,000 a day.
-        treasury = new Treasury(admin, Treasury.Shares(7_000, 1_500, 1_500), 5_000 * COP, 20_000 * COP);
+        // 65% residents, 15% collector, 10% host, 10% operations; advances up to 5,000 COP, 20,000 a day.
+        treasury = new Treasury(admin, Treasury.Shares(6_500, 1_500, 1_000, 1_000), 5_000 * COP, 20_000 * COP);
         minter.setEnabled(address(treasury));
         vm.startPrank(admin);
         treasury.grantRole(treasury.OPERATOR_ROLE(), operator);

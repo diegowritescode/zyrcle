@@ -43,6 +43,10 @@ class Settings(BaseSettings):
     chain_rpc_url: str | None = None
     treasury_address: str | None = None
     oracle_key_file: str | None = None  # hex private key of the Treasury's ORACLE_ROLE
+    # Hex private key of the Treasury's OPERATOR_ROLE: records sales once an operator confirmed the
+    # bank match (docs/adr/0013). Without it, confirmed sales wait.
+    operator_key_file: str | None = None
+    settlement_interval_s: float = 3.0
     # Advance = ratio x reference price x kg, capped like the contract (docs/adr/0003).
     advance_ratio_bps: int = 5_000
     max_advance_cop: int = 5_000
@@ -86,6 +90,10 @@ class Settings(BaseSettings):
     @property
     def chain_enabled(self) -> bool:
         return bool(self.chain_rpc_url and self.treasury_address and self.oracle_key_file)
+
+    @property
+    def sales_enabled(self) -> bool:
+        return self.chain_enabled and bool(self.operator_key_file)
 
     @property
     def accounts_enabled(self) -> bool:

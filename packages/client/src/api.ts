@@ -113,6 +113,8 @@ export interface PayoutInfo {
 export interface HistoryEntry extends Session {
   container_name: string;
   payout: PayoutInfo | null;
+  /** Paid on top of the advance when the deposit's bag was sold (docs/adr/0013). */
+  settled_cop?: number | null;
 }
 
 export interface Me {

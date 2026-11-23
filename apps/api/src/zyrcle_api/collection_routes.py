@@ -5,14 +5,14 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 
 from .api import Operator, Resident
 from .auth import utcnow
 from .collection import CollectionService, bag_view, new_bag_code
 from .errors import SessionError
-from .models import Bag, Collection, Collector, Container, Incident
+from .models import Bag, Collection, Collector, Container, Incident, SaleLine
 from .models import Resident as ResidentRow
 from .sessions import MATERIALS
 
@@ -293,6 +293,13 @@ async def resolve_incident(
         if incident.status == "open":
             incident.status, incident.resolved_at = "resolved", utcnow()
             incident.resolved_by, incident.resolution_note = operator, body.note
+            # Sales waiting on these bags try again now (docs/adr/0013).
+            if incident.bag_ids:
+                await db.execute(
+                    update(SaleLine)
+                    .where(SaleLine.status == "waiting", SaleLine.bag_id.in_(incident.bag_ids))
+                    .values(next_attempt_at=utcnow())
+                )
             await db.commit()
         return incident_view(incident)
 

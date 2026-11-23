@@ -22,7 +22,9 @@ from .notifications import ExpoPush, NotificationWorker
 from .payouts import PayoutWorker
 from .public import router as public_router
 from .recovery import RecoveryWorker
+from .sale_routes import router as sale_router
 from .sessions import SessionService
+from .settlement import SettlementWorker
 
 log = logging.getLogger(__name__)
 
@@ -102,6 +104,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             tasks.append(
                 asyncio.create_task(_every(settings.payout_interval_s, worker.run_once, "payouts"))
             )
+        if chain is not None and settings.sales_enabled:
+            settlements = SettlementWorker(
+                maker,
+                chain,
+                load_account_file(settings.operator_key_file),  # type: ignore[arg-type]
+                load_account_file(settings.oracle_key_file),  # type: ignore[arg-type]
+            )
+            app.state.settlements = settlements
+            tasks.append(
+                asyncio.create_task(
+                    _every(settings.settlement_interval_s, settlements.run_once, "settlements")
+                )
+            )
         if chain is not None and settings.accounts_enabled:
             guardian = load_account_file(settings.guardian_key_file or settings.oracle_key_file)  # type: ignore[arg-type]
             recoveries = RecoveryWorker(maker, chain, guardian, settings)
@@ -147,6 +162,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(booking_router)
     app.include_router(account_router)
     app.include_router(collection_router)
+    app.include_router(sale_router)
     if settings.demo_simulator_url:
         from .demo import router as demo_router
 
@@ -155,7 +171,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.add_middleware(
             CORSMiddleware,
             allow_origins=settings.cors_origin_list,
-            allow_methods=["GET", "POST", "PUT", "DELETE"],
+            allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
             allow_headers=["Authorization", "Content-Type"],
         )
     return app

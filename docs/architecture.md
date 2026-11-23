@@ -93,7 +93,9 @@ silently.
 
 ## 7. Collection and sale
 
-Collection is built ([ADR 0012](adr/0012-collection-and-bags.md)); the sale is planned (v1 M3).
+Collection ([ADR 0012](adr/0012-collection-and-bags.md)) and the sale with its settlement
+([ADR 0013](adr/0013-sale-and-settlement.md)) are built; reading the ticket photo with a vision
+model is not.
 
 - The container's own scale measures each emptying. Collectors do not declare weights.
 - Collectors carry one bag per material, each with a QR. Emptying a container records
@@ -131,8 +133,9 @@ A breach opens an incident for the operator. Nothing is settled from a bag with 
     `advance_ratio × reference_price(material) × kg`, capped per resident per day, paid from the
     advance reserve.
   - When the bag is sold, the proceeds are split by shares fixed in the contract
-    (residents / collector / operations). Each resident's part is pro rata to the grams traced from
-    their deposits into that bag.
+    (residents / collector / host / operations: 65 / 15 / 10 / 10 by default). Each resident's part
+    is pro rata to the grams traced from their deposits into that bag; each host's, to the grams
+    that came from its sites.
   - Settlement = resident's part − advance already paid. Negative results are absorbed by the
     reserve and never clawed back from residents. `advance_ratio` is tuned from loss history.
 - **Reference price** per material = rolling average of the last N confirmed sales.

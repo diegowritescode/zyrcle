@@ -94,11 +94,14 @@ async def chain_env(anvil: str, tmp_path_factory) -> dict:
     factory = await chain.deploy_account_factory(admin, oracle.address)
     key_file = tmp_path_factory.mktemp("keys") / "oracle.key"
     key_file.write_text(ANVIL_KEYS["oracle"])
+    operator_file = key_file.parent / "operator.key"
+    operator_file.write_text(ANVIL_KEYS["operator"])
     return {
         "rpc": anvil,
         "treasury": address,
         "factory": factory,
         "oracle_key_file": str(key_file),
+        "operator_key_file": str(operator_file),
         "chain": chain,
     }
 
@@ -289,7 +292,9 @@ def settings(
         chain_rpc_url=chain_env["rpc"],
         treasury_address=chain_env["treasury"],
         oracle_key_file=chain_env["oracle_key_file"],
+        operator_key_file=chain_env["operator_key_file"],
         payout_interval_s=0.2,
+        settlement_interval_s=0.2,
         database_url=DB_URL,
         mqtt_host=os.environ.get("ZYRCLE_TEST_MQTT_HOST", "localhost"),
         mqtt_password="dev-password",
@@ -423,3 +428,68 @@ async def server_url(app) -> str:
 @pytest.fixture
 async def resident(client: httpx.AsyncClient, settings: Settings) -> dict[str, str]:
     return await sign_in(client, settings)
+
+
+# ---------------------------------------------------------------- collection (docs/adr/0012)
+
+BIN = "ctr-0004"  # its own container, so other tests' deposits do not move its mass balance
+
+
+@pytest.fixture(scope="session")
+async def bin4(client, devices, settings) -> DeviceRunner:
+    host = next(
+        h for h in (await client.get("/v1/hosts")).json() if h["name"] == "Universidad del Río"
+    )
+    site = (
+        await client.post(
+            "/v1/operator/sites",
+            headers=OPS,
+            json={"host_id": host["id"], "name": "Campus de recolección", "slot_capacity": 1000},
+        )
+    ).json()
+    key = generate_private_key()
+    r = await client.post(
+        "/v1/operator/devices", headers=OPS, json={"id": BIN, "public_key_pem": public_key_pem(key)}
+    )
+    assert r.status_code == 201, r.text
+    r = await client.post(
+        "/v1/operator/containers",
+        headers=OPS,
+        json={
+            "id": BIN,
+            "site_id": site["id"],
+            "device_id": BIN,
+            "name": "Contenedor PET y HDPE",
+            "accepted_materials": ["pet", "hdpe", "metal"],
+            "area_mm2": 250_000,
+            "depth_mm": 900,
+        },
+    )
+    assert r.status_code == 201, r.text
+    runner = DeviceRunner(
+        SimulatedContainer(BIN, seed=4),
+        key,
+        host=settings.mqtt_host,
+        password="dev-password",
+        reading_interval_s=0.1,
+    )
+    SIM_RUNNERS[BIN] = runner
+    task = asyncio.create_task(runner.run())
+    await asyncio.wait_for(runner.connected.wait(), 10)
+    await wait_for(lambda: runner.c.code is not None, timeout=10)
+    for material in ("hdpe",):
+        await client.put(f"/v1/operator/prices/{material}", headers=OPS, json={"cop_per_kg": 1000})
+    yield runner
+    task.cancel()
+
+
+@pytest.fixture(scope="session")
+async def collector(client, settings) -> dict:
+    person = await sign_in(client, settings)
+    r = await client.post(
+        "/v1/operator/collectors",
+        headers=OPS,
+        json={"address": person["address"], "name": "Rosa Recicladora"},
+    )
+    assert r.status_code == 201, r.text
+    return person

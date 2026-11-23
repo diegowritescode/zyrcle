@@ -25,7 +25,7 @@ python3 export-artifacts.py   # refresh the ABI/bytecode the backend deploys (CI
 | Treasury | `0xB843946A42F2791B8b932F8c0205C9D277E351B1` (on the NativeMinter allow list) |
 | Operator | `0x528815e03Aa80b045B32840f3e26B394D0838d0d` |
 | Oracle (backend) | `0xd3cBCecC587Bd5f9504bFdea1D3B7e198E66ca50` |
-| Shares | 70% residents, 15% collector, 15% operations |
+| Shares | 65% residents, 15% collector, 10% host, 10% operations ([ADR 0013](../docs/adr/0013-sale-and-settlement.md)) |
 | Advance limits | 5,000 COP per deposit, 20,000 COP per resident per day |
 | Seed capital | 1,000,000 COP, **simulated** (testnet) |
 | AccountFactory | `0x0bE806Ca77340aA50AF6586CDC2FE2561668DaEA` (admin: the L1 admin; guardian: the oracle, on the deployer allow list) |

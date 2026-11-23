@@ -80,6 +80,11 @@ def deposit_id(session_id: uuid.UUID) -> bytes:
     return session_id.bytes.rjust(32, b"\0")
 
 
+def sale_id(line_id: uuid.UUID) -> bytes:
+    """The Treasury's bytes32 id for one bag of a sale (docs/adr/0013)."""
+    return keccak(b"zyrcle-sale-line:" + line_id.bytes)
+
+
 def load_account(key_hex: str) -> LocalAccount:
     key = key_hex.strip()
     return Account.from_key(key if key.startswith("0x") else "0x" + key)
@@ -102,6 +107,33 @@ class TxFailed(Exception):
 class PendingRecovery:
     new_owner: str | None  # lowercase, None if no recovery is pending
     ready_at: int  # unix seconds (chain time)
+
+
+@dataclass(frozen=True)
+class OnChainSale:
+    """A sale as the Treasury holds it, in wei."""
+
+    amount: int
+    residents_part: int
+    collector_part: int
+    host_part: int
+    residents_settled: int
+    collector_paid: int
+    host_paid: int
+
+    @property
+    def recorded(self) -> bool:
+        return self.amount > 0
+
+
+@dataclass(frozen=True)
+class Shares:
+    """Basis points of each sale (they add up to 10,000)."""
+
+    residents: int
+    collector: int
+    host: int
+    operations: int
 
 
 @dataclass(frozen=True)
@@ -164,7 +196,8 @@ class Chain:
         admin: LocalAccount,
         operator: str,
         oracle: str,
-        shares_bps: tuple[int, int, int] = (7_000, 1_500, 1_500),
+        # residents, collector, host, operations (docs/adr/0013)
+        shares_bps: tuple[int, int, int, int] = (6_500, 1_500, 1_000, 1_000),
         max_advance_cop: int = 5_000,
         daily_cap_cop: int = 20_000,
     ) -> str:
@@ -224,6 +257,87 @@ class Chain:
         assert self.treasury is not None
         wei = await self.treasury.functions.advanceOf(deposit_id(session_id)).call()
         return wei // WEI_PER_COP
+
+    # ------------------------------------------------------------------ sales (ADR 0013)
+
+    async def shares(self) -> Shares:
+        assert self.treasury is not None
+        return Shares(*(await self.treasury.functions.shares().call()))
+
+    async def sale(self, line_id: uuid.UUID) -> OnChainSale:
+        assert self.treasury is not None
+        (
+            amount,
+            residents,
+            collector,
+            host,
+            settled,
+            collector_paid,
+            host_paid,
+            _,
+        ) = await self.treasury.functions.sales(sale_id(line_id)).call()
+        return OnChainSale(amount, residents, collector, host, settled, collector_paid, host_paid)
+
+    async def deposit_settled(self, session_id: uuid.UUID) -> bool:
+        assert self.treasury is not None
+        return await self.treasury.functions.depositSettled(deposit_id(session_id)).call()
+
+    async def record_sale(
+        self, operator: LocalAccount, line_id: uuid.UUID, amount_cop: int, evidence: bytes
+    ) -> str:
+        assert self.treasury is not None
+        receipt = await self._send(
+            operator,
+            self.treasury.functions.recordSale(
+                sale_id(line_id), amount_cop * WEI_PER_COP, evidence
+            ),
+        )
+        return receipt["transactionHash"].to_0x_hex()
+
+    async def settle_residents(
+        self,
+        oracle: LocalAccount,
+        line_id: uuid.UUID,
+        shares: list[tuple[uuid.UUID, str, int]],
+        report_hash: bytes,
+    ) -> str:
+        """Pay each (deposit, account, share in pesos) its share minus its advance."""
+        assert self.treasury is not None
+        receipt = await self._send(
+            oracle,
+            self.treasury.functions.settleResidents(
+                sale_id(line_id),
+                [deposit_id(d) for d, _, _ in shares],
+                [to_checksum_address(a) for _, a, _ in shares],
+                [cop * WEI_PER_COP for _, _, cop in shares],
+                report_hash,
+            ),
+        )
+        return receipt["transactionHash"].to_0x_hex()
+
+    async def pay_collector(
+        self, oracle: LocalAccount, line_id: uuid.UUID, collector: str, amount_cop: int
+    ) -> str:
+        assert self.treasury is not None
+        receipt = await self._send(
+            oracle,
+            self.treasury.functions.payCollector(
+                sale_id(line_id), to_checksum_address(collector), amount_cop * WEI_PER_COP
+            ),
+        )
+        return receipt["transactionHash"].to_0x_hex()
+
+    async def pay_host(
+        self, oracle: LocalAccount, line_id: uuid.UUID, host: str, amount_cop: int
+    ) -> str:
+        assert self.treasury is not None
+        receipt = await self._send(
+            oracle,
+            self.treasury.functions.payHost(
+                sale_id(line_id), to_checksum_address(host), amount_cop * WEI_PER_COP
+            ),
+        )
+        return receipt["transactionHash"].to_0x_hex()
 
     async def state(self) -> TreasuryState:
         assert self.treasury is not None

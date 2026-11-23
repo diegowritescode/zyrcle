@@ -1,5 +1,5 @@
 """Turn a local anvil into a ZyrcleChain stand-in: NativeMinter mock, Treasury, seed capital, and
-the account factory (guardian = the oracle key).
+the account factory (guardian = the oracle key). The operator key records sales (docs/adr/0013).
 
     anvil --chain-id 20261121 &
     python dev/local_chain.py            # prints the ZYRCLE_* variables for the API
@@ -39,9 +39,13 @@ async def main() -> None:
     key_file.parent.mkdir(exist_ok=True)
     key_file.write_text(KEYS["oracle"])
     key_file.chmod(0o600)
+    operator_file = key_file.parent / "operator.key"
+    operator_file.write_text(KEYS["operator"])
+    operator_file.chmod(0o600)
     print(f"ZYRCLE_CHAIN_RPC_URL={RPC}")
     print(f"ZYRCLE_TREASURY_ADDRESS={address}")
     print(f"ZYRCLE_ORACLE_KEY_FILE={key_file}")
+    print(f"ZYRCLE_OPERATOR_KEY_FILE={operator_file}")
     print(f"ZYRCLE_ACCOUNT_FACTORY_ADDRESS={factory}")
     print("ZYRCLE_EMAIL_LOG_ONLY=true")
 

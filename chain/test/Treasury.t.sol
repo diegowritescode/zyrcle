@@ -104,12 +104,13 @@ contract TreasuryTest is TreasuryBase {
     function test_a_sale_splits_by_shares_and_only_distributable_parts_back_zyr() public {
         vm.prank(operator);
         treasury.recordSale(SALE, 100_000 * COP, keccak256("ticket-photo"));
-        (uint128 amount, uint128 residentsPart, uint128 collectorPart,,,) = treasury.sales(SALE);
+        (uint128 amount, uint128 residentsPart, uint128 collectorPart, uint128 hostPart,,,,) = treasury.sales(SALE);
         assertEq(amount, 100_000 * COP);
-        assertEq(residentsPart, 70_000 * COP);
+        assertEq(residentsPart, 65_000 * COP);
         assertEq(collectorPart, 15_000 * COP);
-        assertEq(treasury.operationsRevenue(), 15_000 * COP);
-        assertEq(treasury.backing(), 85_000 * COP); // the operations part stays in pesos
+        assertEq(hostPart, 10_000 * COP);
+        assertEq(treasury.operationsRevenue(), 10_000 * COP);
+        assertEq(treasury.backing(), 90_000 * COP); // the operations part stays in pesos
     }
 
     function test_settlement_pays_share_minus_advance() public {
@@ -119,7 +120,7 @@ contract TreasuryTest is TreasuryBase {
         treasury.payAdvance(DEP2, beto, 3_000 * COP);
         vm.stopPrank();
         vm.prank(operator);
-        treasury.recordSale(SALE, 10_000 * COP, bytes32(0)); // residents part: 7,000
+        treasury.recordSale(SALE, 10_000 * COP, bytes32(0)); // residents part: 6,500
 
         // Ana's share is 4,000 (advance 1,000): she gets 3,000 more.
         // Beto's share is 2,000 but his advance was 3,000: he gets 0 and keeps the advance.
@@ -127,7 +128,7 @@ contract TreasuryTest is TreasuryBase {
         treasury.settleResidents(SALE, _ids(DEP1, DEP2), _addrs(ana, beto), _amts(4_000, 2_000), "report");
         assertEq(ana.balance, 4_000 * COP);
         assertEq(beto.balance, 3_000 * COP);
-        (,,, uint128 settled,,) = treasury.sales(SALE);
+        (,,,, uint128 settled,,,) = treasury.sales(SALE);
         assertEq(settled, 6_000 * COP);
         assertLe(treasury.minted(), treasury.backing());
     }
@@ -147,8 +148,8 @@ contract TreasuryTest is TreasuryBase {
         vm.prank(operator);
         treasury.recordSale(SALE, 10_000 * COP, bytes32(0));
         vm.prank(oracle);
-        vm.expectRevert(abi.encodeWithSelector(Treasury.ResidentsPartExceeded.selector, SALE, 7_001 * COP, 7_000 * COP));
-        treasury.settleResidents(SALE, _ids(DEP1, DEP2), _addrs(ana, beto), _amts(7_000, 1), "r");
+        vm.expectRevert(abi.encodeWithSelector(Treasury.ResidentsPartExceeded.selector, SALE, 6_501 * COP, 6_500 * COP));
+        treasury.settleResidents(SALE, _ids(DEP1, DEP2), _addrs(ana, beto), _amts(6_500, 1), "r");
     }
 
     function test_collector_is_paid_up_to_the_collector_part() public {
@@ -158,6 +159,34 @@ contract TreasuryTest is TreasuryBase {
         treasury.payCollector(SALE, collector, 1_000 * COP);
         vm.expectRevert(abi.encodeWithSelector(Treasury.CollectorPartExceeded.selector, SALE, 1_501 * COP, 1_500 * COP));
         treasury.payCollector(SALE, collector, 501 * COP);
+    }
+
+    function test_hosts_are_paid_up_to_the_host_part_split_among_them() public {
+        address campus = makeAddr("campus");
+        address building = makeAddr("building");
+        vm.prank(operator);
+        treasury.recordSale(SALE, 10_000 * COP, bytes32(0)); // host part: 1,000
+        vm.startPrank(oracle);
+        treasury.payHost(SALE, campus, 600 * COP);
+        treasury.payHost(SALE, building, 400 * COP);
+        vm.expectRevert(abi.encodeWithSelector(Treasury.HostPartExceeded.selector, SALE, 1_000 * COP + 1, 1_000 * COP));
+        treasury.payHost(SALE, campus, 1);
+        bytes32 unknown = keccak256("no such sale");
+        vm.expectRevert(abi.encodeWithSelector(Treasury.UnknownSale.selector, unknown));
+        treasury.payHost(unknown, campus, 1);
+        vm.stopPrank();
+        assertEq(campus.balance, 600 * COP);
+        assertEq(building.balance, 400 * COP);
+        (,,,,,, uint128 hostPaid,) = treasury.sales(SALE);
+        assertEq(hostPaid, 1_000 * COP);
+    }
+
+    function test_only_the_oracle_pays_hosts() public {
+        vm.prank(operator);
+        treasury.recordSale(SALE, 10_000 * COP, bytes32(0));
+        vm.prank(operator);
+        vm.expectRevert();
+        treasury.payHost(SALE, ana, 1 * COP);
     }
 
     function test_unknown_sale_and_length_mismatch() public {
@@ -171,10 +200,10 @@ contract TreasuryTest is TreasuryBase {
     function test_shares_must_add_up_and_only_admin_changes_them() public {
         vm.prank(admin);
         vm.expectRevert(Treasury.InvalidShares.selector);
-        treasury.setShares(Treasury.Shares(7_000, 1_500, 1_000));
+        treasury.setShares(Treasury.Shares(7_000, 1_500, 1_000, 1_000));
         vm.prank(operator);
         vm.expectRevert();
-        treasury.setShares(Treasury.Shares(6_000, 2_000, 2_000));
+        treasury.setShares(Treasury.Shares(6_000, 2_000, 1_000, 1_000));
     }
 
     // ----------------------------------------------------------- helpers

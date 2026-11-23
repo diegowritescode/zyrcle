@@ -225,6 +225,22 @@ class CollectionService:
                 assert container is not None
                 if bag.material not in container.accepted_materials:
                     raise Invalid(f"this container holds no {bag.material}")
+                # One bag per material per collection, so each deposit ends up in exactly one bag
+                # and is settled from exactly one sale (docs/adr/0013).
+                other = await db.scalar(
+                    select(Bag.code)
+                    .join(CollectionFill, CollectionFill.bag_id == Bag.id)
+                    .where(
+                        CollectionFill.collection_id == c.id,
+                        CollectionFill.material == bag.material,
+                        CollectionFill.bag_id != bag.id,
+                    )
+                    .limit(1)
+                )
+                if other is not None:
+                    raise Conflict(
+                        f"the {bag.material} of this container already went into bag {other}"
+                    )
                 bag.collector_id = collector_id
             db.add(
                 CollectionFill(

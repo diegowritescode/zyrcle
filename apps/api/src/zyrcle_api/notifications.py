@@ -20,7 +20,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from .models import Container, DepositSession, Notification, Payout, PushToken
+from .models import Container, DepositSession, Notification, Payout, PushToken, Settlement
 
 log = logging.getLogger(__name__)
 
@@ -31,6 +31,7 @@ RECEIPTS_KEPT = timedelta(hours=24)  # Expo deletes receipts after a day
 # Android notification channel of each kind (created by the app, apps/mobile/src/lib/notifications).
 CHANNEL = {
     "payout_confirmed": "payments",
+    "settlement_paid": "payments",
     "deposit_approved": "payments",
     "deposit_review": "deposits",
     "deposit_rejected": "deposits",
@@ -139,6 +140,27 @@ async def notify_payout(db: AsyncSession, payout: Payout, now: datetime) -> None
         ),
         body=f"Por {what}. Ya está en tu saldo.",
         data={"url": "/history", "session_id": str(session.id), "tx_hash": payout.tx_hash},
+        now=now,
+    )
+
+
+async def notify_settlement(db: AsyncSession, row: Settlement, now: datetime) -> None:
+    """A deposit's material was sold and it got more than its advance (docs/adr/0013)."""
+    if row.party != "deposit" or not row.paid_cop:
+        return
+    session = await db.get(DepositSession, uuid.UUID(row.party_ref))
+    if session is None:
+        return
+    container = await db.get(Container, session.container_id)
+    what = _what(session, container.name if container else session.container_id)
+    await enqueue(
+        db,
+        resident_id=session.resident_id,
+        kind="settlement_paid",
+        dedupe_key=f"settlement_paid:{row.id}",
+        title=f"Se vendió tu material: te llegaron {pesos(row.paid_cop)} más",
+        body=f"Por {what}, además del anticipo. Ya está en tu saldo.",
+        data={"url": "/history", "session_id": str(session.id), "tx_hash": row.tx_hash},
         now=now,
     )
 

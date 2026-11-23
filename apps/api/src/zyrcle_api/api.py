@@ -32,6 +32,7 @@ from .models import (
     MaterialPrice,
     Payout,
     PushToken,
+    Settlement,
     Site,
 )
 from .models import Resident as ResidentRow
@@ -247,6 +248,17 @@ async def me(resident: Resident, request: Request) -> dict[str, Any]:
             )
         ).all()
         collector = await db.get(Collector, resident)
+        # What each deposit got when its bag was sold (docs/adr/0013), on top of the advance.
+        settled = {
+            ref: paid
+            for ref, paid in await db.execute(
+                select(Settlement.party_ref, Settlement.paid_cop).where(
+                    Settlement.party == "deposit",
+                    Settlement.party_ref.in_([str(s.id) for s, _, _ in deposits]),
+                    Settlement.paid_cop.is_not(None),
+                )
+            )
+        }
     chain = request.app.state.chain
     balance = None
     if chain is not None:
@@ -280,6 +292,7 @@ async def me(resident: Resident, request: Request) -> dict[str, Any]:
                 "payout": None
                 if p is None
                 else {"amount_cop": p.amount_cop, "status": p.status, "tx_hash": p.tx_hash},
+                "settled_cop": settled.get(str(s.id)),
             }
             for s, name, p in deposits
         ],

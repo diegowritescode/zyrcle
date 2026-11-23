@@ -6,7 +6,8 @@ import {Treasury} from "../src/Treasury.sol";
 import {TreasuryBase} from "./Base.t.sol";
 
 /// @dev Drives the Treasury with random sequences of seed capital, sales, advances, settlements and
-///      collector payments. Calls that revert are fine; the invariants must hold after every call.
+///      collector and host payments. Calls that revert are fine; the invariants must hold after every
+///      call.
 contract Handler is Test {
     uint256 internal constant COP = 1e18;
     Treasury internal t;
@@ -74,6 +75,16 @@ contract Handler is Test {
         } catch {}
     }
 
+    function payHost(uint256 saleSeed, uint256 who, uint256 pesos) external {
+        if (saleIds.length == 0) return;
+        address h = residents[who % residents.length];
+        uint256 before = h.balance;
+        vm.prank(oracle);
+        try t.payHost(saleIds[saleSeed % saleIds.length], h, bound(pesos, 1, 30_000) * COP) {
+            ghostMintedToActors += h.balance - before;
+        } catch {}
+    }
+
     function warp(uint256 secondsAhead) external {
         vm.warp(block.timestamp + bound(secondsAhead, 0, 2 days));
     }
@@ -105,18 +116,26 @@ contract TreasuryInvariantTest is TreasuryBase {
 
     function invariant_sales_never_overpay_their_parts() public view {
         for (uint256 i; i < handler.saleCount(); ++i) {
-            (, uint128 residentsPart, uint128 collectorPart, uint128 settled, uint128 paid,) =
-                treasury.sales(handler.saleIds(i));
+            (
+                ,
+                uint128 residentsPart,
+                uint128 collectorPart,
+                uint128 hostPart,
+                uint128 settled,
+                uint128 collectorPaid,
+                uint128 hostPaid,
+            ) = treasury.sales(handler.saleIds(i));
             assertLe(settled, residentsPart);
-            assertLe(paid, collectorPart);
+            assertLe(collectorPaid, collectorPart);
+            assertLe(hostPaid, hostPart);
         }
     }
 
     function invariant_backing_is_seed_plus_distributable_sales() public view {
         uint256 distributable;
         for (uint256 i; i < handler.saleCount(); ++i) {
-            (, uint128 residentsPart, uint128 collectorPart,,,) = treasury.sales(handler.saleIds(i));
-            distributable += uint256(residentsPart) + collectorPart;
+            (, uint128 residentsPart, uint128 collectorPart, uint128 hostPart,,,,) = treasury.sales(handler.saleIds(i));
+            distributable += uint256(residentsPart) + collectorPart + hostPart;
         }
         assertEq(treasury.backing(), treasury.seedCapital() + distributable);
     }

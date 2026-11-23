@@ -3,7 +3,8 @@ import { Recycle } from "lucide-react-native";
 import { StyleSheet, Text, View } from "react-native";
 import { colors, familyColor, space } from "@/ui/theme";
 
-/** One deposit in the resident's history: material, weight, container, date and its payment. */
+/** One deposit in the resident's history: material, weight, container, date and its payment (the
+ * advance, plus what it got when its bag was sold). */
 export function DepositRow({ entry }: { entry: HistoryEntry }) {
   const family = familyOf([entry.declared_material]).key;
   return (
@@ -21,8 +22,10 @@ export function DepositRow({ entry }: { entry: HistoryEntry }) {
       <View style={{ alignItems: "flex-end" }}>
         {entry.payout ? (
           <>
-            <Text style={styles.amount}>{pesos(entry.payout.amount_cop)}</Text>
-            <Text style={styles.sub}>{PAYOUT_STATUS[entry.payout.status] ?? entry.payout.status}</Text>
+            <Text style={styles.amount}>{pesos(entry.payout.amount_cop + (entry.settled_cop ?? 0))}</Text>
+            <Text style={styles.sub}>
+              {entry.settled_cop ? "Anticipo + venta" : (PAYOUT_STATUS[entry.payout.status] ?? entry.payout.status)}
+            </Text>
           </>
         ) : (
           <Text style={[styles.sub, CREDITED.has(entry.state) && { color: colors.emerald, fontWeight: "600" }]}>

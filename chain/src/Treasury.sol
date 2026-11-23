@@ -25,6 +25,9 @@ interface INativeMinter {
 ///
 ///         The pro-rata shares are computed off chain from the traceability data; `reportHash`
 ///         anchors the published report so anyone can recompute them.
+///
+///         Each sale is split between residents, the collector who brought the bag, the hosts whose
+///         sites the material came from (docs/adr/0013), and operations.
 contract Treasury is AccessControl, Pausable {
     INativeMinter public constant NATIVE_MINTER = INativeMinter(0x0200000000000000000000000000000000000001);
 
@@ -38,6 +41,7 @@ contract Treasury is AccessControl, Pausable {
     struct Shares {
         uint16 residents;
         uint16 collector;
+        uint16 host;
         uint16 operations;
     }
 
@@ -45,8 +49,10 @@ contract Treasury is AccessControl, Pausable {
         uint128 amount;
         uint128 residentsPart;
         uint128 collectorPart;
+        uint128 hostPart;
         uint128 residentsSettled;
         uint128 collectorPaid;
+        uint128 hostPaid;
         bytes32 evidence;
     }
 
@@ -74,6 +80,7 @@ contract Treasury is AccessControl, Pausable {
         uint256 amount,
         uint256 residentsPart,
         uint256 collectorPart,
+        uint256 hostPart,
         uint256 operationsPart,
         bytes32 evidence
     );
@@ -83,7 +90,8 @@ contract Treasury is AccessControl, Pausable {
     );
     event ResidentsSettled(bytes32 indexed saleId, uint256 totalShares, uint256 totalPayout, bytes32 reportHash);
     event CollectorPaid(bytes32 indexed saleId, address indexed collector, uint256 amount);
-    event SharesChanged(uint16 residents, uint16 collector, uint16 operations);
+    event HostPaid(bytes32 indexed saleId, address indexed host, uint256 amount);
+    event SharesChanged(uint16 residents, uint16 collector, uint16 host, uint16 operations);
     event AdvanceLimitsChanged(uint256 maxAdvancePerDeposit, uint256 dailyAdvanceCap);
 
     error ZeroAmount();
@@ -97,6 +105,7 @@ contract Treasury is AccessControl, Pausable {
     error DepositAlreadySettled(bytes32 depositId);
     error ResidentsPartExceeded(bytes32 saleId, uint256 wouldBe, uint256 part);
     error CollectorPartExceeded(bytes32 saleId, uint256 wouldBe, uint256 part);
+    error HostPartExceeded(bytes32 saleId, uint256 wouldBe, uint256 part);
     error InvalidShares();
     error InvalidLimits();
     error LengthMismatch();
@@ -126,18 +135,21 @@ contract Treasury is AccessControl, Pausable {
         Shares memory s = shares;
         uint256 residentsPart = amount * s.residents / BPS;
         uint256 collectorPart = amount * s.collector / BPS;
-        uint256 operationsPart = amount - residentsPart - collectorPart;
+        uint256 hostPart = amount * s.host / BPS;
+        uint256 operationsPart = amount - residentsPart - collectorPart - hostPart;
         sales[saleId] = Sale({
             amount: SafeCast.toUint128(amount),
             residentsPart: SafeCast.toUint128(residentsPart),
             collectorPart: SafeCast.toUint128(collectorPart),
+            hostPart: SafeCast.toUint128(hostPart),
             residentsSettled: 0,
             collectorPaid: 0,
+            hostPaid: 0,
             evidence: evidence
         });
-        backing += residentsPart + collectorPart;
+        backing += residentsPart + collectorPart + hostPart;
         operationsRevenue += operationsPart;
-        emit SaleRecorded(saleId, amount, residentsPart, collectorPart, operationsPart, evidence);
+        emit SaleRecorded(saleId, amount, residentsPart, collectorPart, hostPart, operationsPart, evidence);
     }
 
     // ------------------------------------------------------------------ ZYR out
@@ -205,6 +217,20 @@ contract Treasury is AccessControl, Pausable {
         emit CollectorPaid(saleId, collector, amount);
     }
 
+    /// @notice Pay a host its share of a sale. A bag can hold material from several hosts' sites,
+    ///         so a sale's host part may be paid to several hosts, pro rata to their grams.
+    function payHost(bytes32 saleId, address host, uint256 amount) external onlyRole(ORACLE_ROLE) whenNotPaused {
+        if (host == address(0)) revert ZeroAddress();
+        if (amount == 0) revert ZeroAmount();
+        Sale storage sale = sales[saleId];
+        if (sale.amount == 0) revert UnknownSale(saleId);
+        uint256 paid = sale.hostPaid + amount;
+        if (paid > sale.hostPart) revert HostPartExceeded(saleId, paid, sale.hostPart);
+        sale.hostPaid = SafeCast.toUint128(paid);
+        _mint(host, amount);
+        emit HostPaid(saleId, host, amount);
+    }
+
     // ------------------------------------------------------------------ administration
 
     function setShares(Shares calldata newShares) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -251,9 +277,9 @@ contract Treasury is AccessControl, Pausable {
     }
 
     function _setShares(Shares memory s) private {
-        if (uint256(s.residents) + s.collector + s.operations != BPS) revert InvalidShares();
+        if (uint256(s.residents) + s.collector + s.host + s.operations != BPS) revert InvalidShares();
         shares = s;
-        emit SharesChanged(s.residents, s.collector, s.operations);
+        emit SharesChanged(s.residents, s.collector, s.host, s.operations);
     }
 
     function _setAdvanceLimits(uint256 maxAdvance, uint256 dailyCap) private {

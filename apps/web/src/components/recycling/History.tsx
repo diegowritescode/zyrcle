@@ -44,8 +44,10 @@ export function History({ token }: { token: string | null }) {
                                 <div className="text-right">
                                     {s.payout ? (
                                         <>
-                                            <p className="text-sm font-semibold text-eco-emerald">{pesos(s.payout.amount_cop)}</p>
-                                            <p className="text-xs text-eco-forest/60">{PAYOUT_STATUS[s.payout.status] ?? s.payout.status}</p>
+                                            <p className="text-sm font-semibold text-eco-emerald">{pesos(s.payout.amount_cop + (s.settled_cop ?? 0))}</p>
+                                            <p className="text-xs text-eco-forest/60">
+                                                {s.settled_cop ? "Anticipo + venta" : (PAYOUT_STATUS[s.payout.status] ?? s.payout.status)}
+                                            </p>
                                         </>
                                     ) : (
                                         <p className={`text-xs font-medium ${CREDITED.has(s.state) ? "text-eco-emerald" : "text-eco-forest/60"}`}>
