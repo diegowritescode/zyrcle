@@ -36,3 +36,7 @@ neither.
   of creating a second set of containers, so earlier demo deposits now count toward the first
   campus.
 - A host with a single site shows the same numbers on both dashboards; that is expected.
+
+## Amendments
+- **2026-11-22, Claude (documentation review):** the deprecated `residence` routes and fields go
+  once the APK built after block 1 is the one in use; their removal is planned for block 2.

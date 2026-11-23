@@ -16,3 +16,8 @@ import point is tagged `v0-hackathon`.
 - One CI run checks every component against the same commit.
 - The git history shows where the project came from, which is part of the story it tells.
 - The two old repos get archived once this one is published.
+
+## Amendments
+- **2026-11-22 (ADR 0019):** `contracts/` (Hardhat) was removed; the contracts live in `chain/`
+  (Foundry, ADR 0007). `packages/` (protocol, shared client) and `deploy/` were added. The layout in
+  the README is current.

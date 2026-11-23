@@ -68,3 +68,9 @@ HDPE share one in the demo), while a buyer pays per material.
   sealed; 10 g is the same threshold that tells material is going in. Commit `65f9366`.
 - **2026-11-22, Claude (ADR 0013):** each material goes into a single bag per collection, so a
   deposit is settled from exactly one sale.
+- **2026-11-22, Claude (documentation review):** "Deposits are traced into bags" links every deposit
+  whose material is inside, credited or not (`verified`, `approved`, `review`, `rejected`), because
+  rejected material leaves with the rest. Only credited deposits are paid when the bag is sold
+  (ADR 0013), and a bag waits while one of its deposits is in review.
+- **2026-11-22, Claude (documentation review):** a collector role given to a phone that is waiting
+  to recover an account moves to that account when the recovery completes.

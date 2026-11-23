@@ -1,7 +1,54 @@
 # Zyrcle architecture
 
-> Status: **rebuild in progress.** The one-day hackathon build (May 2025) is preserved at tag
-> `v0-hackathon`. This document is the target design. Sections marked *planned* are not built yet.
+> Status: **v1 block 1 built** (hosts and sites, collection, sale and settlement, operator console).
+> The one-day hackathon build (May 2025) is preserved at tag `v0-hackathon`; how the project got here
+> is in [history.md](history.md). Sections marked *planned* are not built yet. Step-by-step flows with
+> diagrams: [flows.md](flows.md). Schema: [database.md](database.md). Servers and operation:
+> [infrastructure.md](infrastructure.md). Endpoints: [api.md](api.md). Every decision:
+> [adr/](adr/README.md).
+
+## System at a glance
+
+```mermaid
+flowchart TB
+    subgraph People
+        P[Participant<br/>resident, student, staff]
+        Co[Collector]
+        Op[Operator]
+        H[Host institution]
+    end
+    subgraph Clients
+        M[Mobile app<br/>apps/mobile]
+        W[Web app and console<br/>apps/web]
+    end
+    subgraph Backend[VPS]
+        API[API and workers<br/>apps/api]
+        DB[(Postgres)]
+        MQ[MQTT broker]
+        SIM[Container simulator<br/>device/simulator]
+        L1[ZyrcleChain node<br/>infra/l1]
+    end
+    subgraph Chain[ZyrcleChain, Avalanche L1 on Fuji]
+        T[Treasury]
+        F[AccountFactory and smart accounts]
+    end
+    subgraph External
+        EX[Expo push / FCM]
+        RS[Resend email]
+        CC[Collection center<br/>buyer, pays in COP]
+        BK[Operator's bank]
+    end
+    P --> M & W
+    Co --> M
+    Op --> W
+    H -. dashboard, share of sales .-> W
+    M & W -->|HTTPS, WebSocket| API
+    API --- DB
+    API <-->|signed messages| MQ <--> SIM
+    API -->|web3| L1 --- T & F
+    API --> EX & RS
+    Co -->|sealed bags| CC -->|COP| BK -. confirmed by operator .-> W
+```
 
 ## 1. Problem
 
@@ -43,13 +90,14 @@ received.
 
 | Path | Component | Notes |
 |---|---|---|
-| `apps/mobile` | Resident app (Expo, built) | Scans the container's rotating QR, shows the live session, balance in COP, hourly turns, push notifications ([ADR 0008](adr/0008-push-notifications.md)). Embedded wallet: key in device secure storage, no seed phrase shown; the ZYR lives in a smart account the key controls, recoverable on a new phone through a verified email ([ADR 0010](adr/0010-smart-accounts-and-recovery.md)). |
+| `apps/mobile` | Resident and collector app (Expo, built) | Scans the container's rotating QR, shows the live session, balance in COP, hourly turns, push notifications ([ADR 0008](adr/0008-push-notifications.md)). Embedded wallet: key in device secure storage, no seed phrase shown; the ZYR lives in a smart account the key controls, recoverable on a new phone through a verified email ([ADR 0010](adr/0010-smart-accounts-and-recovery.md)). |
 | `apps/web` | Landing, dashboards, operations console | The hackathon UI on real data: hosts' and sites' dashboards, the web resident flow, and `/console` for operators signed in by email code ([ADR 0014](adr/0014-operator-accounts.md)): review queue, incidents, collectors and bag labels, sales with the bank match and the settlement report, hosts and sites, prices, operators. |
-| `apps/api` | Backend (FastAPI + Postgres) | Deposit sessions, device link, verification (built). Settlement and ledger come in phase 2. |
+| `apps/api` | Backend (FastAPI + Postgres) | Deposit sessions, device link, verification, payouts, turns, push, lost-phone recovery, collections, sales and settlement, operator accounts; one worker per outbox. |
 | `device/simulator`, `packages/protocol` | Device protocol + simulator (built) | Signed MQTT protocol ([spec](device-protocol.md)); the simulator speaks it exactly as firmware will. |
-| `chain/` | Treasury contract (built) | Mints ZYR only against recorded pesos; advances and settlements ([ADR 0007](adr/0007-on-chain-treasury.md)). |
+| `chain/` | Contracts (built) | Treasury: mints ZYR only against recorded pesos; advances, settlements, collector and host parts ([ADR 0007](adr/0007-on-chain-treasury.md), [ADR 0013](adr/0013-sale-and-settlement.md)). AccountFactory and ZyrcleAccount: smart accounts with guardian recovery ([ADR 0010](adr/0010-smart-accounts-and-recovery.md)). |
 | `infra/l1` | ZyrcleChain v2 (live on Fuji) | Subnet-EVM L1 on Fuji, native coin ZYR, validator on the operator's VPS. |
-| `infra/deploy` | Compose stack *planned* | API, worker, Postgres, MQTT broker, web, behind Traefik. |
+| `deploy/` | Production stack (built) | Docker Compose on the VPS: API, Postgres, Mosquitto, simulator, web, behind Traefik; images by commit SHA ([ADR 0020](adr/0020-single-vps-docker-compose.md)). |
+| `packages/client` | Shared TypeScript (built) | API client, Sign-In with Ethereum, QR parsing and Spanish labels for web and mobile ([ADR 0024](adr/0024-monorepo-tooling.md)). |
 
 ## 5. Deposit session
 

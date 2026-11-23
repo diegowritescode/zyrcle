@@ -32,3 +32,9 @@ Create ZyrcleChain v2: a Subnet-EVM L1 on Fuji whose native coin is **ZYR (1 ZYR
   the municipality).
 - The VPS sits at the documented minimum for a low-throughput L1 node (2 cores, 4 GB RAM). Memory
   limits per container, monitored in the existing Grafana.
+
+## Amendments
+- **2026-11-22 (ADR 0021):** P-Chain transactions are signed with `platform-cli`, not the Avalanche
+  CLI, whose 1.9.7 release is broken against AvalancheGo v1.15.
+- **2026-11-22 (ADR 0010):** the AccountFactory guardian key is also on the ContractDeployerAllowList,
+  so it can deploy smart accounts on their first recovery.

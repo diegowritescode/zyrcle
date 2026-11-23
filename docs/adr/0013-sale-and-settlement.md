@@ -69,4 +69,9 @@ sites should also get something back ([roadmap](../roadmap-v1.md)).
   and oracle roles, enabled on the NativeMinter; 1,000,000 COP of simulated seed recorded again
   (tx `0x802b19d9…e009d`). The API, the web app and `infra/l1/fuji.env` point to it. The first
   Treasury (`0xB843946A…51B1`) is still on the NativeMinter allow list; removing it is pending.
-
+- **2026-11-22, Claude (found while documenting the infrastructure):** the new Treasury does not
+  know the advances the first one paid. The settlement worker reads each deposit's advance from the
+  `payout` table and subtracts from the share it sends whatever the current Treasury did not pay
+  itself, so no advance is paid twice.
+- **2026-11-22, Claude (documentation review):** public totals and dashboards count as paid both the
+  advances and what sales added on top of them.

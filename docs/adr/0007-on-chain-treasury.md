@@ -29,3 +29,8 @@ compromised backend must not be able to print money.
   Treasury; it cannot raise `backing`.
 - Recording a sale is a human (operator) step until bank reconciliation is automated (phase 4).
 - Daily caps use UTC days, not Colombian days (UTC-5).
+
+## Amendments
+- **2026-11-22 (ADR 0013):** a sale now has a host part too; `backing` grows by the residents',
+  collector's and host's parts, and `payHost` pays hosts. Recording a sale is done by the backend's
+  operator key after a named operator confirms the bank match.

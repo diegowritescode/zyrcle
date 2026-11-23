@@ -10,7 +10,12 @@ lands in your wallet in a few seconds. Open a container's screen (`/container/ct
 device and scan it with the phone from another to see the real flow.
 
 Zyrcle started as a one-day hackathon project (May 2025, first place). It is now being rebuilt
-properly. The hackathon state is preserved at tag [`v0-hackathon`](../../tree/v0-hackathon).
+properly ([history](docs/history.md)). The hackathon state is preserved at tag
+[`v0-hackathon`](../../tree/v0-hackathon).
+
+**Documentation:** [docs/README.md](docs/README.md) is the map: architecture, step-by-step flows with
+diagrams, the API, the database, infrastructure and operation, the repository guide, and every
+decision with who made it ([docs/adr](docs/adr/README.md)).
 
 ## Status
 

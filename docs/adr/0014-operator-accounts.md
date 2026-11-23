@@ -41,3 +41,9 @@ confirmed it must be on record.
 - An admin cannot demote or deactivate themselves, so the console always keeps one admin.
 - The console keeps the operator's session in the browser's storage so a reload does not sign them
   out; it is cleared on "Salir" or when the server answers 401.
+
+## Amendments
+- **2026-11-22, Claude (documentation review):** with email off, a sign-in code is not written to the
+  email outbox at all, so no plaintext code waits there.
+- **2026-11-22, Claude:** a wrong code answers 401 at operator sign-in (an authentication failure)
+  and 422 on participants' email routes, where the caller is already signed in.
