@@ -38,7 +38,7 @@ code format. If a number in the code changes how money, weight or trust is handl
 | [0010](0010-smart-accounts-and-recovery.md) | Smart accounts with guardian recovery, proven by email | accepted 2026-11-22 | Diego chose the smart account and an email code sent with Resend; Claude designed it |
 | [0011](0011-hosts-and-sites.md) | Hosts and sites | accepted 2026-11-22 | Claude proposed (v1 block 1); Diego answered "sí, ok, te autorizo" to the list of block 1 decisions |
 | [0012](0012-collection-and-bags.md) | Collection and bags weighed by the container | accepted 2026-11-22 | as 0011 |
-| [0013](0013-sale-and-settlement.md) | Sale, bank match, settlement; shares 65/15/10/10 | accepted 2026-11-22 | as 0011 |
+| [0013](0013-sale-and-settlement.md) | Sale, bank match, settlement; shares 65/15/10/10 | accepted 2026-11-22 | as 0011; Diego confirmed the shares on 2026-11-23 |
 | [0014](0014-operator-accounts.md) | Operator accounts and the console | accepted 2026-11-22 | as 0011 |
 | [0015](0015-android-builds.md) | Android builds: EAS, Firebase push, ARM only | accepted 2026-11-23 | Claude proposed; Diego set up the Expo and Firebase accounts and confirmed it |
 | [0016](0016-rebuild-not-patch.md) | Rebuild the hackathon project instead of patching it | accepted 2026-11-21, recorded later | Diego set the goal; Claude proposed the approach |
@@ -48,7 +48,7 @@ code format. If a number in the code changes how money, weight or trust is handl
 | [0020](0020-single-vps-docker-compose.md) | One VPS with Docker Compose; images by full commit SHA | accepted 2026-11-22, recorded later | Claude proposed; Diego provided the VPS and domain |
 | [0021](0021-l1-operations.md) | Operate the L1 with platform-cli; one validator, fee topped up by hand | accepted 2026-11-21, recorded later | Claude |
 | [0022](0022-keys-secrets-and-production-changes.md) | Keys, secrets, and who may change production | accepted 2026-11-22, recorded later | Diego |
-| [0023](0023-testnet-economics.md) | Testnet money: simulated seed and test prices | accepted 2026-11-22, recorded later | Diego (seed amount); Claude (prices, limits) |
+| [0023](0023-testnet-economics.md) | Testnet money: simulated seed and test prices | accepted 2026-11-22, recorded later | Diego (seed amount); Claude (prices, limits); Diego confirmed the advance limits on 2026-11-23 |
 | [0024](0024-monorepo-tooling.md) | No npm workspaces, shared TS client, StyleSheet on mobile | accepted 2026-11-22, recorded later | Claude |
 | [0025](0025-documentation-as-code.md) | Documentation in the repository, changed with the code | accepted 2026-11-22 | Diego asked; Claude proposed the structure |
 | [0026](0026-v1-scope-and-delivery.md) | v1: one university campus, delivered in two reviewed blocks | accepted 2026-11-22 | Diego (university, two blocks); Claude (scope, milestones) |

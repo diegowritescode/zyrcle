@@ -75,3 +75,6 @@ sites should also get something back ([roadmap](../roadmap-v1.md)).
   itself, so no advance is paid twice.
 - **2026-11-22, Claude (documentation review):** public totals and dashboards count as paid both the
   advances and what sales added on top of them.
+- **2026-11-23, Diego confirmed the shares** of 65 % participants, 15 % collector, 10 % host and
+  10 % operations: "el reparto esta bien, lo veo bien". They were the defaults above; nothing in the
+  code changes. The Treasury v1 and v2 left the NativeMinter allow list the same day (ADR 0029).
