@@ -104,6 +104,16 @@ class Settings(BaseSettings):
     # Where browsers read the copy. The web page's Content-Security-Policy must allow its origin.
     ipfs_gateway: str = "https://gateway.pinata.cloud/ipfs/"
 
+    # Rate limits per minute (docs/adr/0035): emailed codes and phone sign-in per IP; writes and
+    # reads per account, or per IP without one. `rate_limit_proxy_hops`: proxies in front of the API
+    # (Traefik: 1).
+    rate_limits_enabled: bool = True
+    rate_limit_codes_per_min: int = 20
+    rate_limit_signin_per_min: int = 120
+    rate_limit_write_per_min: int = 120
+    rate_limit_read_per_min: int = 600
+    rate_limit_proxy_hops: int = 1
+
     # Error reports to Sentry (docs/adr/0033), without personal data. No DSN, no reports.
     sentry_dsn: str | None = None
     sentry_environment: str = "production"

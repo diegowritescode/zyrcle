@@ -355,6 +355,9 @@ export type LiveEvent =
   | ({ type: "state" } & Partial<Session>)
   | { type: "reading"; weight_g: number; fill_mm: number | null };
 
+/** What the apps say when the API answers 429 (docs/adr/0035). */
+export const TOO_FAST = "Vas muy rápido: espera unos segundos e inténtalo de nuevo.";
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -388,6 +391,7 @@ export function createApi(baseUrl: string) {
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
       const detail = body?.detail?.detail ?? body?.detail ?? res.statusText;
+      if (res.status === 429 && body?.detail?.code === "rate_limited") throw new ApiError(429, TOO_FAST, "rate_limited");
       throw new ApiError(
         res.status,
         typeof detail === "string" ? detail : JSON.stringify(detail),
@@ -502,6 +506,7 @@ const end = (s: string) => (s.endsWith(".") ? s : `${s}.`);
 /** Spanish message for a failed attempt to open a container. */
 export function startErrorMessage(e: unknown): string {
   if (!(e instanceof ApiError)) return "Algo salió mal. Intenta de nuevo.";
+  if (e.code === "rate_limited") return TOO_FAST;
   const d = e.message;
   if (e.status === 0) return d;
   if (e.code === "closed") {
@@ -526,6 +531,7 @@ export function startErrorMessage(e: unknown): string {
 /** Spanish message for a failed booking or cancellation. */
 export function bookingErrorMessage(e: unknown): string {
   if (!(e instanceof ApiError)) return "Algo salió mal. Intenta de nuevo.";
+  if (e.code === "rate_limited") return TOO_FAST;
   switch (e.code) {
     case "slot_full":
       return "Esa hora se acaba de llenar. Elige otra.";
@@ -553,6 +559,7 @@ const RECOVERY_PENDING =
 /** Spanish message for a failed step with the recovery email or a recovery. */
 export function accountErrorMessage(e: unknown): string {
   if (!(e instanceof ApiError)) return "Algo salió mal. Intenta de nuevo.";
+  if (e.code === "rate_limited") return TOO_FAST;
   switch (e.code) {
     case "invalid_email":
       return "Ese correo no parece válido. Revísalo.";
@@ -584,6 +591,7 @@ export function accountErrorMessage(e: unknown): string {
 /** Spanish message for a failed payment or redemption (docs/adr/0029). */
 export function paymentErrorMessage(e: unknown): string {
   if (!(e instanceof ApiError)) return "Algo salió mal. Intenta de nuevo.";
+  if (e.code === "rate_limited") return TOO_FAST;
   const d = e.message;
   if (e.status === 0) return d;
   if (/not enough ZYR/.test(d)) return "No tienes saldo suficiente.";

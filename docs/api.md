@@ -166,7 +166,24 @@ the API with `average=20` and `burst=60`
 defaults apply (see Open questions). Over the limit, Traefik answers `429` with a plain-text body,
 not the JSON error shape. There is no limit when you run the API locally.
 
-**In the app.** These limits are enforced in code and apply everywhere:
+**Per caller, in the app** ([ADR 0035](adr/0035-rate-limits.md),
+[`ratelimit.py`](../apps/api/src/zyrcle_api/ratelimit.py)). Every request takes a token from a bucket
+that refills steadily. Over the limit the API answers `429` with `{"code": "rate_limited"}` and a
+`Retry-After` header, CORS headers included; the apps say "Vas muy rápido: espera unos segundos e
+inténtalo de nuevo."
+
+| Class | Routes | Counted by | Per minute |
+|---|---|---|---|
+| Emailed codes | `POST /v1/me/email`, `/v1/me/email/verify`, `/v1/recovery/code`, `/v1/recovery`, `/v1/operator/login/code`, `/v1/operator/login` | IP address | 20 |
+| Phone sign-in | `POST /v1/auth/nonce`, `/v1/auth/verify` | IP address | 120 |
+| Writes | other `POST`, `PUT`, `PATCH`, `DELETE` | account (a token whose signature checks), else IP address | 120 |
+| Reads | other `GET` | account, else IP address | 600 |
+
+`/health`, CORS preflights and the WebSocket are not limited. The IP address is the last entry of
+`X-Forwarded-For`, the one Traefik added, so a client cannot choose it. The settings are
+`ZYRCLE_RATE_LIMIT_*`.
+
+**Per purpose, in the app.** These limits are enforced in code and apply everywhere:
 
 | What | Limit | Error | Source |
 |---|---|---|---|

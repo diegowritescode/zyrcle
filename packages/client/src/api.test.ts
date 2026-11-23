@@ -61,3 +61,19 @@ describe("start errors while a container is busy", () => {
   });
 });
 
+
+describe("rate limits", () => {
+  it("are said in plain Spanish, whatever the screen", async () => {
+    const { createApi, startErrorMessage, paymentErrorMessage, TOO_FAST } = await import("./api");
+    const original = globalThis.fetch;
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify({ detail: { code: "rate_limited", detail: "too many requests; try again in 3 seconds" } }), { status: 429 })) as typeof fetch;
+    try {
+      const err = await createApi("http://x").api.stats().catch((e: unknown) => e);
+      expect(startErrorMessage(err)).toBe(TOO_FAST);
+      expect(paymentErrorMessage(err)).toBe(TOO_FAST);
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+});

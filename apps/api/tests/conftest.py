@@ -369,6 +369,8 @@ def settings(
         jwt_secret="test-secret-" + "y" * 32,
         operator_token=OPERATOR_TOKEN,
         siwe_domain="zyrcle.test",
+        # The suite signs in hundreds of residents from one address (limits: test_ratelimit.py).
+        rate_limits_enabled=False,
         code_rotation_s=3,
         unlock_ack_timeout_s=3,
         idle_timeout_s=2,

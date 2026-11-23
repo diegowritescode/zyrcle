@@ -8,7 +8,7 @@ export default defineConfig({
   expect: { timeout: 20_000 },
   fullyParallel: false,
   workers: 1,
-  retries: 0,
+  retries: process.env.CI ? 1 : 0, // in serial mode a retry replays the whole journey
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",
   use: {
     // Locally the installed Chrome; in CI the Chromium that `playwright install` downloads.

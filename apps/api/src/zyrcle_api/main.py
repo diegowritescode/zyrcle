@@ -30,6 +30,7 @@ from .payment_routes import router as payment_router
 from .payments import PaymentService, RelayWorker
 from .payouts import PayoutWorker
 from .public import router as public_router
+from .ratelimit import RateLimitMiddleware
 from .recovery import RecoveryWorker
 from .sale_routes import router as sale_router
 from .sessions import SessionService
@@ -227,6 +228,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         from .demo import router as demo_router
 
         app.include_router(demo_router)
+    if settings.rate_limits_enabled:
+        # Added before CORS, so CORS wraps it and a 429 still carries the CORS headers.
+        app.add_middleware(RateLimitMiddleware, settings=settings)
     if settings.cors_origin_list:
         app.add_middleware(
             CORSMiddleware,

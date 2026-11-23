@@ -202,6 +202,9 @@ export function operatorApi(token: string | null, onUnauthorized: () => void) {
         if (!res.ok) {
             if (res.status === 401 && token) onUnauthorized();
             const detail = body?.detail?.detail ?? body?.detail ?? res.statusText;
+            if (res.status === 429 && body?.detail?.code === "rate_limited") {
+                throw new OperatorApiError(429, "Vas muy rápido: espera unos segundos e inténtalo de nuevo.", "rate_limited");
+            }
             throw new OperatorApiError(res.status, typeof detail === "string" ? detail : JSON.stringify(detail), body?.detail?.code);
         }
         return body as T;

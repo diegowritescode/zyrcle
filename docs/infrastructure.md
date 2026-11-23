@@ -384,6 +384,7 @@ has none). Unknown variables are ignored. "Default" means the column is not set 
 | `ZYRCLE_CHAIN_RPC_URL` | none | `http://zyrcle-l1-node-1:9650/ext/bc/${BLOCKCHAIN_ID}/rpc` | no | ZyrcleChain JSON-RPC endpoint, reached over `edge`. |
 | `ZYRCLE_TREASURY_ADDRESS` | none | `${TREASURY}` | no | Treasury contract address. |
 | `ZYRCLE_ORACLE_KEY_FILE` | none | `/run/secrets/oracle.key` | the file is | Path to the hex private key with the Treasury's ORACLE_ROLE. |
+| `ZYRCLE_RATE_LIMITS_ENABLED`, `ZYRCLE_RATE_LIMIT_CODES_PER_MIN` (20), `_SIGNIN_PER_MIN` (120), `_WRITE_PER_MIN` (120), `_READ_PER_MIN` (600), `_PROXY_HOPS` (1) | as listed | default | no | Rate limits per caller ([ADR 0035](adr/0035-rate-limits.md)). `PROXY_HOPS` is the number of proxies in front of the API: Traefik, one. |
 | `ZYRCLE_SENTRY_DSN` | none | `${SENTRY_DSN_API:-}` | no | Sentry DSN of the API's project. Empty: no error reports ([ADR 0033](adr/0033-error-reports-and-uptime.md)). |
 | `ZYRCLE_RELEASE` | none | `${ZYRCLE_API_TAG:-}` | no | The deployed commit, named in error reports. |
 | `ZYRCLE_CHAIN_HEALTH_URL` | none | `http://zyrcle-l1-node-1:9650/ext/health` | no | The validator node's health endpoint, checked by the health report ([ADR 0028, amendment](adr/0028-pilot-readiness.md#amendments)). Unset: not checked. |
