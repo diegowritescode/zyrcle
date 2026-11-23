@@ -102,6 +102,7 @@ jobs:
           BLOCKCHAIN_ID: x
           TREASURY: "0x0"
           ORACLE_KEY_PATH: /dev/null
+          OPERATOR_KEY_PATH: /dev/null
           POSTGRES_PASSWORD: x
           JWT_SECRET: x
           OPERATOR_TOKEN: x
