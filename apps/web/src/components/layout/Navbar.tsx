@@ -31,10 +31,10 @@ const GROUPS = [
         links: [{ to: "/collectors", label: "Rutas de recolección" }],
     },
     {
-        key: "validators",
-        label: "Validadores",
-        heading: "Para validadores",
-        links: [{ to: "/validator", label: "Ventas y liquidación" }],
+        key: "operators",
+        label: "Operación",
+        heading: "Para operadores",
+        links: [{ to: "/console", label: "Consola de operación" }],
     },
 ];
 

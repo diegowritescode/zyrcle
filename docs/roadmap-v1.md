@@ -96,6 +96,7 @@ H  Weighing station: hardware track, in parallel
   incidents, sales and bank matching, settlements, and the Treasury. Built in `apps/web`, in the
   hackathon design.
 - **Done when:** a pilot can run for a month without anyone using the API by hand.
+- **Decision:** ADR 0014, operator accounts and the console.
 
 ### M5. Impact certificates
 - **Why:** a host's reason to say yes, available from the first month.
@@ -109,7 +110,7 @@ H  Weighing station: hardware track, in parallel
   - Exports a sustainability office can use.
 - **Done when:** a host downloads a certificate, opens its verification link and sees it check out
   against the chain. A second certificate over the same grams is refused.
-- **Decision:** ADR 0014, impact certificates (factor source, anchoring, claim ledger).
+- **Decision:** ADR 0015, impact certificates (factor source, anchoring, claim ledger).
 - **Not in v1:** tradable carbon or plastic credits. They need an approved methodology, an
   accredited third-party audit, registration (RENARE in Colombia) and a scale no single campus
   reaches. The path is one Zyrcle program aggregating every site, with revenue shared with the
@@ -124,7 +125,7 @@ H  Weighing station: hardware track, in parallel
   - Only businesses go through KYC.
 - **Done when:** in the demo, a participant buys something at a simulated campus merchant, and the
   merchant's redemption appears in the Treasury and the reconciliation.
-- **Decision:** ADR 0015, closed-loop payments.
+- **Decision:** ADR 0016, closed-loop payments.
 
 ### M7. Pilot readiness
 - **Why:** none of the above should touch a real person's data or money without this.
@@ -156,7 +157,7 @@ H  Weighing station: hardware track, in parallel
 |---|---|
 | Staffed station or autonomous container for the pilot | staffed station |
 | Host share of each sale | set in ADR 0013 |
-| Emission factor source for certificates | set in ADR 0014, cited |
+| Emission factor source for certificates | set in ADR 0015, cited |
 | Who audits the legal framing of ZYR | needed before M7 closes |
 | Chain for real value | decided in M7 |
 

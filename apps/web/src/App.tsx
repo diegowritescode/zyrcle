@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 
 // The landing page loads first; the rest (charts, QR scanner, QR drawing) load when visited.
 const Sites = lazy(() => import("./pages/Sites"));
+const Console = lazy(() => import("./pages/Console"));
 const RecyclingPage = lazy(() => import("./pages/RecyclingPage"));
 const ContainerScreen = lazy(() => import("./pages/ContainerScreen"));
 const ComingSoon = lazy(() => import("./pages/ComingSoon"));
@@ -34,12 +35,13 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/sites" element={<Sites />} />
+              <Route path="/console" element={<Console />} />
               {/* The mobile app links here (docs/adr/0011). */}
               <Route path="/residence" element={<Navigate to="/sites" replace />} />
               <Route path="/recycling" element={<RecyclingPage />} />
               <Route path="/container/:containerId" element={<ContainerScreen />} />
               <Route path="/collectors" element={<ComingSoon section="collectors" />} />
-              <Route path="/validator" element={<ComingSoon section="validator" />} />
+              <Route path="/validator" element={<Navigate to="/console" replace />} />
               <Route path="/marketplace" element={<ComingSoon section="marketplace" />} />
               <Route path="/my-certificates" element={<ComingSoon section="certificates" />} />
               <Route path="*" element={<NotFound />} />

@@ -19,6 +19,7 @@ from .live import LiveHub
 from .mail import EmailWorker, LogMail, ResendMail
 from .mqtt import MqttBridge
 from .notifications import ExpoPush, NotificationWorker
+from .operator_auth import router as operator_router
 from .payouts import PayoutWorker
 from .public import router as public_router
 from .recovery import RecoveryWorker
@@ -163,6 +164,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(account_router)
     app.include_router(collection_router)
     app.include_router(sale_router)
+    app.include_router(operator_router)
     if settings.demo_simulator_url:
         from .demo import router as demo_router
 

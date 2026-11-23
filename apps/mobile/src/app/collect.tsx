@@ -17,7 +17,7 @@ import { useRef, useState } from "react";
 import { Platform, StyleSheet, Text, TextInput, View } from "react-native";
 import { DemoContainers } from "@/features/DemoContainers";
 import { api } from "@/lib/api";
-import { Body, Button, Card, Heading, Muted, Notice, Pill, Title } from "@/ui/kit";
+import { Body, Button, Card, Heading, Muted, Notice, Pill } from "@/ui/kit";
 import { Screen } from "@/ui/Screen";
 import { colors, radius, space } from "@/ui/theme";
 import { useWallet } from "@/wallet/context";
@@ -119,7 +119,6 @@ export default function Collect() {
 
   return (
     <Screen>
-      <Title>Recolección</Title>
       {home.data && <Muted>{home.data.name}</Muted>}
       {error && <Notice text={error} />}
 
@@ -142,8 +141,9 @@ export default function Collect() {
           </View>
           <View style={styles.row}>
             <Weight color={colors.forest} size={22} />
-            <Text style={styles.weight} accessibilityLabel={`Peso ${c.weight_g ?? 0} gramos`}>
-              {c.weight_g === null ? "—" : grams(c.weight_g)}
+            {/* An empty scale reads a few grams either side of zero. */}
+            <Text style={styles.weight} accessibilityLabel={`Peso ${Math.max(c.weight_g ?? 0, 0)} gramos`}>
+              {c.weight_g === null ? "—" : grams(Math.max(c.weight_g, 0))}
             </Text>
             <Muted>en el contenedor</Muted>
           </View>

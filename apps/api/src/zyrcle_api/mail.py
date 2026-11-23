@@ -24,7 +24,7 @@ log = logging.getLogger(__name__)
 
 MAX_ATTEMPTS = 6
 # Kinds whose body holds a one-time code: cleared once sent, and pointless to send once expired.
-CODE_KINDS = {"code_verify", "code_recover"}
+CODE_KINDS = {"code_verify", "code_recover", "code_operator"}
 CODE_TTL = timedelta(minutes=10)
 
 

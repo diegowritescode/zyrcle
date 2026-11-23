@@ -44,7 +44,7 @@ received.
 | Path | Component | Notes |
 |---|---|---|
 | `apps/mobile` | Resident app (Expo, built) | Scans the container's rotating QR, shows the live session, balance in COP, hourly turns, push notifications ([ADR 0008](adr/0008-push-notifications.md)). Embedded wallet: key in device secure storage, no seed phrase shown; the ZYR lives in a smart account the key controls, recoverable on a new phone through a verified email ([ADR 0010](adr/0010-smart-accounts-and-recovery.md)). |
-| `apps/web` | Operations console + landing | Containers, sessions under review, collections, sales, reconciliation, treasury. Today it still holds the hackathon UI. |
+| `apps/web` | Landing, dashboards, operations console | The hackathon UI on real data: hosts' and sites' dashboards, the web resident flow, and `/console` for operators signed in by email code ([ADR 0014](adr/0014-operator-accounts.md)): review queue, incidents, collectors and bag labels, sales with the bank match and the settlement report, hosts and sites, prices, operators. |
 | `apps/api` | Backend (FastAPI + Postgres) | Deposit sessions, device link, verification (built). Settlement and ledger come in phase 2. |
 | `device/simulator`, `packages/protocol` | Device protocol + simulator (built) | Signed MQTT protocol ([spec](device-protocol.md)); the simulator speaks it exactly as firmware will. |
 | `chain/` | Treasury contract (built) | Mints ZYR only against recorded pesos; advances and settlements ([ADR 0007](adr/0007-on-chain-treasury.md)). |

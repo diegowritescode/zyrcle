@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import secrets
 import uuid
 from typing import Annotated, Any, Literal
 
@@ -36,6 +35,7 @@ from .models import (
     Site,
 )
 from .models import Resident as ResidentRow
+from .operator_auth import Who, operator_who
 from .sessions import MATERIALS, SessionService, session_view
 
 router = APIRouter()
@@ -76,13 +76,9 @@ async def resident_dep(
     return resident_id
 
 
-def operator_dep(
-    settings: Annotated[Settings, Depends(settings_dep)],
-    authorization: Annotated[str | None, Header()] = None,
-) -> str:
-    if not secrets.compare_digest(_bearer(authorization), settings.operator_token):
-        raise HTTPException(401, "invalid operator token")
-    return "operator"
+async def operator_dep(who: Annotated[Who, Depends(operator_who)]) -> str:
+    """Who is acting: an operator's email, or "token" for the shared token (docs/adr/0014)."""
+    return who.name
 
 
 def _raise(e: SessionError) -> None:
@@ -490,6 +486,28 @@ async def set_price(material: str, body: PriceIn, _: Operator, request: Request)
             price.updated_at = auth.utcnow()
         await db.commit()
     return {"material": material, "cop_per_kg": body.cop_per_kg, "source": "manual"}
+
+
+@router.get("/v1/operator/prices")
+async def list_prices(_: Operator, request: Request) -> list[dict[str, Any]]:
+    async with request.app.state.maker() as db:
+        prices = {p.material: p for p in await db.scalars(select(MaterialPrice))}
+    return [
+        {
+            "material": m,
+            "cop_per_kg": prices[m].cop_per_kg if m in prices else None,
+            "source": prices[m].source if m in prices else None,
+        }
+        for m in MATERIALS
+    ]
+
+
+@router.get("/v1/operator/sites")
+async def list_sites(_: Operator, request: Request) -> list[dict[str, Any]]:
+    """Every site with its schedule and host, for the console."""
+    async with request.app.state.maker() as db:
+        rows = await db.execute(select(Site, Host).join(Host).order_by(Host.name, Site.name))
+        return [{**site_schedule(site), "host_name": host.name} for site, host in rows]
 
 
 @router.get("/v1/operator/treasury")

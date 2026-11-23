@@ -18,6 +18,7 @@ Design: [docs/architecture.md](../../docs/architecture.md), protocol:
 | `public.py` | Public read-only views: platform totals, a scanned container, host and site dashboards. Aggregates only, no access codes |
 | `collection.py`, `collection_routes.py` | Collections ([ADR 0012](../../docs/adr/0012-collection-and-bags.md)): a collector empties a container into bags weighed by its own scale, deposits traced to the collection, mass balances and incidents |
 | `sale_routes.py`, `settlement.py`, `domain/settlement.py` | Sales ([ADR 0013](../../docs/adr/0013-sale-and-settlement.md)): the buyer's ticket per bag, the bank match, and the worker that settles each bag on chain (record, residents pro rata minus advance, collector, hosts) |
+| `operator_auth.py` | Operator accounts ([ADR 0014](../../docs/adr/0014-operator-accounts.md)): sign-in by email code, operator sessions, admins manage operators; every operator route records who acted |
 | `demo.py` | Demo-only routes (mounted when a simulator is configured): containers with their live QR, "drop this item", "take this out", bags standing in for printed labels |
 | `models.py`, `migrations/` | Schema; one active session per container enforced by a partial unique index |
 | `pricing.py`, `payouts.py`, `chain.py` | Advance sizing, the payout outbox worker, and the Treasury client (web3.py) |

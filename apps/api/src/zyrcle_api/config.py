@@ -18,6 +18,8 @@ class Settings(BaseSettings):
 
     jwt_secret: str = Field(min_length=32)
     jwt_ttl_minutes: int = 24 * 60
+    # Operators' console sessions: a working day (docs/adr/0014).
+    operator_jwt_ttl_minutes: int = 8 * 60
     operator_token: str = Field(min_length=24)
 
     siwe_domain: str = "zyrcle.deviego.xyz"
