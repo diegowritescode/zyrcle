@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .account_routes import router as account_router
 from .api import router
+from .bank_routes import router as bank_router
 from .booking_routes import router as booking_router
 from .center_routes import router as center_router
 from .chain import Chain, load_account_file
@@ -237,6 +238,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(setup_router)
     app.include_router(center_router)
     app.include_router(ticket_router)
+    app.include_router(bank_router)
     app.include_router(account_router)
     app.include_router(collection_router)
     app.include_router(sale_router)

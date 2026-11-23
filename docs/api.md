@@ -1170,6 +1170,17 @@ of the center it sells to, else the general table (`/v1/operator/prices`).
 `POST /v1/operator/sales` takes an optional `ticket_scan_id`; the scan then names the sale it became
 (409 if it already did).
 
+#### Bank statements (operator)
+
+[ADR 0039](adr/0039-bank-statement-matching.md),
+[`bank_routes.py`](../apps/api/src/zyrcle_api/bank_routes.py).
+
+| Method and path | Body | Returns |
+|---|---|---|
+| `POST /v1/operator/bank-statements` | `{filename, content_base64}`: the CSV or `.xlsx` export, at most 5 MB | 201: `{statement_id, movements, added, already_known, proposals}`. 422 `unreadable` when no date and amount columns are found. A movement already uploaded is kept once |
+| `GET /v1/operator/bank-proposals` | | `[{line: {id, posted_on, description, reference, amount_cop}, kind: "sale" \| "redemption", target_id, target, score, why}]`, best first, each movement and each target once |
+| `POST /v1/operator/bank-lines/{id}/match` | `{kind, target_id}` | Confirms the sale (same rules as `/confirm`, with the movement's reference as `bank_ref`) or settles the redemption (same as `/settle`), then marks the movement. 409 if it is matched already |
+
 #### Impact certificates (operator)
 
 | Method and path | Body | Returns |

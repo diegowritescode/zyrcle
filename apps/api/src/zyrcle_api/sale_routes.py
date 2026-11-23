@@ -235,21 +235,26 @@ async def confirm_sale(
         sale = await db.get(Sale, sale_id, with_for_update=True)
         if sale is None:
             raise HTTPException(404, {"code": "not_found", "detail": "unknown sale"})
-        if sale.status == "confirmed":
-            return await sale_view(db, sale)
-        if body.received_cop != sale.total_cop:
-            raise HTTPException(
-                422,
-                {
-                    "code": "amount_mismatch",
-                    "detail": f"the bank received {body.received_cop} but the ticket says "
-                    f"{sale.total_cop}; correct the sale first",
-                },
-            )
-        sale.status, sale.bank_ref = "confirmed", body.bank_ref
-        sale.confirmed_by, sale.confirmed_at = operator, utcnow()
+        apply_bank_match(sale, body.bank_ref, body.received_cop, operator)
         await db.commit()
         return await sale_view(db, sale)
+
+
+def apply_bank_match(sale: Sale, bank_ref: str, received_cop: int, operator: str) -> None:
+    """Mark a locked sale as paid by the bank (also used by bank statement matching)."""
+    if sale.status == "confirmed":
+        return
+    if received_cop != sale.total_cop:
+        raise HTTPException(
+            422,
+            {
+                "code": "amount_mismatch",
+                "detail": f"the bank received {received_cop} but the ticket says "
+                f"{sale.total_cop}; correct the sale first",
+            },
+        )
+    sale.status, sale.bank_ref = "confirmed", bank_ref
+    sale.confirmed_by, sale.confirmed_at = operator, utcnow()
 
 
 @router.get("/sales")

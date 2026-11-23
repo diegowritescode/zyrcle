@@ -25,6 +25,16 @@ test.beforeAll(async ({ browser }) => {
   expect(r.status).toBe(201);
 });
 
+const todayDMY = () => {
+  const [y, m, d] = new Date().toLocaleDateString("en-CA").split("-");
+  return `${d}/${m}/${y}`;
+};
+
+async function uploadStatement(csv: string) {
+  await desk.getByLabel("Extracto del banco").setInputFiles({ name: "extracto.csv", mimeType: "text/csv", buffer: Buffer.from(csv, "latin1") });
+  await expect(desk.getByText(/movimientos: 1 nuevos/)).toBeVisible();
+}
+
 test.afterEach(() => {
   expect(errors.list, "browser errors").toEqual([]);
 });
@@ -163,9 +173,9 @@ test("a sale confirmed against the bank settles the participants, the collector 
   await expect(desk.getByLabel("Pago por la bolsa").first()).toHaveValue("20000");
   await desk.getByRole("button", { name: "Registrar venta" }).click();
   await expect(desk.getByText("Por confirmar").first()).toBeVisible();
-  await desk.getByLabel("Referencia del banco").first().fill("BANCO-0001");
-  await desk.getByLabel("Monto recibido (COP)").first().fill("20000");
-  await desk.getByRole("button", { name: "Confirmar pago" }).click();
+  // The bank match from the statement the operator downloads from the bank (ADR 0039).
+  await uploadStatement(`Fecha;Descripción;Documento;Débito;Crédito\n${todayDMY()};TRANSF CENTRO LA 80 T-0001;8812;;20.000,00\n`);
+  await desk.getByRole("row", { name: /Venta T-0001/ }).getByRole("button", { name: "Confirmar" }).click();
   await expect(desk.getByText(/· Liquidada/).first()).toBeVisible({ timeout: 60_000 });
   await desk.getByRole("button", { name: "Reparto" }).first().click();
   await expect(desk.getByText("Le toca")).toBeVisible();
@@ -256,9 +266,10 @@ test("a campus merchant charges with a QR, a participant pays from the phone, an
   await shop.page.getByRole("button", { name: "Solicitar el cambio" }).click();
   await expect(shop.page.getByText("Esperando la transferencia")).toBeVisible({ timeout: 60_000 });
   await desk.reload({ waitUntil: "networkidle" });
+  await desk.getByRole("tab", { name: "Ventas" }).click();
+  await uploadStatement(`Fecha;Descripción;Documento;Débito;Crédito\n${todayDMY()};PAGO CAFETERIA CENTRAL;9921;2.000,00;\n`);
+  await desk.getByRole("row", { name: /Cambio a pesos · Cafetería Central/ }).getByRole("button", { name: "Confirmar" }).click();
   await desk.getByRole("tab", { name: "Comercios" }).click();
-  await desk.getByLabel("Referencia de la transferencia").first().fill("BANCO-CAFE-001");
-  await desk.getByRole("button", { name: "Ya pagué" }).first().click();
   await expect(desk.getByText("Pagado", { exact: true }).first()).toBeVisible();
   await expect(shop.page.getByText("Pagado en pesos")).toBeVisible();
   expect(await overflow(shop.page)).toBe(0);

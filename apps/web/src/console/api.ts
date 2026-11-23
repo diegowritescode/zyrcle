@@ -117,6 +117,16 @@ export interface TicketScan {
     sale_id: string | null;
 }
 
+/** A movement of the bank account and what the API proposes it pays (docs/adr/0039). */
+export interface BankProposal {
+    line: { id: string; posted_on: string; description: string; reference: string; amount_cop: number };
+    kind: "sale" | "redemption";
+    target_id: string;
+    target: { ticket_ref?: string; buyer?: string; merchant?: string; nit?: string; amount_cop: number };
+    score: number;
+    why: string[];
+}
+
 export interface Sale {
     id: string;
     buyer: string;
@@ -272,6 +282,11 @@ export function operatorApi(token: string | null, onUnauthorized: () => void) {
             call<Center>(`/v1/operator/centers/${id}/prices/${material}`, json("PUT", { cop_per_kg, source })),
         centerSuggestions: (id: string) => call<Record<string, { cop_per_kg: number; lines: number }>>(`/v1/operator/centers/${id}/suggested-prices`),
         setSiteCenter: (siteId: string, center_id: string | null) => call<unknown>(`/v1/operator/sites/${siteId}/center`, json("PUT", { center_id })),
+        uploadStatement: (filename: string, content_base64: string) =>
+            call<{ movements: number; added: number; already_known: number; proposals: BankProposal[] }>("/v1/operator/bank-statements", json("POST", { filename, content_base64 })),
+        bankProposals: () => call<BankProposal[]>("/v1/operator/bank-proposals"),
+        matchBankLine: (lineId: string, kind: "sale" | "redemption", target_id: string) =>
+            call<unknown>(`/v1/operator/bank-lines/${lineId}/match`, json("POST", { kind, target_id })),
         scanTicket: (image_base64: string, media_type: "image/jpeg" | "image/png" | "image/webp") =>
             call<TicketScan>("/v1/operator/ticket-scans", json("POST", { image_base64, media_type })),
         recordSale: (body: { buyer: string; center_id?: string | null; ticket_scan_id?: string | null; ticket_ref: string; sold_on: string; lines: { bag: string; buyer_g: number; amount_cop: number }[] }) =>

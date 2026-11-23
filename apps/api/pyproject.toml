@@ -22,6 +22,7 @@ dependencies = [
   "httpx>=0.28",
   "sentry-sdk[fastapi]>=2.40",
   "anthropic>=2.12",
+  "openpyxl>=3.1",
   "zyrcle-protocol",
 ]
 

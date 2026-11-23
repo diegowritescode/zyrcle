@@ -1,6 +1,11 @@
 """Persistence model, one module per area (docs/repository.md). Everything is importable from
 here, as it was from the single models.py: `from .models import Host`."""
 
+from .bank import (
+    BANK_MATCH_KINDS,
+    BankLine,
+    BankStatement,
+)
 from .base import (
     ACTIVE_SQL,
     STATES_SQL,
@@ -84,6 +89,9 @@ from .sales import (
 )
 
 __all__ = [
+    "BANK_MATCH_KINDS",
+    "BankLine",
+    "BankStatement",
     "TICKET_SCAN_STATUSES",
     "TicketScan",
     "PRICE_SOURCES",

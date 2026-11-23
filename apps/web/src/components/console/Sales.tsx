@@ -12,6 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Sale, SaleLine, TicketScan } from "@/console/api";
 import { TicketScanCard } from "./TicketScan";
+import { BankStatementCard } from "./BankStatement";
 import { useConsole } from "@/console/context";
 import { Empty, Loading, Section } from "./shared";
 import { failed } from "@/console/format";
@@ -32,6 +33,7 @@ export function Sales() {
         <div className="space-y-6">
             <TicketScanCard onUse={setPrefill} />
             <NewSale prefill={prefill} />
+            <BankStatementCard />
             <SaleList />
         </div>
     );
