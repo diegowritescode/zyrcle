@@ -1,6 +1,9 @@
 # ADR 0013: Sale, bank match and settlement, with a share for the host
 
-- Status: accepted (2026-11-22). The share percentages are a default for Diego to confirm.
+- Status: accepted (2026-11-22)
+- Decided by: Claude proposed in v1 block 1; Diego answered "sí, ok, te autorizo" to the list of
+  block 1 decisions on 2026-11-22. That list named the shares
+  (65 / 15 / 10 / 10), the tolerances, one bag per material and the operator key held by the backend.
 
 ## Context
 Participants were paid an advance from seed capital (ADR 0003). The rest of the promise, paying
@@ -49,3 +52,13 @@ sites should also get something back ([roadmap](../roadmap-v1.md)).
   another. Splitting a deposit across bags is left for later.
 - The Treasury on Fuji must be redeployed for the host share. Its seed capital is recorded again;
   advances already paid stay where they are.
+
+## Details decided while building it (v1 block 1, same confirmation)
+- A line that has to wait tries again every **30 seconds**, and at once when the incident that held
+  it is resolved or the missing host address is set. A contract refusal that means "not now"
+  (`UnbackedMint`, paused Treasury) waits 10 minutes; any other refusal marks the line `failed` for the
+  operator.
+- Deposits are paid in transactions of up to **40** at a time.
+- The settlement report's hash is sha256 of its canonical JSON (keys sorted, no spaces), anchored on
+  chain with the payments.
+- A sale's date is stored at noon local time of the day the operator enters.

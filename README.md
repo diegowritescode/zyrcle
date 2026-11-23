@@ -29,8 +29,8 @@ on the project's own L1 that pays the advance in ZYR. The web app keeps the hack
 now runs on real data: live platform totals, the resident flow (QR scan, live weight, verdict,
 payment) with an embedded wallet or MetaMask/Core, and the dashboard of each host (a university, a residential complex) and its sites. Collectors and
 sales (phase 4) are marked as coming next. Route optimization comes after phase 4. See
-[docs/architecture.md](docs/architecture.md) for the design and [docs/adr](docs/adr) for the
-decisions behind it.
+[docs/architecture.md](docs/architecture.md) for the design and [docs/adr](docs/adr/README.md)
+for every decision behind it, with who made it and when.
 
 ## Layout
 

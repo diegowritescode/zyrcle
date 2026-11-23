@@ -1,6 +1,7 @@
 # ADR 0010: Smart accounts with guardian recovery, proven by a recovery email
 
 - Status: accepted (2026-11-22)
+- Decided by: Diego chose the smart account and an email code sent with Resend; Claude designed it.
 
 ## Context
 A resident's ZYR was paid to the address of a key that exists only in their phone's secure storage

@@ -1,6 +1,8 @@
 # ADR 0011: Hosts and sites
 
 - Status: accepted (2026-11-22)
+- Decided by: Claude proposed in v1 block 1; Diego answered "sí, ok, te autorizo" to the list of
+  block 1 decisions on 2026-11-22.
 
 ## Context
 A container belonged to a "residence": a name, opening hours and spots per hour. The first real

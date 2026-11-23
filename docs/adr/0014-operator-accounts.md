@@ -1,6 +1,8 @@
 # ADR 0014: Operator accounts and the operations console
 
 - Status: accepted (2026-11-22)
+- Decided by: Claude proposed in v1 block 1; Diego answered "sí, ok, te autorizo" to the list of
+  block 1 decisions on 2026-11-22.
 
 ## Context
 Every operator action (reviewing deposits, resolving incidents, recording sales, confirming the bank
@@ -33,3 +35,9 @@ confirmed it must be on record.
   should be rotated once operators have their own accounts.
 - An operator needs a working mailbox to sign in. An admin who loses theirs is recovered with the
   shared token.
+
+## Details decided while building it (v1 block 1, same confirmation)
+- Operators sign in again after **8 hours**; participants' sessions last 24 hours.
+- An admin cannot demote or deactivate themselves, so the console always keeps one admin.
+- The console keeps the operator's session in the browser's storage so a reload does not sign them
+  out; it is cleared on "Salir" or when the server answers 401.

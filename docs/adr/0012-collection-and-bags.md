@@ -1,6 +1,8 @@
 # ADR 0012: Collection and bags
 
 - Status: accepted (2026-11-22)
+- Decided by: Claude proposed in v1 block 1; Diego answered "sí, ok, te autorizo" to the list of
+  block 1 decisions on 2026-11-22.
 
 ## Context
 Material entered containers and stayed there. To pay participants from what a buyer pays (ADR 0003,
@@ -51,3 +53,18 @@ HDPE share one in the demo), while a buyer pays per material.
   asks for one material at a time, and the buyer's scale catches what slips through.
 - Deposit and collection readings share the same device messages. A collection that never closes
   expires like a deposit session; its incomplete bags keep what was measured so far.
+
+## Details decided while building it (v1 block 1, same confirmation)
+- **Bag codes** are 8 Crockford base32 characters (no I, L, O or U), so they can be typed from a
+  label when the camera fails; the QR is `zyrcle://b/<code>`.
+- **A collection left idle** closes after 10 minutes without the scale moving (a deposit closes after
+  1): a collector bags several materials one after another.
+- **The demo keeps two empty bags per material** ready, standing in for printed labels, topped up on
+  every seed.
+
+## Amendments
+- **2026-11-22, Claude (a fix, part of block 1):** a fill whose scale readings differ by less than
+  10 g counts as empty. Readings carry a few grams of noise either way, and an "empty" bag could be
+  sealed; 10 g is the same threshold that tells material is going in. Commit `65f9366`.
+- **2026-11-22, Claude (ADR 0013):** each material goes into a single bag per collection, so a
+  deposit is settled from exactly one sale.
