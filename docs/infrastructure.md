@@ -606,6 +606,7 @@ Foundry scripts cannot call Subnet-EVM precompiles, which is why contracts are n
 | AccountFactory | `0x0bE806Ca77340aA50AF6586CDC2FE2561668DaEA` | [AccountFactory.sol](../chain/src/AccountFactory.sol), deployed with `zyrcle-api chain accounts-deploy`; admin is the L1 admin |
 | ZyrcleAccount implementation | `0x008094fd22255b4d91846eb93042d0f05212b79f` | deployed by the factory's constructor |
 | Guardian | `0xd3cBCecC587Bd5f9504bFdea1D3B7e198E66ca50` | the oracle key |
+| Admin Safe (2 of 3) | `0x607c011C6921eA75C1e38223a5E5514eDbA7E43b` | Safe v1.4.1 ([ADR 0040](adr/0040-keys-guardian-and-multisig.md)); holds every admin power since 2026-11-23: the four precompiles, the validator manager and its proxy admin, the Treasury and AccountFactory admin roles. Owners and helpers in `fuji.env` |
 
 Advance limits are 5,000 COP per deposit and 20,000 COP per resident per UTC day
 ([ADR 0023](adr/0023-testnet-economics.md)).
@@ -977,6 +978,8 @@ transaction on Fuji, so it needs Diego's approval.
    role there, so it could still mint up to its unused backing. Take it off the allow list once the
    new one is deployed and the API points at it:
    ```bash
+   # Since the handover (runbook 9.14) the Safe is the NativeMinter's admin: propose the
+   # equivalent `setNone(<old Treasury>)` with `safe propose --what call`. Before it:
    infra/l1/scripts/zyrcle-api-docker.sh chain minter-revoke \
      --admin-key-file /keys/zyrcle-l1-admin.pk --address <old Treasury>
    ```
@@ -1195,7 +1198,10 @@ cd ~/apps/zyrcle
 W=infra/l1/scripts/zyrcle-api-docker.sh
 $W keys new --out /keys/zyrcle-guardian.pk          # prints only the new address
 $W chain fund --from-key-file /keys/zyrcle-l1-admin.pk --to <new address> --amount-zyr 10
-$W chain accounts-guardian --admin-key-file /keys/zyrcle-l1-admin.pk --guardian <new address>
+# Since the handover (runbook 9.14) the Safe names the guardian: two owners sign this proposal.
+$W safe propose --safe <SAFE> --what guardian --guardian <new address> --multisend <SAFE_MULTISEND> \
+   --out ../../infra/l1/safe/3-guardian.json
+$W safe exec --proposal ../../infra/l1/safe/3-guardian.json --key-file /keys/zyrcle-l1-admin.pk
 sed -i "s|^GUARDIAN_KEY_PATH=.*|GUARDIAN_KEY_PATH=$HOME/.avalanche-cli/key/zyrcle-guardian.pk|" deploy/.env
 deploy/deploy.sh <api-sha> <web-sha>                # the API now relays with the new key
 ```
@@ -1283,9 +1289,9 @@ Each item is checked against the repository.
   API ([ADR 0013](adr/0013-sale-and-settlement.md)). The oracle key is also the guardian and is on
   the deployer allow list. `config.py` says production should give the guardian its own key
   (`ZYRCLE_GUARDIAN_KEY_FILE`); compose does not pass one.
-- **One L1 admin key holds everything:** every precompile, the validator manager, and the admin role
-  of the Treasury and the AccountFactory. It can mint directly. The repository has no procedure to
-  rotate it.
+- **Admin changes need two of three signers.** Since 2026-11-23 the Safe holds every admin power
+  (runbook 9.14) and the L1 admin key none; an emergency pause of the Treasury also needs two
+  signatures. The L1 admin key still holds the genesis ZYR float that pays the backend's gas.
 - **Missing chain commands.** No command grants or revokes Treasury roles, pauses the Treasury,
   removes an allow-list entry, or tops up the validator. The wrapper does not pass the factory
   address that `chain accounts-guardian` needs.

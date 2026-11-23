@@ -39,8 +39,9 @@ cd chain && ../.slither/bin/slither . --filter-paths "test|lib|dependencies" --e
 
 ## Known weaknesses
 
-- The L1 admin key can mint ZYR directly through the NativeMinter, bypassing the Treasury. It is the
-  most powerful key and lives on the VPS (infrastructure, section 6).
+- Every admin power (minting rights, deployers, fees, validators, contract roles) belongs to a 2-of-3
+  Safe since 2026-11-23 (ADR 0040). Losing two of its three keys would lock them for good; each has
+  its own backup.
 - The oracle key is also the recovery guardian; it should get its own key before the pilot
   (ADR 0028).
 - The demo router publishes live QR codes; a pilot with real containers must run without it

@@ -1,0 +1,88 @@
+{
+  "safe": "0x607c011C6921eA75C1e38223a5E5514eDbA7E43b",
+  "chain_id": 20261121,
+  "to": "0x0bE806Ca77340aA50AF6586CDC2FE2561668DaEA",
+  "data": "0x2f2ff15d0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000607c011c6921ea75c1e38223a5e5514edba7e43b",
+  "nonce": 0,
+  "description": "Prueba: el Safe puede actuar (no cambia nada)",
+  "value": 0,
+  "operation": 0,
+  "signatures": {
+    "0xEBf748F482367cDe60c53abBae3Bd4e130eD656F": "0xaf017dc86cc9e667714e27bde764cc8c5430e65600b24e49905ccb6b747fa08e5723fc208d82d79d564645cfe4df4d61ca8055df979c11f28421c07543de44891b",
+    "0x8548277163d01F6225dD01BE740C86d286FD8C6F": "0xf795df7cce5db3ddd5b7855073bf1b80f70d15bb9e6776333d95bfc0d274763c2d2c55dc3e3378375da893b5499c3becd38ebac6f60fd31671d6cd993ade0c741c"
+  },
+  "safe_tx_hash": "0x0970227e60f1a2779390ef214a2a55c66bd06c684ad5e68b43d0c5ffc5391ddc",
+  "typed_data": {
+    "types": {
+      "EIP712Domain": [
+        {
+          "name": "chainId",
+          "type": "uint256"
+        },
+        {
+          "name": "verifyingContract",
+          "type": "address"
+        }
+      ],
+      "SafeTx": [
+        {
+          "name": "to",
+          "type": "address"
+        },
+        {
+          "name": "value",
+          "type": "uint256"
+        },
+        {
+          "name": "data",
+          "type": "bytes"
+        },
+        {
+          "name": "operation",
+          "type": "uint8"
+        },
+        {
+          "name": "safeTxGas",
+          "type": "uint256"
+        },
+        {
+          "name": "baseGas",
+          "type": "uint256"
+        },
+        {
+          "name": "gasPrice",
+          "type": "uint256"
+        },
+        {
+          "name": "gasToken",
+          "type": "address"
+        },
+        {
+          "name": "refundReceiver",
+          "type": "address"
+        },
+        {
+          "name": "nonce",
+          "type": "uint256"
+        }
+      ]
+    },
+    "primaryType": "SafeTx",
+    "domain": {
+      "chainId": 20261121,
+      "verifyingContract": "0x607c011C6921eA75C1e38223a5E5514eDbA7E43b"
+    },
+    "message": {
+      "to": "0x0bE806Ca77340aA50AF6586CDC2FE2561668DaEA",
+      "value": 0,
+      "data": "0x2f2ff15d0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000607c011c6921ea75c1e38223a5e5514edba7e43b",
+      "operation": 0,
+      "safeTxGas": 0,
+      "baseGas": 0,
+      "gasPrice": 0,
+      "gasToken": "0x0000000000000000000000000000000000000000",
+      "refundReceiver": "0x0000000000000000000000000000000000000000",
+      "nonce": 0
+    }
+  }
+}

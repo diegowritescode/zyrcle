@@ -8,7 +8,7 @@ import pytest
 from eth_account import Account
 from eth_utils import to_checksum_address
 
-from zyrcle_api.chain import Chain, load_account
+from zyrcle_api.chain import Chain, artifact, load_account
 from zyrcle_api.multisig import NATIVE_MINTER, PRECOMPILES, Proposal, sign_with_key
 from zyrcle_api.safe_ops import PROXY_ADMIN_SLOT, SET_ADMIN_ABI, VALIDATOR_MANAGER, SafeOps
 
@@ -117,6 +117,13 @@ async def test_the_handover_moves_all_eight_powers_and_leaves_the_admin_key_none
 
     after = await ops.status(admin.address, safe)
     assert all(r["safe"] and not r["admin_key"] for r in after), after
+
+    # From now on admin changes are the Safe's: a new guardian for the factory, for example.
+    guardian = Account.create().address
+    change = await ops.guardian_proposal(safe, guardian, stack["multisend"])
+    await ops.execute(admin, await signed(change))
+    f = w3.eth.contract(address=to_checksum_address(factory), abi=artifact("AccountFactory")["abi"])
+    assert (await f.functions.guardian().call()).lower() == guardian.lower()
     await fresh.w3.provider.disconnect()
 
 
@@ -176,6 +183,25 @@ async def test_the_command_line_runs_the_first_steps_and_a_paper_key_signs(
     assert "executed" in cli(
         chain_env, "exec", "--proposal", str(proposal), "--key-file", str(admin_file)
     )
+    # Any later admin change is a plain call the owners sign the same way.
+    anything = tmp_path / "call.json"
+    cli(
+        chain_env,
+        "propose",
+        "--safe",
+        safe,
+        "--what",
+        "call",
+        "--to",
+        safe,
+        "--data",
+        "0x",
+        "--description",
+        "nada",
+        "--out",
+        str(anything),
+    )
+    assert Proposal.from_json(anything.read_text()).nonce == 1
     admin = load_account(ANVIL_KEYS["admin"]).address
     status = cli(chain_env, "status", "--safe", safe, "--admin", admin)
     assert "AccountFactory" in status and "Safe: sí" in status

@@ -291,6 +291,25 @@ class SafeOps:
         note = "Quitar la llave de administrador de las precompilas"
         return await self.propose(safe, multisend, data, note, operation=1)
 
+    async def guardian_proposal(self, safe: str, guardian: str, multisend: str) -> Proposal:
+        """After the handover, giving the AccountFactory a new guardian is the Safe's job (runbook
+        9.13): put the guardian on the deployer allow list, then name it in the factory."""
+        if not self.factory_address:
+            raise ValueError("set ZYRCLE_ACCOUNT_FACTORY_ADDRESS")
+        guardian = to_checksum_address(guardian)
+        deployers = self.w3.eth.contract(
+            address=to_checksum_address(PRECOMPILES["ContractDeployerAllowList"]), abi=SET_ADMIN_ABI
+        )
+        factory = self.w3.eth.contract(
+            address=to_checksum_address(self.factory_address), abi=artifact("AccountFactory")["abi"]
+        )
+        allow = deployers.encode_abi("setEnabled", args=[guardian])
+        name = factory.encode_abi("setGuardian", args=[guardian])
+        calls = [(PRECOMPILES["ContractDeployerAllowList"], allow), (self.factory_address, name)]
+        data = self.multisend(multisend, calls)
+        note = f"Nueva llave guardián de las cuentas: {guardian}"
+        return await self.propose(safe, multisend, data, note, operation=1)
+
     async def renounce_roles(self, admin: LocalAccount, safe: str) -> list[str]:
         """Step 5, from the admin key: it gives up its contract roles. Refuses while the Safe does
         not hold them."""

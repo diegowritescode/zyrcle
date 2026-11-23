@@ -67,4 +67,14 @@ every signed payment, also shared the oracle key (ADR 0028 asked to separate it)
     owner's over that proposal.
   - Tested on anvil (two signatures, the threshold, tampering, the five steps leaving the admin key
     with nothing) and end to end in a browser with a stand-in wallet.
+- **2026-11-23, Diego (the handover, done):** with his approval ("autorizo desplegar el Safe y mover
+  los poderes en Fuji") the Safe `0x607c011C6921eA75C1e38223a5E5514eDbA7E43b` was deployed with his Core wallet
+  (`0xEBf7…656F`), his phone's MetaMask (`0xA8a5…1646`) and a paper key (`0x8548…8C6F`), threshold
+  two. He signed both proposals with Core on the multisig page and with the paper key on the
+  command line: the proof (`0xddeed673…1fe7`) and the removal of the admin key from the
+  precompiles (`0x6ba1915b…0ecf`). Checked on the public RPC afterwards: the Safe holds the eight
+  powers, the L1 admin key none, and the Treasury still mints. The signed proposals are in
+  `infra/l1/safe/`. The admin key keeps the genesis ZYR float for gas; it is moved off the VPS once
+  that float has another holder. Changing the guardian is now a Safe proposal
+  (`safe propose --what guardian`).
 

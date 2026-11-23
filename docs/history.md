@@ -134,8 +134,9 @@ stalled one (ADR 0028, amendment). Diego confirmed every record, chose the multi
 MetaMask, his phone and a paper key) and authorized the merge and the deploy: commit `ac09179`,
 migrations `0014` to `0016`, images pinned by digest and recorded in `deploy/history.log`.
 The multisig code of M17 followed the same day with his approval (`48fd1d1`): the Safe contracts, the
-`zyrcle-api safe` commands and the `/multisig` signing page. The Safe itself is not deployed yet: it
-waits for the owners' three addresses and the approval of the Fuji transactions (runbook 9.14).
+`zyrcle-api safe` commands and the `/multisig` signing page. Diego then chose his three signers and
+approved the handover: the Safe `0x607c011C6921eA75C1e38223a5E5514eDbA7E43b` holds every admin power of ZyrcleChain since 2026-11-23,
+and the key that held them all has none.
 
 ## Where the old things are
 

@@ -7,6 +7,9 @@
   safe own      --admin-key-file F --safe S                       step 3: ownerships to the Safe
   safe propose  --safe S --what revoke --admin A --multisend M --out FILE   step 4
   safe renounce --admin-key-file F --safe S                       step 5: the admin key gives up
+  safe propose  --safe S --what guardian --guardian G --multisend M --out FILE   new guardian
+  safe propose  --safe S --what call --to T --data 0x… --description TEXT --out FILE
+                                                                  any later admin change
   safe sign     --proposal FILE --key-file F|-                    sign with a key (- asks for it)
   safe exec     --proposal FILE --key-file F                      send it once two owners signed
 
@@ -39,7 +42,11 @@ def add_parser(sub) -> None:
         step.add_argument("--safe", required=True)
     propose = safe.add_parser("propose")
     propose.add_argument("--safe", required=True)
-    propose.add_argument("--what", choices=["proof", "revoke"], required=True)
+    propose.add_argument("--what", choices=["proof", "revoke", "guardian", "call"], required=True)
+    propose.add_argument("--guardian", help="the new guardian's address (guardian)")
+    propose.add_argument("--to", help="the contract to call (call)")
+    propose.add_argument("--data", help="the calldata, 0x… (call)")
+    propose.add_argument("--description", help="what it does, in plain words (call)")
     propose.add_argument("--admin", help="the admin key's address (revoke)")
     propose.add_argument("--multisend", help="the MultiSendCallOnly address (revoke)")
     propose.add_argument("--out", required=True)
@@ -89,6 +96,14 @@ async def run(args: argparse.Namespace) -> None:
     elif a == "propose":
         if args.what == "proof":
             p = await ops.proof_proposal(args.safe)
+        elif args.what == "guardian":
+            if not args.guardian or not args.multisend:
+                raise SystemExit("guardian needs --guardian and --multisend")
+            p = await ops.guardian_proposal(args.safe, args.guardian, args.multisend)
+        elif args.what == "call":
+            if not (args.to and args.data and args.description):
+                raise SystemExit("call needs --to, --data and --description")
+            p = await ops.propose(args.safe, args.to, args.data, args.description)
         else:
             if not args.admin or not args.multisend:
                 raise SystemExit("revoke needs --admin and --multisend")
