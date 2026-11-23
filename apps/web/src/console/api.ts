@@ -154,7 +154,7 @@ export interface Health {
     outboxes: { name: string; pending: number; failed: number; oldest_pending_min: number | null; stuck: boolean }[];
     devices: { online: number; total: number };
     mqtt: boolean;
-    chain: { block?: number; block_age_s?: number; available_cop?: number; keys: Record<string, { address: string; zyr: number }>; error?: string } | null;
+    chain: { block?: number; block_age_s?: number; waiting_s?: number | null; node_healthy?: boolean; available_cop?: number; keys: Record<string, { address: string; zyr: number }>; error?: string } | null;
 }
 
 export interface MerchantRow {

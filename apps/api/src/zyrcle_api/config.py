@@ -64,6 +64,8 @@ class Settings(BaseSettings):
     alert_available_min_cop: int = 100_000
     alert_stuck_after_min: int = 30
     alert_chain_stale_min: int = 10
+    # The validator node's own health endpoint (AvalancheGo `/ext/health`). Unset: not checked.
+    chain_health_url: str | None = None
     # Advance = ratio x reference price x kg, capped like the contract (docs/adr/0003).
     advance_ratio_bps: int = 5_000
     max_advance_cop: int = 5_000

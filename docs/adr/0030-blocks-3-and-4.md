@@ -1,10 +1,10 @@
 # ADR 0030: Blocks 3 and 4: foundations and operations first, then every party
 
-- Status: proposed (2026-11-23)
+- Status: accepted (2026-11-23)
 - Decided by: Diego asked on 2026-11-23 for one large plan covering everything Claude listed as
   missing, for every party and for the engineering, split into two large blocks ("quiero un bloque
   grande… podemos dividir el trabajo en dos bloques grandes"). Claude proposed the split, the order
-  and the designs. Not yet confirmed.
+  and the designs. Diego confirmed it the same day: "confirmo el 0030 y arranca el bloque 3".
 
 ## Context
 v1 blocks 1 and 2 are deployed (ADR 0026). The loop closes on a simulator, with much of the

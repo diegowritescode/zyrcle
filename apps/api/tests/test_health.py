@@ -1,11 +1,13 @@
 """Health report and admin alerts (docs/adr/0028)."""
 
 import uuid
+from datetime import UTC, datetime, timedelta
 
+import httpx
 import pytest
 from sqlalchemy import select
 
-from zyrcle_api.health import AlertWorker, report
+from zyrcle_api.health import AlertWorker, chain_stalled, report
 from zyrcle_api.main import create_app
 from zyrcle_api.models import EmailMessage
 
@@ -57,3 +59,39 @@ def test_production_turns_the_interactive_docs_off(settings):
     assert "/docs" not in paths and "/openapi.json" not in paths
     on = create_app(settings)
     assert "/docs" in {getattr(r, "path", None) for r in on.routes}
+
+
+def test_a_quiet_chain_is_not_a_stalled_one():
+    # Subnet-EVM makes no empty blocks: an old last block alone is not a warning.
+    assert not chain_stalled(block_age_s=6_000, waiting_s=None, threshold_s=600)
+    assert not chain_stalled(block_age_s=6_000, waiting_s=60, threshold_s=600)
+    assert not chain_stalled(block_age_s=30, waiting_s=6_000, threshold_s=600)
+    assert chain_stalled(block_age_s=6_000, waiting_s=900, threshold_s=600)
+
+
+async def test_an_old_block_warns_only_when_work_waits_for_the_chain(app, settings):
+    later = datetime.now(UTC) + timedelta(hours=2)  # the last block is now two hours old
+    h = await report(app.state.maker, settings, app.state.chain, {}, True, clock=lambda: later)
+    stale = any(w["kind"] == "chain_stale" for w in h["warnings"])
+    assert h["chain"]["block_age_s"] >= 7_000
+    assert stale == (h["chain"]["waiting_s"] is not None and h["chain"]["waiting_s"] > 600)
+
+
+async def test_the_validator_node_reports_its_own_health(app, settings):
+    def node(answer: dict, status: int = 200):
+        return httpx.AsyncClient(
+            transport=httpx.MockTransport(lambda request: httpx.Response(status, json=answer))
+        )
+
+    checked = settings.model_copy(update={"chain_health_url": "http://node:9650/ext/health"})
+    args = (app.state.maker, checked, app.state.chain, {}, True)
+    async with node({"healthy": True}) as ok, node({"healthy": False}) as sick:
+        good = await report(*args, http=ok)
+        bad = await report(*args, http=sick)
+    async with node({}, status=503) as down:
+        gone = await report(*args, http=down)
+    assert good["chain"]["node_healthy"] is True
+    assert not any(w["kind"] == "node_unhealthy" for w in good["warnings"])
+    for h in (bad, gone):
+        assert h["chain"]["node_healthy"] is False
+        assert any(w["kind"] == "node_unhealthy" for w in h["warnings"])

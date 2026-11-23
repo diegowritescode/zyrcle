@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { useConsole } from "@/console/context";
 import { Empty, Loading, Section, Stat } from "./shared";
 
+const blockAge = (s: number) => (s < 120 ? `${s} s` : s < 7_200 ? `${Math.round(s / 60)} min` : `${Math.round(s / 3_600)} h`);
+
 /** What needs the operator now, and the Treasury's books. */
 export function Summary() {
     const { api } = useConsole();
@@ -48,7 +50,7 @@ export function Summary() {
                         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                             <Stat label="Contenedores en línea" value={`${h.devices.online} de ${h.devices.total}`} />
                             <Stat label="Broker MQTT" value={h.mqtt ? "Conectado" : "Sin conexión"} />
-                            <Stat label="Último bloque" value={h.chain?.block ?? "—"} hint={h.chain?.block_age_s !== undefined ? `hace ${h.chain.block_age_s} s` : undefined} />
+                            <Stat label="Último bloque" value={h.chain?.block ?? "—"} hint={h.chain?.block_age_s !== undefined ? `hace ${blockAge(h.chain.block_age_s)} · solo hay bloques cuando hay transacciones` : undefined} />
                             {Object.entries(h.chain?.keys ?? {}).map(([role, k]) => (
                                 <Stat key={role} label={`Gas de la llave ${role}`} value={`${k.zyr} ZYR`} />
                             ))}

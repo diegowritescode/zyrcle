@@ -384,6 +384,7 @@ has none). Unknown variables are ignored. "Default" means the column is not set 
 | `ZYRCLE_CHAIN_RPC_URL` | none | `http://zyrcle-l1-node-1:9650/ext/bc/${BLOCKCHAIN_ID}/rpc` | no | ZyrcleChain JSON-RPC endpoint, reached over `edge`. |
 | `ZYRCLE_TREASURY_ADDRESS` | none | `${TREASURY}` | no | Treasury contract address. |
 | `ZYRCLE_ORACLE_KEY_FILE` | none | `/run/secrets/oracle.key` | the file is | Path to the hex private key with the Treasury's ORACLE_ROLE. |
+| `ZYRCLE_CHAIN_HEALTH_URL` | none | `http://zyrcle-l1-node-1:9650/ext/health` | no | The validator node's health endpoint, checked by the health report ([ADR 0028, amendment](adr/0028-pilot-readiness.md#amendments)). Unset: not checked. |
 | `ZYRCLE_OPERATOR_KEY_FILE` | none | `/run/secrets/operator.key` | the file is | Path to the hex private key with the Treasury's OPERATOR_ROLE. Without it, confirmed sales wait. |
 | `ZYRCLE_SETTLEMENT_INTERVAL_S` | `3.0` | default | no | Settlement worker interval. |
 | `ZYRCLE_ADVANCE_RATIO_BPS` | `5000` | default | no | Advance as a share of the reference price, in basis points (50 %, [ADR 0023](adr/0023-testnet-economics.md)). |
@@ -1110,7 +1111,9 @@ The dumps stay on the VPS: losing the machine loses them. An off-site copy is st
 broker, the chain's latest block and its age, the Treasury's mintable pesos and the gas of the oracle
 and operator keys. Each warning is emailed to every active admin at most once a day. Thresholds are
 settings (`alert_*` in [config.py](../apps/api/src/zyrcle_api/config.py)): queue stuck 30 min, any
-failed row, no block for 10 min, under 100,000 COP mintable, under 1 ZYR of gas.
+failed row, no block for 10 min while a transaction has waited for the chain as long, the validator
+node reporting itself unhealthy, under 100,000 COP mintable, under 1 ZYR of gas. ZyrcleChain makes
+no empty blocks, so a quiet night leaves the last block hours old without anything being wrong.
 
 ### 9.12 Top up gas for the backend's keys
 

@@ -26,6 +26,8 @@ x-api-env: &api-env
   ZYRCLE_CHAIN_RPC_URL: http://zyrcle-l1-node-1:9650/ext/bc/${BLOCKCHAIN_ID:?}/rpc
   ZYRCLE_TREASURY_ADDRESS: ${TREASURY:?}
   ZYRCLE_ORACLE_KEY_FILE: /run/secrets/oracle.key
+  # The validator node's own health, for the console and the admin alerts (ADR 0028, amendment).
+  ZYRCLE_CHAIN_HEALTH_URL: http://zyrcle-l1-node-1:9650/ext/health
   # The Treasury's OPERATOR_ROLE key: records a sale once an operator confirmed the bank match
   # (ADR 0013).
   ZYRCLE_OPERATOR_KEY_FILE: /run/secrets/operator.key

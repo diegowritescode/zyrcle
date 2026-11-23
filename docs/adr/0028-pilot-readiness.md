@@ -46,3 +46,13 @@ some needs a lawyer, money or Diego's accounts.
 - An operator learns about a stuck queue or a dying validator from an email, not from a participant.
 - Consent is recorded per version, so a new policy asks everyone again.
 - Some M7 items cannot be closed by code; they are listed here until Diego decides them.
+
+## Amendments
+- **2026-11-23, Claude (a false alarm, the night of the block 2 deploy):** the alert "no block for
+  10 minutes" fired on a healthy chain. ZyrcleChain (Subnet-EVM) makes a block only when there is a
+  transaction, so a quiet hour leaves the last block old. The chain warning now needs both an old
+  last block and a transaction that has waited for the chain as long (advances, settlements,
+  certificate anchors, recoveries, relayed payments and redemptions). The health report also asks
+  the validator node itself (`/ext/health`, `ZYRCLE_CHAIN_HEALTH_URL`) and warns when it reports
+  itself unhealthy, which catches a dead validator even on a quiet chain.
+

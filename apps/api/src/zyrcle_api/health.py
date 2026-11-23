@@ -1,8 +1,13 @@
 """Is everything working? For the console and for admins' email alerts (docs/adr/0028).
 
-Every outbox should drain, the chain should keep producing blocks, the Treasury should have pesos
-left to mint against, and the keys that pay gas should have some. Each check that fails becomes a
-warning in Spanish, the language of the people who act on it.
+Every outbox should drain, the chain should keep producing blocks while there is work for it, the
+validator node should report itself healthy, the Treasury should have pesos left to mint against,
+and the keys that pay gas should have some. Each check that fails becomes a warning in Spanish, the
+language of the people who act on it.
+
+ZyrcleChain (Subnet-EVM) makes a block only when there is a transaction, so an old last block on
+its own means a quiet chain, not a stalled one. It is a warning only when work has been waiting for
+the chain that long too (amendment of ADR 0028, 2026-11-23).
 """
 
 import logging
@@ -10,6 +15,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+import httpx
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -23,7 +29,9 @@ from .models import (
     EmailMessage,
     Notification,
     Operator,
+    PaymentRequest,
     Payout,
+    RedemptionRequest,
     SaleLine,
 )
 
@@ -38,6 +46,46 @@ OUTBOXES = [
     ("certificados", Certificate, ("issued",), ("failed",)),
     ("recuperaciones", AccountRecovery, ("starting", "cancelling"), ("failed",)),
 ]
+
+
+# Rows that wait on a transaction: (model, statuses). Their age counts from `updated_at` when the
+# model has it (a sale line is created long before it settles), else from `created_at`.
+CHAIN_WORK = [
+    (Payout, ("pending", "submitting")),
+    (SaleLine, ("settling",)),
+    (Certificate, ("issued",)),
+    (AccountRecovery, ("starting", "cancelling")),
+    (PaymentRequest, ("paying",)),
+    (RedemptionRequest, ("requested",)),
+]
+
+
+def chain_stalled(block_age_s: int, waiting_s: int | None, threshold_s: int) -> bool:
+    """A stall is an old last block while something has waited for the chain as long."""
+    return block_age_s > threshold_s and waiting_s is not None and waiting_s > threshold_s
+
+
+async def _oldest_chain_work(db: AsyncSession) -> datetime | None:
+    oldest = None
+    for model, statuses in CHAIN_WORK:
+        since = getattr(model, "updated_at", model.created_at)
+        first = await db.scalar(select(func.min(since)).where(model.status.in_(statuses)))
+        if first is not None and (oldest is None or first < oldest):
+            oldest = first
+    return oldest
+
+
+async def _node_healthy(url: str, http: httpx.AsyncClient | None) -> bool:
+    """The node's own health endpoint (`/ext/health` on AvalancheGo)."""
+    try:
+        if http is None:
+            async with httpx.AsyncClient(timeout=5) as own:
+                r = await own.get(url)
+        else:
+            r = await http.get(url, timeout=5)
+        return r.status_code == 200 and r.json().get("healthy") is True
+    except (httpx.HTTPError, ValueError):
+        return False
 
 
 def utcnow() -> datetime:
@@ -76,6 +124,7 @@ async def report(
     keys: dict[str, str],
     mqtt_connected: bool,
     clock: Callable[[], datetime] = utcnow,
+    http: httpx.AsyncClient | None = None,
 ) -> dict[str, Any]:
     """The whole picture. `keys` maps a role name to the address that pays its gas."""
     now = clock()
@@ -88,6 +137,7 @@ async def report(
             .where(Device.last_seen_at > now - timedelta(seconds=settings.device_offline_after_s))
         )
         devices = await db.scalar(select(func.count()).select_from(Device))
+        waiting_since = await _oldest_chain_work(db)
     for box in outboxes:
         if box["stuck"]:
             warnings.append(
@@ -113,13 +163,16 @@ async def report(
         try:
             block = await chain.w3.eth.get_block("latest")
             age = int(now.timestamp()) - int(block["timestamp"])
-            chain_view.update(block=int(block["number"]), block_age_s=age)
-            if age > settings.alert_chain_stale_min * 60:
+            waiting = None if waiting_since is None else int((now - waiting_since).total_seconds())
+            chain_view.update(block=int(block["number"]), block_age_s=age, waiting_s=waiting)
+            if chain_stalled(age, waiting, settings.alert_chain_stale_min * 60):
+                assert waiting is not None
                 warnings.append(
                     {
                         "kind": "chain_stale",
-                        "text": f"ZyrcleChain no produce bloques hace {age // 60} minutos: "
-                        "revisa el validador y su saldo en la P-Chain.",
+                        "text": f"Hay operaciones esperando a ZyrcleChain hace {waiting // 60} "
+                        f"minutos y no produce bloques hace {age // 60}: revisa el validador y su "
+                        "saldo en la P-Chain.",
                     }
                 )
             if chain.treasury is not None:
@@ -147,6 +200,17 @@ async def report(
         except Exception as e:  # the chain being unreachable is itself the warning
             chain_view["error"] = f"{type(e).__name__}: {e}"
             warnings.append({"kind": "chain_down", "text": "No logramos leer ZyrcleChain."})
+        if settings.chain_health_url:
+            healthy = await _node_healthy(settings.chain_health_url, http)
+            chain_view["node_healthy"] = healthy
+            if not healthy:
+                warnings.append(
+                    {
+                        "kind": "node_unhealthy",
+                        "text": "El nodo validador de ZyrcleChain dice que no está sano: revisa "
+                        "el contenedor del nodo y su saldo en la P-Chain.",
+                    }
+                )
     return {
         "checked_at": now.isoformat(),
         "ok": not warnings,
