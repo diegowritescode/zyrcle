@@ -28,6 +28,7 @@ if [ ! -f .env ]; then
       -e "s|^MQTT_CTR_0003_PASSWORD=.*|MQTT_CTR_0003_PASSWORD=$(secret 24)|" \
       -e "s|^MQTT_CTR_0004_PASSWORD=.*|MQTT_CTR_0004_PASSWORD=$(secret 24)|" \
       -e "s|^ORACLE_KEY_PATH=.*|ORACLE_KEY_PATH=$HOME/.avalanche-cli/key/zyrcle-oracle.pk|" \
+      -e "s|^OPERATOR_KEY_PATH=.*|OPERATOR_KEY_PATH=$HOME/.avalanche-cli/key/zyrcle-operator.pk|" \
       -e "s|^DEPLOY_UID=.*|DEPLOY_UID=$(id -u)|" -e "s|^DEPLOY_GID=.*|DEPLOY_GID=$(id -g)|" \
       .env.example > .env
   echo "created deploy/.env with fresh secrets"

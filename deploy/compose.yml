@@ -26,6 +26,9 @@ x-api-env: &api-env
   ZYRCLE_CHAIN_RPC_URL: http://zyrcle-l1-node-1:9650/ext/bc/${BLOCKCHAIN_ID:?}/rpc
   ZYRCLE_TREASURY_ADDRESS: ${TREASURY:?}
   ZYRCLE_ORACLE_KEY_FILE: /run/secrets/oracle.key
+  # The Treasury's OPERATOR_ROLE key: records a sale once an operator confirmed the bank match
+  # (ADR 0013).
+  ZYRCLE_OPERATOR_KEY_FILE: /run/secrets/operator.key
   # Only if "enhanced security for push notifications" is on in the Expo project (ADR 0008).
   ZYRCLE_EXPO_ACCESS_TOKEN: ${EXPO_ACCESS_TOKEN:-}
   # Smart accounts and lost-phone recovery (ADR 0010). Empty: both stay off.
@@ -77,11 +80,13 @@ services:
   api:
     image: ghcr.io/diegowritescode/zyrcle-api:${ZYRCLE_API_TAG:?set ZYRCLE_API_TAG in deploy/.env}
     restart: unless-stopped
-    # Runs as the host user so it can read the oracle key, which stays a 0600 file of that user.
+    # Runs as the host user so it can read the oracle and operator keys, which stay 0600 files of
+    # that user.
     user: "${DEPLOY_UID:-1000}:${DEPLOY_GID:-1000}"
     environment: *api-env
     volumes:
       - ${ORACLE_KEY_PATH:?}:/run/secrets/oracle.key:ro
+      - ${OPERATOR_KEY_PATH:?set OPERATOR_KEY_PATH in deploy/.env (ADR 0013)}:/run/secrets/operator.key:ro
     depends_on:
       postgres: { condition: service_healthy }
       mosquitto: { condition: service_started }
