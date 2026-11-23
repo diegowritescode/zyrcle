@@ -50,3 +50,11 @@ curl -s https://zyrcle-backend.deviego.xyz/v1/stats
 curl -s https://zyrcle-backend.deviego.xyz/v1/demo/containers
 curl -sI https://zyrcle.deviego.xyz | grep -i content-security-policy
 ```
+
+## Backups
+
+`deploy/backup.sh` dumps the database to `~/backups/zyrcle` (14 days) and `deploy/backup.sh --check
+FILE` proves a dump restores. Meant for a daily cron entry; see
+[docs/infrastructure.md](../docs/infrastructure.md), runbook 9.10, and
+[ADR 0028](../docs/adr/0028-pilot-readiness.md).
+

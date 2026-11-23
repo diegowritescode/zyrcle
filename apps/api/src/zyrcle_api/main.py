@@ -15,6 +15,8 @@ from .collection import CollectionService
 from .collection_routes import router as collection_router
 from .config import Settings, get_settings
 from .db import make_engine, make_sessionmaker
+from .health import AlertWorker
+from .health import report as health_report
 from .impact import AnchorWorker, ImpactService
 from .impact_routes import router as impact_router
 from .live import LiveHub
@@ -128,6 +130,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     _every(settings.settlement_interval_s, anchors.run_once, "anchors")
                 )
             )
+        gas_keys = {}
+        if settings.chain_enabled:
+            gas_keys["oráculo"] = load_account_file(settings.oracle_key_file).address  # type: ignore[arg-type]
+        if settings.sales_enabled:
+            gas_keys["operador"] = load_account_file(settings.operator_key_file).address  # type: ignore[arg-type]
+
+        async def snapshot():
+            return await health_report(maker, settings, chain, gas_keys, bridge.connected.is_set())
+
+        app.state.health = snapshot
+        if settings.email_enabled:
+            alerts = AlertWorker(maker, settings, snapshot)
+            app.state.alerts = alerts
+            tasks.append(
+                asyncio.create_task(_every(settings.alert_interval_s, alerts.run_once, "alerts"))
+            )
         if chain is not None and settings.accounts_enabled:
             guardian = load_account_file(settings.guardian_key_file or settings.oracle_key_file)  # type: ignore[arg-type]
             recoveries = RecoveryWorker(maker, chain, guardian, settings)
@@ -167,7 +185,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 await mail_http.aclose()
             await engine.dispose()
 
-    app = FastAPI(title="Zyrcle API", version="0.1.0", lifespan=lifespan)
+    docs = (
+        {} if settings.docs_enabled else {"docs_url": None, "redoc_url": None, "openapi_url": None}
+    )
+    app = FastAPI(title="Zyrcle API", version="0.1.0", lifespan=lifespan, **docs)
     app.include_router(router)
     app.include_router(public_router)
     app.include_router(booking_router)

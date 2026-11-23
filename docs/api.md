@@ -729,6 +729,18 @@ email configured. The recovery routes also need smart accounts (`recovery_enable
 `cancelled` or `failed`), `ready_at`, `ready_label` (the date in Spanish, for display),
 `cancelled_by` (`owner`, `new_phone`, `chain`, `replaced` or null), `created_at`.
 
+#### Consent (Ley 1581)
+
+[ADR 0028](adr/0028-pilot-readiness.md). `GET /v1/me` also returns `privacy_version` (accepted, or
+null) and `privacy_current` (in force).
+
+| Method and path | Body | Returns |
+|---|---|---|
+| `POST /v1/me/consent` | `{version}` | `{privacy_version}`. 409 if `version` is not the policy in force |
+
+With `require_consent` on, `POST /v1/sessions` answers 403 `consent_required` until the participant
+accepts the policy in force.
+
 ### 3.4 Collector
 
 A collector is a participant with an active collector row, named by an operator
@@ -1069,6 +1081,14 @@ The worker runs only when the chain and `ZYRCLE_OPERATOR_KEY_FILE` are configure
 `settled_at`.
 
 
+#### Health
+
+| Method and path | Returns |
+|---|---|
+| `GET /v1/operator/health` | `{ok, warnings: [{kind, text}], outboxes: [{name, pending, failed, oldest_pending_min, stuck}], devices: {online, total}, mqtt, chain: {block, block_age_s, available_cop, keys: {role: {address, zyr}}}}` ([ADR 0028](adr/0028-pilot-readiness.md)). Warnings are in Spanish |
+
+Interactive docs (`/docs`, `/redoc`, `/openapi.json`) are off in production (`ZYRCLE_DOCS_ENABLED=false`).
+
 #### Impact certificates (operator)
 
 | Method and path | Body | Returns |
@@ -1331,8 +1351,8 @@ Found on 2026-11-22 by comparing the routes with the two TypeScript clients and 
 | 9 | 500s: demo drop on an unknown session, demo items with the simulator down, registering a container with an unknown or used device | Fixed: 404, 503 and 404/409 |
 | 10 | Public `paid_cop` counted advances only | Fixed: it adds what sales paid; the daily chart too |
 | 11 | Finishing someone else's session answered 403, revealing it exists | Fixed: 404, as reading it does |
-| 12 | `/docs`, `/redoc` and `/openapi.json` are served in production | Open: decide in v1 M7 (pilot readiness) |
-| 13 | The demo router runs in production and `GET /v1/demo/containers` lists every container's live QR | Open, M7: a pilot deployment runs without the demo router; real containers must not share a deployment with it |
+| 12 | `/docs`, `/redoc` and `/openapi.json` are served in production | Fixed: off in production (ADR 0028) |
+| 13 | The demo router runs in production and `GET /v1/demo/containers` lists every container's live QR | Decided (ADR 0028): a pilot deployment with real containers runs without the demo router |
 | 14 | Plain-string errors without a `code` (section 1) | Open: move them to `{"code", "detail"}` when touched |
 | 15 | The edge rate limit's period and source are Traefik's defaults, not checked on the running proxy | Open, M7 |
 | 16 | When the `residence` aliases go (ADR 0011) | Planned: remove them once the APK built after block 1 is the one in use; tracked in ADR 0011 |

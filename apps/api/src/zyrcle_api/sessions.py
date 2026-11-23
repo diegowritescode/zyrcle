@@ -24,7 +24,15 @@ from . import bookings
 from .config import Settings
 from .domain.session_machine import ACTIVE, CREDITED, Event, InvalidTransition, State, transition
 from .domain.verification import MAX_BULK_DENSITY_G_PER_ML, Measurement, Outcome, Rules, verify
-from .errors import Conflict, Forbidden, Invalid, NotFound, RecoveryPending, Unavailable
+from .errors import (
+    Conflict,
+    ConsentRequired,
+    Forbidden,
+    Invalid,
+    NotFound,
+    RecoveryPending,
+    Unavailable,
+)
 from .live import LiveHub
 from .models import (
     COLLECTION_ACTIVE,
@@ -112,6 +120,12 @@ class SessionService:
         async with self._maker() as db:
             if await recovery_pending(db, resident_id):
                 raise RecoveryPending("this phone is waiting to recover an account")
+            if self._s.require_consent:
+                accepted = await db.scalar(
+                    select(Resident.privacy_version).where(Resident.id == resident_id)
+                )
+                if accepted != self._s.privacy_version:
+                    raise ConsentRequired("accept the data-processing policy before depositing")
             # Locked so that counting the hour's spots and taking one cannot race (bookings.py).
             container = await db.get(Container, container_id, with_for_update=True)
             if container is None:

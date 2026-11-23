@@ -147,6 +147,16 @@ export interface CertificatePreview {
     merkle_root: string;
 }
 
+export interface Health {
+    checked_at: string;
+    ok: boolean;
+    warnings: { kind: string; text: string }[];
+    outboxes: { name: string; pending: number; failed: number; oldest_pending_min: number | null; stuck: boolean }[];
+    devices: { online: number; total: number };
+    mqtt: boolean;
+    chain: { block?: number; block_age_s?: number; available_cop?: number; keys: Record<string, { address: string; zyr: number }>; error?: string } | null;
+}
+
 export interface ContainerBalance {
     container_id: string;
     name: string;
@@ -189,6 +199,7 @@ export function operatorApi(token: string | null, onUnauthorized: () => void) {
         me: () => call<OperatorMe>("/v1/operator/me"),
 
         treasury: () => call<TreasuryState>("/v1/operator/treasury"),
+        health: () => call<Health>("/v1/operator/health"),
         reviewQueue: () => call<Session[]>("/v1/operator/review"),
         review: (id: string, approve: boolean, note: string) => call<Session>(`/v1/operator/sessions/${id}/review`, json("POST", { approve, note: note || null })),
 

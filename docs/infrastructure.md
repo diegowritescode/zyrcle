@@ -1060,17 +1060,47 @@ Work down this list.
 7. **Memory.** `docker stats --no-stream` shows each container against its limit
    ([section 4.5](#45-memory-budget)).
 
+### 9.10 Back up and restore the database
+
+[ADR 0028](adr/0028-pilot-readiness.md). On the VPS:
+
+```bash
+~/apps/zyrcle/deploy/backup.sh                       # dump now into ~/backups/zyrcle, keep 14 days
+~/apps/zyrcle/deploy/backup.sh --check FILE          # restore FILE into a throwaway Postgres, count rows
+```
+
+Daily from cron (pending Diego's approval to install it): `15 3 * * * ~/apps/zyrcle/deploy/backup.sh`.
+`BACKUP_DIR` and `BACKUP_KEEP_DAYS` change the folder and the retention.
+
+To restore production from a dump, stop the API first so nothing writes meanwhile:
+
+```bash
+cd ~/apps/zyrcle/deploy
+docker compose stop api
+docker compose exec -T postgres psql -U zyrcle -d postgres -c "DROP DATABASE zyrcle" -c "CREATE DATABASE zyrcle OWNER zyrcle"
+gunzip -c FILE | docker compose exec -T postgres psql -U zyrcle -d zyrcle -v ON_ERROR_STOP=1
+docker compose start api
+```
+
+The dumps stay on the VPS: losing the machine loses them. An off-site copy is still to be decided.
+
+### 9.11 Health and alerts
+
+`GET /v1/operator/health` (and the console's summary) reports each outbox, devices online, the
+broker, the chain's latest block and its age, the Treasury's mintable pesos and the gas of the oracle
+and operator keys. Each warning is emailed to every active admin at most once a day. Thresholds are
+settings (`alert_*` in [config.py](../apps/api/src/zyrcle_api/config.py)): queue stuck 30 min, any
+failed row, no block for 10 min, under 100,000 COP mintable, under 1 ZYR of gas.
+
 ## 10. Known gaps and risks
 
 Each item is checked against the repository.
 
 **Data and availability**
 
-- **No database backups.** Nothing in the repository backs up `pgdata`, and `deploy.sh` migrates
-  without one. Roadmap M7 lists "Postgres backups, tested by restoring them"
-  ([ADR 0020](adr/0020-single-vps-docker-compose.md)). Nothing backs up the `node-data` volume (the
-  validator identity), `deploy/.env` or the key files either. The L1 README asks for an offline
-  copy of the keys, by hand.
+- **Backups stay on the VPS.** `deploy/backup.sh` exists (runbook 9.10) but its cron entry is not installed yet and nothing copies the dumps off the machine.
+- **Only the database is backed up.** Nothing backs up the `node-data` volume (the validator identity), `deploy/.env` or the key files; the L1 README asks for an offline copy of the keys, by hand.
+- **A migration is not reversible by data.** `deploy.sh` migrates before starting the new API; take a backup first (runbook 9.10) so a bad migration can be undone by restoring.
 - **One VPS.** It runs the application, the validator and Traefik, shared with other projects. It is
   a single point of failure for the demo and the chain ([ADR 0020](adr/0020-single-vps-docker-compose.md)).
   The memory limits add up to 4,160 MiB on a 4 GB machine ([section 4.5](#45-memory-budget)).

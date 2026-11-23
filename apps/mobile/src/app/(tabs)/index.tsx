@@ -4,6 +4,7 @@ import { Image } from "expo-image";
 import { router } from "expo-router";
 import { BellRing, CalendarClock, ChevronRight, CircleDollarSign, Mail, QrCode, Recycle, ShieldCheck } from "lucide-react-native";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { PrivacyCard } from "@/account/PrivacyCard";
 import { RecoveryAlerts } from "@/account/RecoveryAlerts";
 import { useAccount } from "@/account/useAccount";
 import { DepositRow } from "@/features/DepositRow";
@@ -73,6 +74,7 @@ export default function Home() {
       </GradientCard>
 
       <RecoveryAlerts />
+      <PrivacyCard me={me.data} />
 
       {open && (
         <Card style={{ gap: space(3), borderColor: colors.emerald }}>

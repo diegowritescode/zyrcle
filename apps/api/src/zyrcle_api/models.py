@@ -126,6 +126,10 @@ class Resident(Base):
     # Verified recovery email, lowercase. Set only after the resident typed the code sent to it.
     email: Mapped[str | None] = mapped_column(String(254), unique=True)
     email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # The version of the data-processing policy the participant accepted, and when (Ley 1581 de
+    # 2012, docs/adr/0028). None: not accepted yet.
+    privacy_version: Mapped[str | None] = mapped_column(String(16))
+    privacy_accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = _now()
 
 

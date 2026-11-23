@@ -13,6 +13,8 @@ export function Summary() {
     const incidents = useQuery({ queryKey: ["op", "incidents", "open"], queryFn: () => api.incidents("open"), refetchInterval: 15_000 });
     const sales = useQuery({ queryKey: ["op", "sales"], queryFn: api.sales, refetchInterval: 15_000 });
     const balance = useQuery({ queryKey: ["op", "balance"], queryFn: api.containersBalance, refetchInterval: 30_000 });
+    const health = useQuery({ queryKey: ["op", "health"], queryFn: api.health, refetchInterval: 30_000 });
+    const h = health.data;
 
     const toConfirm = sales.data?.filter((s) => s.status === "recorded").length;
     const waiting = sales.data?.flatMap((s) => s.lines).filter((l) => l.status === "waiting" || l.status === "failed").length;
@@ -27,6 +29,52 @@ export function Summary() {
                     <Stat label="Ventas por confirmar" value={toConfirm ?? "—"} hint="Falta ver el pago en el banco" />
                     <Stat label="Bolsas sin liquidar" value={waiting ?? "—"} hint="Esperando o con error" />
                 </div>
+            </Section>
+
+            <Section title="Estado del sistema" description="Colas, contenedores, cadena y gas. Los avisos también llegan por correo a los administradores, una vez al día">
+                {!h ? (
+                    <Loading />
+                ) : (
+                    <div className="space-y-4">
+                        {h.ok ? (
+                            <p className="text-sm text-eco-forest">Todo funciona: las colas avanzan y la cadena produce bloques.</p>
+                        ) : (
+                            <ul className="space-y-1">
+                                {h.warnings.map((w) => (
+                                    <li key={w.kind} className="text-sm rounded-lg bg-amber-50 text-amber-900 px-3 py-2">{w.text}</li>
+                                ))}
+                            </ul>
+                        )}
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                            <Stat label="Contenedores en línea" value={`${h.devices.online} de ${h.devices.total}`} />
+                            <Stat label="Broker MQTT" value={h.mqtt ? "Conectado" : "Sin conexión"} />
+                            <Stat label="Último bloque" value={h.chain?.block ?? "—"} hint={h.chain?.block_age_s !== undefined ? `hace ${h.chain.block_age_s} s` : undefined} />
+                            {Object.entries(h.chain?.keys ?? {}).map(([role, k]) => (
+                                <Stat key={role} label={`Gas de la llave ${role}`} value={`${k.zyr} ZYR`} />
+                            ))}
+                        </div>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Cola</TableHead>
+                                    <TableHead>Pendientes</TableHead>
+                                    <TableHead>Con error</TableHead>
+                                    <TableHead>La más vieja</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {h.outboxes.map((o) => (
+                                    <TableRow key={o.name}>
+                                        <TableCell className="font-medium">{o.name}</TableCell>
+                                        <TableCell>{o.pending}</TableCell>
+                                        <TableCell>{o.failed ? <Badge variant="destructive">{o.failed}</Badge> : 0}</TableCell>
+                                        <TableCell>{o.oldest_pending_min === null ? "—" : `${o.oldest_pending_min} min`}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                )}
             </Section>
 
             <Section title="Tesorería" description="ZYR solo existe respaldado por pesos recibidos (1 ZYR = 1 peso)">

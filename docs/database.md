@@ -1537,6 +1537,7 @@ Until a worker runs, its rows stay `pending`.
 | [`0006`][m0006] | 2026-11-22 | `bag`, `collector`, `collection` with `one_active_collection_per_container`, `collection_fill` with `one_open_fill_per_collection`, `incident`; `deposit_session.collection_id`. | [ADR 0012][adr-0012] |
 | [`0007`][m0007] | 2026-11-22 | `sale`, `sale_line`, `settlement` with `one_settlement_per_party`. | [ADR 0013][adr-0013] |
 | [`0008`][m0008] | 2026-11-22 | `operator`, `operator_code`. | [ADR 0014][adr-0014] |
+| [`0011`][m0011] | 2026-11-23 | `resident.privacy_version`, `privacy_accepted_at`: the data-processing policy each participant accepted. | [ADR 0028](adr/0028-pilot-readiness.md) |
 | [`0010`][m0010] | 2026-11-22 | `certificate`, `impact_claim` with `one_claim_per_deposit_attribute`. | [ADR 0027](adr/0027-impact-certificates.md) |
 | [`0009`][m0009] | 2026-11-22 | The three CHECKs the models declared but no migration created (`container.area_mm2`, `container.depth_mm`, `material_price.cop_per_kg`); operator identity columns widened to 254. | section 9 below |
 
@@ -1700,6 +1701,7 @@ Found on 2026-11-22 by comparing the code with its comments, docstrings and ADRs
 [m0008]: ../apps/api/migrations/versions/0008_operators.py
 [m0009]: ../apps/api/migrations/versions/0009_checks_and_operator_names.py
 [m0010]: ../apps/api/migrations/versions/0010_impact_certificates.py
+[m0011]: ../apps/api/migrations/versions/0011_privacy_consent.py
 [adr-0002]: adr/0002-own-avalanche-l1.md
 [adr-0003]: adr/0003-advance-and-settlement.md
 [adr-0005]: adr/0005-device-link-mqtt.md

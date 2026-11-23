@@ -14,6 +14,7 @@ the same commit.
 | Call or change the API | [api.md](api.md) |
 | Understand the database: tables, states, migrations | [database.md](database.md) |
 | Deploy, operate or rebuild the servers and the chain | [infrastructure.md](infrastructure.md) |
+| Know what is protected and how; contract analysis | [security.md](security.md) |
 | Build or replace a container's firmware | [device-protocol.md](device-protocol.md) |
 | See what comes next | [roadmap-v1.md](roadmap-v1.md) |
 

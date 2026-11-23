@@ -150,6 +150,9 @@ export interface Me {
   email: string | null;
   /** Their collector name, when the operator named them a collector (docs/adr/0012). */
   collector: string | null;
+  /** The data-processing policy they accepted, and the one in force (Ley 1581, docs/adr/0028). */
+  privacy_version: string | null;
+  privacy_current: string;
   /** On-chain balance, in pesos; may carry fractions of a peso. */
   balance_cop: number | null;
   payouts: { session_id: string; kind: string; amount_cop: number; status: string; tx_hash: string | null; created_at: string }[];
@@ -360,6 +363,8 @@ export function createApi(baseUrl: string) {
     finish: (token: string, id: string) => call<Session>(`/v1/sessions/${id}/finish`, post(), token),
     session: (token: string, id: string) => call<Session>(`/v1/sessions/${id}`, {}, token),
     me: (token: string) => call<Me>("/v1/me", {}, token),
+    acceptPrivacy: (token: string, version: string) =>
+      call<{ privacy_version: string }>("/v1/me/consent", post({ version }), token),
     registerPushToken: (token: string, pushToken: string, platform: "ios" | "android") =>
       call<void>("/v1/me/push-token", { method: "PUT", body: JSON.stringify({ token: pushToken, platform }) }, token),
 
@@ -442,6 +447,7 @@ export function startErrorMessage(e: unknown): string {
   if (e.code === "slot_full")
     return "Todos los cupos de esta hora están reservados en este contenedor. Reserva otra hora o prueba en otro contenedor.";
   if (e.code === "recovery_pending") return RECOVERY_PENDING;
+  if (e.code === "consent_required") return "Antes de reciclar, acepta la política de tratamiento de datos en Cuenta.";
   if (/invalid or expired/.test(d)) return "El código del QR ya cambió. Escanéalo de nuevo.";
   if (/offline/.test(d)) return "El contenedor está sin conexión.";
   if (/busy/.test(d)) return "Otra persona está usando este contenedor. Espera un momento.";

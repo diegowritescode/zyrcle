@@ -278,6 +278,9 @@ async def me(resident: Resident, request: Request) -> dict[str, Any]:
         "address": row.address,
         "owner": row.owner_address,
         "email": row.email,
+        # Ley 1581: the policy version they accepted, and the one in force (docs/adr/0028).
+        "privacy_version": row.privacy_version,
+        "privacy_current": request.app.state.settings.privacy_version,
         # Set when the operator named this participant a collector (docs/adr/0012).
         "collector": collector.name if collector is not None and collector.active else None,
         "balance_cop": None if balance is None else balance / WEI_PER_COP,
@@ -304,6 +307,26 @@ async def me(resident: Resident, request: Request) -> dict[str, Any]:
             for s, name, p in deposits
         ],
     }
+
+
+class ConsentIn(BaseModel):
+    version: str = Field(max_length=16)
+
+
+@router.post("/v1/me/consent")
+async def consent(body: ConsentIn, resident: Resident, request: Request) -> dict[str, Any]:
+    """The participant accepts the data-processing policy in force (Ley 1581 de 2012)."""
+    settings: Settings = request.app.state.settings
+    if body.version != settings.privacy_version:
+        raise HTTPException(
+            409, {"code": "conflict", "detail": "that is not the policy in force; reload it"}
+        )
+    async with request.app.state.maker() as db:
+        row = await db.get(ResidentRow, resident, with_for_update=True)
+        assert row is not None
+        row.privacy_version, row.privacy_accepted_at = body.version, auth.utcnow()
+        await db.commit()
+        return {"privacy_version": row.privacy_version}
 
 
 class PushTokenIn(BaseModel):
@@ -528,6 +551,12 @@ async def list_sites(_: Operator, request: Request) -> list[dict[str, Any]]:
     async with request.app.state.maker() as db:
         rows = await db.execute(select(Site, Host).join(Host).order_by(Host.name, Site.name))
         return [{**site_schedule(site), "host_name": host.name} for site, host in rows]
+
+
+@router.get("/v1/operator/health")
+async def operator_health(_: Operator, request: Request) -> dict[str, Any]:
+    """Outboxes, devices, broker, chain, Treasury and gas keys, with warnings (docs/adr/0028)."""
+    return await request.app.state.health()
 
 
 @router.get("/v1/operator/treasury")

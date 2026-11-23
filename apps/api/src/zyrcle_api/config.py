@@ -49,6 +49,20 @@ class Settings(BaseSettings):
     # bank match (docs/adr/0013). Without it, confirmed sales wait.
     operator_key_file: str | None = None
     settlement_interval_s: float = 3.0
+
+    # Pilot readiness (docs/adr/0028). Interactive API docs are for development; production turns
+    # them off.
+    docs_enabled: bool = True
+    # The data-processing policy in force (its date), and whether depositing requires having
+    # accepted it. Off until the pilot, so apps installed before the consent screen keep working.
+    privacy_version: str = "2026-11-22"
+    require_consent: bool = False
+    # Health warnings, emailed to admins at most once a day per kind.
+    alert_interval_s: float = 600.0
+    alert_gas_min_zyr: float = 1.0
+    alert_available_min_cop: int = 100_000
+    alert_stuck_after_min: int = 30
+    alert_chain_stale_min: int = 10
     # Advance = ratio x reference price x kg, capped like the contract (docs/adr/0003).
     advance_ratio_bps: int = 5_000
     max_advance_cop: int = 5_000

@@ -29,6 +29,8 @@ x-api-env: &api-env
   # The Treasury's OPERATOR_ROLE key: records a sale once an operator confirmed the bank match
   # (ADR 0013).
   ZYRCLE_OPERATOR_KEY_FILE: /run/secrets/operator.key
+  # Interactive API docs are for development (ADR 0028).
+  ZYRCLE_DOCS_ENABLED: "false"
   # Only if "enhanced security for push notifications" is on in the Expo project (ADR 0008).
   ZYRCLE_EXPO_ACCESS_TOKEN: ${EXPO_ACCESS_TOKEN:-}
   # Smart accounts and lost-phone recovery (ADR 0010). Empty: both stay off.

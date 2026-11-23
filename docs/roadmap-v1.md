@@ -140,6 +140,7 @@ H  Weighing station: hardware track, in parallel
   - Static analysis of the contracts, and a review of how the oracle and guardian keys are held.
   - A decision on the chain for real value: Fuji, or an L1 on mainnet and what it costs per month.
 - **Done when:** the checklist is complete and the host has approved the pilot.
+- **Decision:** [ADR 0028](adr/0028-pilot-readiness.md). Built in block 2: backups with a restore check, health and alerts, consent, production switches, Slither review. Waiting for Diego: cron, off-site copy, lawyer, Play account, chain decision.
 
 ### H. Weighing station (hardware track, in parallel)
 - **Why:** an autonomous container with a camera and NIR is the long-term design, but the pilot

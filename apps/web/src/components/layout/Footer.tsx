@@ -141,7 +141,12 @@ export function Footer() {
                 {/* Bottom section */}
                 <div className="pt-8 mt-8 border-t border-eco-emerald/20">
                     <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-eco-forest/60">
-                        <p>© {new Date().getFullYear()} ZYRCLE. Código público en GitHub.</p>
+                        <p>
+                            © {new Date().getFullYear()} ZYRCLE. Código público en GitHub.{" "}
+                            <Link to="/privacidad" className="underline hover:text-eco-forest">Tratamiento de datos</Link>
+                            {" · "}
+                            <Link to="/terminos" className="underline hover:text-eco-forest">Términos</Link>
+                        </p>
                         <p className="text-sm text-center md:text-right">
                             Testnet de Avalanche Fuji: ZYR no tiene valor real y los contenedores de la demo son simulados.
                         </p>

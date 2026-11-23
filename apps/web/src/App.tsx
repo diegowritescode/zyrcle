@@ -11,6 +11,7 @@ import Index from "./pages/Index";
 const Sites = lazy(() => import("./pages/Sites"));
 const Console = lazy(() => import("./pages/Console"));
 const CertificatePage = lazy(() => import("./pages/CertificatePage"));
+const Legal = lazy(() => import("./pages/Legal"));
 const RecyclingPage = lazy(() => import("./pages/RecyclingPage"));
 const ContainerScreen = lazy(() => import("./pages/ContainerScreen"));
 const ComingSoon = lazy(() => import("./pages/ComingSoon"));
@@ -45,6 +46,8 @@ const App = () => (
               <Route path="/validator" element={<Navigate to="/console" replace />} />
               <Route path="/marketplace" element={<ComingSoon section="marketplace" />} />
               <Route path="/certificates/:certificateId" element={<CertificatePage />} />
+              <Route path="/privacidad" element={<Legal kind="privacy" />} />
+              <Route path="/terminos" element={<Legal kind="terms" />} />
               {/* The hackathon's "Mis certificados": hosts' certificates are listed on their dashboard. */}
               <Route path="/my-certificates" element={<Navigate to="/sites" replace />} />
               <Route path="*" element={<NotFound />} />

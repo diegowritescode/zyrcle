@@ -98,3 +98,9 @@ class RecoveryInProgress(Conflict):
     """This phone is already waiting for another account."""
 
     code = "recovery_in_progress"
+
+
+class ConsentRequired(Forbidden):
+    """The participant has not accepted the data-processing policy in force (docs/adr/0028)."""
+
+    code = "consent_required"
