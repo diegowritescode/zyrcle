@@ -45,7 +45,7 @@ x-api-env: &api-env
 
 services:
   postgres:
-    image: postgres:17-alpine
+    image: postgres:17-alpine@sha256:f9cf3e1f0066f0eb0c48707d864f0ac5941e9ff454a072077d97a4d278d07d73
     restart: unless-stopped
     environment:
       POSTGRES_USER: zyrcle
@@ -61,7 +61,7 @@ services:
     networks: [internal]
 
   mosquitto:
-    image: eclipse-mosquitto:2.1.4-alpine
+    image: eclipse-mosquitto:2.1.4-alpine@sha256:fa12172a051310efe5bcb7a6a11b77bd5faacb82cbacd7742aa758bf024fd8e4
     restart: unless-stopped
     # Run as the host user from the start: with no capabilities it cannot drop root by itself, and
     # this way its password and ACL files can stay 0600.
@@ -77,7 +77,7 @@ services:
     networks: [internal]
 
   migrate:
-    image: ghcr.io/diegowritescode/zyrcle-api:${ZYRCLE_API_TAG:?set ZYRCLE_API_TAG in deploy/.env}
+    image: ${ZYRCLE_API_IMAGE:?run deploy/deploy.sh, which pins the image by digest}
     profiles: [ops]
     command: ["alembic", "upgrade", "head"]
     environment: *api-env
@@ -85,7 +85,7 @@ services:
     networks: [internal]
 
   api:
-    image: ghcr.io/diegowritescode/zyrcle-api:${ZYRCLE_API_TAG:?set ZYRCLE_API_TAG in deploy/.env}
+    image: ${ZYRCLE_API_IMAGE:?run deploy/deploy.sh, which pins the image by digest}
     restart: unless-stopped
     # Runs as the host user so it can read the oracle and operator keys, which stay 0600 files of
     # that user.
@@ -118,7 +118,7 @@ services:
       - traefik.http.services.zyrcle-api.loadbalancer.server.port=8000
 
   sim:
-    image: ghcr.io/diegowritescode/zyrcle-api:${ZYRCLE_API_TAG:?}
+    image: ${ZYRCLE_API_IMAGE:?}
     restart: unless-stopped
     command: ["zyrcle-sim", "serve", "--broker", "mosquitto", "--keys-dir", "/keys",
               "--devices", "ctr-0001,ctr-0002,ctr-0003,ctr-0004", "--control-port", "8090"]
@@ -135,7 +135,7 @@ services:
     networks: [internal]
 
   web:
-    image: ghcr.io/diegowritescode/zyrcle-web:${ZYRCLE_WEB_TAG:?set ZYRCLE_WEB_TAG in deploy/.env}
+    image: ${ZYRCLE_WEB_IMAGE:?run deploy/deploy.sh, which pins the image by digest}
     restart: unless-stopped
     <<: *hardened
     tmpfs: [/tmp, /var/cache/nginx]

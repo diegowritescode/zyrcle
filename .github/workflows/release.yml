@@ -12,6 +12,7 @@ on:
 permissions:
   contents: read
   packages: write
+  actions: read
 
 jobs:
   images:
@@ -20,6 +21,17 @@ jobs:
     env:
       SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
     steps:
+      - name: A manual run publishes only a commit whose CI passed (ADR 0032)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          passed=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow CI --commit "$SHA" \
+            --status success --json databaseId --jq length)
+          if [ "$passed" -lt 1 ]; then
+            echo "CI has not passed for $SHA; not publishing images" >&2
+            exit 1
+          fi
       - uses: actions/checkout@v4
         with:
           ref: ${{ env.SHA }}
@@ -30,6 +42,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Backend image (API + simulator)
+        id: api
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -40,6 +53,7 @@ jobs:
           cache-from: type=gha,scope=api
           cache-to: type=gha,scope=api,mode=max
       - name: Web app image
+        id: web
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -49,6 +63,14 @@ jobs:
           labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
           cache-from: type=gha,scope=web
           cache-to: type=gha,scope=web,mode=max
-      - run: |
-          echo "### Images for ${SHA}" >> "$GITHUB_STEP_SUMMARY"
-          echo "Deploy on the VPS: \`deploy/deploy.sh ${SHA} ${SHA}\`" >> "$GITHUB_STEP_SUMMARY"
+      - env:
+          API_DIGEST: ${{ steps.api.outputs.digest }}
+          WEB_DIGEST: ${{ steps.web.outputs.digest }}
+        run: |
+          {
+            echo "### Images for ${SHA}"
+            echo "- \`ghcr.io/diegowritescode/zyrcle-api@${API_DIGEST}\`"
+            echo "- \`ghcr.io/diegowritescode/zyrcle-web@${WEB_DIGEST}\`"
+            echo
+            echo "Deploy on the VPS: \`deploy/deploy.sh ${SHA} ${SHA}\`. It pins these digests and records them in \`deploy/history.log\`."
+          } >> "$GITHUB_STEP_SUMMARY"

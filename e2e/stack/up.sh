@@ -73,6 +73,7 @@ ZYRCLE_IPFS_GATEWAY=http://127.0.0.1:8093/ipfs/
 ENV
 cat chain.env >> api.env
 set -a
+# shellcheck source=/dev/null
 . ./api.env
 set +a
 

@@ -5,6 +5,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 STATE="${E2E_STATE:-$ROOT/e2e/.stack}"
 set -a
+# shellcheck source=/dev/null
 . "$STATE/chain.env"
 set +a
 

@@ -727,35 +727,41 @@ flowchart TB
 `deploy/deploy.sh <api-sha> <web-sha>` is idempotent: running it twice with the same SHAs changes
 nothing. Step by step ([deploy.sh](../deploy/deploy.sh)):
 
-1. **Check the tags.** Both must be full 40-character SHAs. A SHA expanded by hand from a short one
-   will not exist in GHCR.
-2. **Secrets, first run only.** If `deploy/.env` is missing, create it from `.env.example` with
+1. **Check the tags and the checkout.** Both tags must be full 40-character SHAs. The checkout must
+   be the commit whose API is deployed, because `compose.yml`, the broker files and the script come
+   from it; `DEPLOY_ANY_CHECKOUT=1` allows another one, to roll back only the web app.
+2. **Pull and pin the two images.** Each pull is cut after 5 minutes and tried up to three times (a
+   pull hung on 2026-11-23). The images' digests are read from the pulled images. `SKIP_PULL=1`
+   uses images already on the machine.
+3. **Secrets, first run only.** If `deploy/.env` is missing, create it from `.env.example` with
    `umask 077` and fresh values from Python's `secrets.token_urlsafe` (see
    [section 5.2](#52-deployenv)). Set the key paths to `$HOME/.avalanche-cli/key/zyrcle-oracle.pk`
    and `zyrcle-operator.pk`, and the UID and GID to the current user's.
-3. **Update `.env`.** Rename the legacy variable names, write the two image tags, then load the file.
-4. **Broker accounts.** Hash the five broker passwords with `mosquitto_passwd` in a throwaway
-   `eclipse-mosquitto:2.1.4-alpine` container. Install the result as `mosquitto/passwd` and copy
-   the ACL to `mosquitto/acl.runtime`, both `0600`.
-5. **Images and database.** `docker compose pull --quiet` (unless `SKIP_PULL=1`), start `postgres`
-   and `mosquitto`, then run `docker compose --profile ops run --rm migrate` (`alembic upgrade
-   head`). The running API is not stopped first.
-6. **Simulated containers.** Start `sim` and wait up to 30 s for `/keys/ctr-0004.pub.pem`. Then run
+4. **Update `.env`.** Rename the legacy variable names, write the two tags and the two images pinned
+   by digest (`ZYRCLE_API_IMAGE`, `ZYRCLE_WEB_IMAGE`, added if missing), then load the file. Compose
+   runs the images by digest.
+5. **Broker accounts.** Hash the five broker passwords with `mosquitto_passwd` in a throwaway
+   container of the pinned Mosquitto image. Install the result as `mosquitto/passwd` and copy the ACL
+   to `mosquitto/acl.runtime`, both `0600`.
+6. **Database, backup, migrations.** Pull any other image compose names that is missing, start
+   `postgres` and `mosquitto` and wait for them, back up the database with `backup.sh`, then run
+   `docker compose --profile ops run --rm migrate` (`alembic upgrade head`). The running API is not
+   stopped first.
+7. **Simulated containers.** Start `sim` and wait up to 30 s for `/keys/ctr-0004.pub.pem`. Then run
    `zyrcle-api demo seed` in a one-off `api` container with the `zyrcle_sim-keys` volume mounted
    read-only. The seed registers the demo host, sites, containers, bags and test prices, and is safe
    to repeat.
-7. **Services.** `docker compose up -d --remove-orphans api web sim mosquitto postgres`, then print
+8. **Services.** `docker compose up -d --remove-orphans api web sim mosquitto postgres`, then print
    each service's status. `--remove-orphans` removes services no longer in the file; the L1 node is
    another project and is not touched.
+9. **Record it.** Append a line to `deploy/history.log` (not in git): the time, both images by
+   digest, the migration revision and the user. That file is what a rollback reads.
 
 Things `deploy.sh` does not do:
 
-- It does not check out the given SHA. `compose.yml`, the broker files and the script come from
-  whatever the checkout holds.
-- It keeps no record of the previous tags; it overwrites them in `.env`.
-- It does not add new variables to an existing `.env`.
-- It does not back up the database before migrating.
+- It does not add new variables to an existing `.env`, except the two image variables.
 - It does not restart Mosquitto when the broker files change.
+- It does not downgrade the database for a rollback across migrations (runbook 9.2).
 
 ### 8.4 Rollback
 
@@ -833,17 +839,20 @@ Before any of these:
 
 ### 9.2 Roll back
 
-1. **Find the previous SHAs.** `deploy.sh` does not keep them. Look at `git log` on `main`, the
-   "Release images" runs on GitHub, or the images still on the VPS:
+1. **Find the previous deploy.** `deploy/history.log` has one line per deploy: time, both images by
+   digest, migration revision, user. The commit SHA is the image tag, also on the "Release images"
+   run of that commit.
    ```bash
-   docker images ghcr.io/diegowritescode/zyrcle-api
-   docker images ghcr.io/diegowritescode/zyrcle-web
+   tail -5 ~/apps/zyrcle/deploy/history.log
    ```
-2. **No migration in between.** Deploy the older SHAs:
+2. **No migration in between.** Check out the older commit and deploy it:
    ```bash
+   git fetch && git checkout <previous-api-sha>
    deploy/deploy.sh <previous-api-sha> <previous-web-sha>
+   git checkout main                 # afterwards, so the next git pull works
    ```
-   To roll back only the web app, pass the current API SHA and the previous web SHA.
+   To roll back only the web app, stay on the current checkout and run
+   `DEPLOY_ANY_CHECKOUT=1 deploy/deploy.sh <current-api-sha> <previous-web-sha>`.
 3. **A migration in between.** The older image's `alembic upgrade head` fails, because the database
    is at a revision that image does not know. `deploy.sh` stops there and the newer API keeps
    running. **Gap:** this path is not scripted. Downgrade with the newer image still in `.env`, then
@@ -871,7 +880,7 @@ Before any of these:
 - **Writing a migration.** Migrations live in `apps/api/migrations/versions/`, numbered, each with a
   `downgrade`. CI applies them to an empty database and runs `alembic check`, so a model change
   without a migration fails CI.
-- **Gap:** nothing backs up the database before a migration.
+- `deploy.sh` backs up the database before migrating (section 8.3).
 
 ### 9.4 Rotate the Treasury operator or oracle key
 
@@ -1140,7 +1149,7 @@ Each item is checked against the repository.
 
 - **Backups stay on the VPS.** `deploy/backup.sh` runs daily from cron (runbook 9.10), but nothing copies the dumps off the machine.
 - **Only the database is backed up.** Nothing backs up the `node-data` volume (the validator identity), `deploy/.env` or the key files; the L1 README asks for an offline copy of the keys, by hand.
-- **A migration is not reversible by data.** `deploy.sh` migrates before starting the new API; take a backup first (runbook 9.10) so a bad migration can be undone by restoring.
+- **A migration is not reversible by data.** `deploy.sh` backs up the database before migrating, so a bad migration is undone by restoring that dump (runbook 9.10).
 - **One VPS.** It runs the application, the validator and Traefik, shared with other projects. It is
   a single point of failure for the demo and the chain ([ADR 0020](adr/0020-single-vps-docker-compose.md)).
   The memory limits add up to 4,160 MiB on a 4 GB machine ([section 4.5](#45-memory-budget)).
@@ -1177,16 +1186,14 @@ Each item is checked against the repository.
 
 **Deployment**
 
-- **Manual, unpinned deploys.** `deploy.sh` does not check out the deployed SHA, keeps no history of
-  tags, and has no scripted rollback across migrations.
-- **A manual release run skips CI.** `workflow_dispatch` builds and pushes images without the CI
-  gate.
+- **Manual deploys, no scripted rollback across migrations.** `deploy.sh` checks the checkout, pins
+  the images by digest and records every deploy in `deploy/history.log` (ADR 0032), but a rollback
+  across a migration is still done by hand (runbook 9.2).
 - **Traefik, the `edge` network, TLS certificates and DNS** are configured outside this repository.
 - **Whether the GHCR images are public or private** is not recorded. If they are private, the VPS
   needs a `docker login ghcr.io`, which is not in the repository.
-- **Images are pinned by tag, not digest,** except the validator's base. `postgres:17-alpine` takes
-  the latest 17.x on every pull. CI's Mosquitto uses the floating `eclipse-mosquitto:2`, production
-  `2.1.4-alpine`.
+- **CI's Mosquitto floats.** Production and the base images are pinned by digest, with Dependabot
+  proposing updates (ADR 0032), but the CI jobs start the floating `eclipse-mosquitto:2`.
 - **Hardening is partial.** `postgres` and `migrate` are not hardened and `migrate` has no memory
   limit, although [deploy/README.md](../deploy/README.md) says every container is.
 - **The `internal` network is not isolated.** It is not marked `internal: true`, so Postgres,

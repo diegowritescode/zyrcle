@@ -15,7 +15,7 @@ keep="${BACKUP_KEEP_DAYS:-14}"
 check() {
   local file="$1" name="zyrcle-restore-check-$$"
   docker run -d --rm --name "$name" -e POSTGRES_PASSWORD=check -e POSTGRES_USER=zyrcle \
-    -e POSTGRES_DB=zyrcle postgres:17-alpine >/dev/null
+    -e POSTGRES_DB=zyrcle postgres:17-alpine@sha256:f9cf3e1f0066f0eb0c48707d864f0ac5941e9ff454a072077d97a4d278d07d73 >/dev/null
   trap 'docker rm -f "$name" >/dev/null 2>&1 || true' RETURN
   for _ in $(seq 1 30); do
     docker exec "$name" pg_isready -U zyrcle -d zyrcle >/dev/null 2>&1 && break

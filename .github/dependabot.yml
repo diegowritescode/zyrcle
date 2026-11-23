@@ -1,0 +1,17 @@
+# Base images are pinned by digest (ADR 0032); Dependabot proposes the updates as pull requests,
+# which run the whole CI, end-to-end journeys included, before anyone merges them.
+version: 2
+updates:
+  - package-ecosystem: docker
+    directories: ["/apps/api", "/apps/web", "/infra/l1/node"]
+    schedule: { interval: weekly }
+    groups:
+      base-images: { patterns: ["*"] }
+  - package-ecosystem: docker-compose
+    directory: "/deploy"
+    schedule: { interval: weekly }
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule: { interval: monthly }
+    groups:
+      actions: { patterns: ["*"] }
