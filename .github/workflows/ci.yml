@@ -242,6 +242,8 @@ jobs:
         with:
           python-version: "3.13"
       - run: shellcheck -x infra/l1/scripts/*.sh deploy/*.sh e2e/stack/*.sh
+      - name: The off-site copy encrypts, uploads and restores (ADR 0034)
+        run: deploy/offsite-selftest.sh
       - run: python3 -m unittest discover -s infra/l1/scripts -v
       - name: Validator image builds
         run: docker build -q infra/l1/node

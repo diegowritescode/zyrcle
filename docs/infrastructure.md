@@ -520,6 +520,7 @@ about 88.95 (read from the public RPC). No script funds them; see section 10.
 | `MQTT_API_PASSWORD` | The API's broker account. | Read every device's uplink and send commands (`display`, `unlock`, `lock`) to any container. Commands are not signed ([device-protocol.md](device-protocol.md)). The broker is not published outside the VPS. |
 | `MQTT_CTR_0001_PASSWORD` … `0004` | Each simulated container's broker account. | Publish on that container's topics. Messages still need the device's signature, so the password alone cannot forge readings. |
 | `EXPO_ACCESS_TOKEN` (optional) | Expo push with enhanced security ([ADR 0008](adr/0008-push-notifications.md)). | Send push notifications through the project, when enhanced security is on. |
+| `OFFSITE_S3_ACCESS_KEY_ID`, `OFFSITE_S3_SECRET_ACCESS_KEY` (optional) | Write the encrypted copies to the backup bucket ([ADR 0034](adr/0034-encrypted-off-site-backups.md)). | Read the copies, which are useless without Diego's private age key, and fill or try to delete them; the bucket lock keeps recent ones. |
 | `RESEND_API_KEY` (optional) | Sends email for the verified domain. | Send email as `no-reply@zyrcle.deviego.xyz` and use up the daily quota ([ADR 0010](adr/0010-smart-accounts-and-recovery.md)). |
 | `PINATA_JWT` (optional) | Pins impact certificates on IPFS ([ADR 0027, amendment](adr/0027-impact-certificates.md#amendments)). | Pin or, if the key allows it, unpin files in Zyrcle's Pinata account and use up its quota. It cannot change a pinned file: a CID is its content's hash. |
 
@@ -1115,7 +1116,31 @@ gunzip -c FILE | docker compose exec -T postgres psql -U zyrcle -d zyrcle -v ON_
 docker compose start api
 ```
 
-The dumps stay on the VPS: losing the machine loses them. An off-site copy is still to be decided.
+**Off-site, encrypted** ([ADR 0034](adr/0034-encrypted-off-site-backups.md)). `deploy/offsite.sh`
+encrypts the newest dump with `age` to a public key and streams it to an S3-compatible bucket
+(Cloudflare R2) with `rclone`; on Sundays, or with `--keys`, it also sends a bundle of the validator
+identity (`staking/` from the node's volume, not the chain data), the key files and `deploy/.env`.
+Both tools run in a container built from `deploy/offsite/Dockerfile`, so nothing is installed on the
+host. The script never deletes remote copies: the bucket's lifecycle rule expires them and its lock
+keeps them from early deletion. Without its five `OFFSITE_*` settings it does nothing.
+
+```bash
+~/apps/zyrcle/deploy/offsite.sh            # the newest dump now (and the keys bundle on Sundays)
+~/apps/zyrcle/deploy/offsite.sh --keys     # the keys bundle now
+```
+
+Cron, once configured and approved: `40 3 * * * $HOME/apps/zyrcle/deploy/offsite.sh >>
+$HOME/backups/zyrcle/offsite.log 2>&1`, after the dump at 03:15.
+
+**Restore drill**, on Diego's machine, which holds the private key:
+
+1. Download the newest `db/…sql.gz.age` from the bucket (R2 dashboard or `rclone`).
+2. Decrypt it: `age -d -i zyrcle-backups.key FILE.sql.gz.age > FILE.sql.gz`.
+3. Check it restores: copy it to any machine with Docker and run `deploy/backup.sh --check FILE.sql.gz`.
+
+The keys bundle decrypts the same way into a `.tar.gz` with `keys/`, `node/staking/` and
+`deploy.env`. CI proves the whole path on every push with `deploy/offsite-selftest.sh` (an S3
+stand-in and a throwaway key).
 
 ### 9.11 Health and alerts
 
@@ -1161,8 +1186,7 @@ Each item is checked against the repository.
 
 **Data and availability**
 
-- **Backups stay on the VPS.** `deploy/backup.sh` runs daily from cron (runbook 9.10), but nothing copies the dumps off the machine.
-- **Only the database is backed up.** Nothing backs up the `node-data` volume (the validator identity), `deploy/.env` or the key files; the L1 README asks for an offline copy of the keys, by hand.
+- **Off-site copies wait for their bucket.** `deploy/offsite.sh` copies the dumps, the validator identity, the key files and `deploy/.env` off the VPS, encrypted (runbook 9.10), once Diego sets up the bucket and the age key; until then everything stays on the machine.
 - **A migration is not reversible by data.** `deploy.sh` backs up the database before migrating, so a bad migration is undone by restoring that dump (runbook 9.10).
 - **One VPS.** It runs the application, the validator and Traefik, shared with other projects. It is
   a single point of failure for the demo and the chain ([ADR 0020](adr/0020-single-vps-docker-compose.md)).

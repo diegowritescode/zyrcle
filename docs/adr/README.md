@@ -59,6 +59,7 @@ code format. If a number in the code changes how money, weight or trust is handl
 | [0031](0031-testing-and-the-pre-production-check.md) | Every party's journey tested in CI; coverage floors that only go up | proposed 2026-11-23 | Claude (block 3, M8); not yet confirmed |
 | [0032](0032-deploys-pinned-recorded-and-backed-up.md) | Deploys pinned by digest, recorded, backed up before migrating; base images pinned | proposed 2026-11-23 | Claude (block 3, M9); not yet confirmed |
 | [0033](0033-error-reports-and-uptime.md) | Error reports to Sentry without personal data; uptime check from outside | proposed 2026-11-23 | Claude (block 3, M10); not yet confirmed |
+| [0034](0034-encrypted-off-site-backups.md) | Encrypted copies off the VPS: database, validator identity, keys | proposed 2026-11-23 | Claude (block 3, M11); not yet confirmed; needs Diego's bucket and age key |
 
 Records 0016 to 0024 describe decisions taken before this log existed. They were written on
 2026-11-22 from the code, the commit history and the conversations, and keep the date each decision
