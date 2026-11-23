@@ -1,7 +1,7 @@
 # Zyrcle v1: one campus, the full loop
 
-> Status: **planned** (2026-11-22). Phases 0 to 3 and 5 of the rebuild are done or in progress
-> ([README](../README.md#status)). This document is the next block of work.
+> Status: **deployed** (blocks 1 and 2, 2026-11-23). Planned 2026-11-22. What comes next:
+> [roadmap-blocks-3-4.md](roadmap-blocks-3-4.md).
 
 ## What v1 means
 

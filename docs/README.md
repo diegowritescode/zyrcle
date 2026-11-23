@@ -16,7 +16,7 @@ the same commit.
 | Deploy, operate or rebuild the servers and the chain | [infrastructure.md](infrastructure.md) |
 | Know what is protected and how; contract analysis | [security.md](security.md) |
 | Build or replace a container's firmware | [device-protocol.md](device-protocol.md) |
-| See what comes next | [roadmap-v1.md](roadmap-v1.md) |
+| See what comes next | [roadmap-blocks-3-4.md](roadmap-blocks-3-4.md) (blocks 3 and 4); [roadmap-v1.md](roadmap-v1.md) (v1, deployed) |
 
 Each app also has its own README with its modules and commands:
 [apps/api](../apps/api/README.md), [apps/web](../apps/web/README.md),

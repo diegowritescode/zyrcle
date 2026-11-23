@@ -55,6 +55,7 @@ code format. If a number in the code changes how money, weight or trust is handl
 | [0027](0027-impact-certificates.md) | Impact certificates: sold material only, EPA WARM v16, one claim per gram, anchored root; amended 2026-11-22 with a permanent copy on IPFS (Pinata) | accepted 2026-11-23 | Claude proposed (v1 block 2, M5); Diego asked for host certificates, chose the IPFS copy and confirmed it |
 | [0028](0028-pilot-readiness.md) | Pilot readiness: backups, alerts, consent, production switches | accepted 2026-11-23 | Claude proposed (v1 block 2, M7); Diego confirmed it; several items still wait for him |
 | [0029](0029-closed-loop-payments.md) | Paying campus merchants; redeeming ZYR for pesos; Treasury v3 | accepted 2026-11-23 | Claude proposed (v1 block 2, M6, after ADR 0004); Diego confirmed it |
+| [0030](0030-blocks-3-and-4.md) | Blocks 3 and 4: foundations and operations first, then every party | proposed 2026-11-23 | Diego asked for one large plan in two blocks; Claude proposed the split, order and designs; not yet confirmed |
 
 Records 0016 to 0024 describe decisions taken before this log existed. They were written on
 2026-11-22 from the code, the commit history and the conversations, and keep the date each decision
