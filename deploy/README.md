@@ -6,7 +6,7 @@ container simulator and the web app, behind the existing Traefik. The L1 node ru
 
 | Service | Exposed as | Notes |
 |---|---|---|
-| `api` | `https://zyrcle-backend.deviego.xyz` | rate limited; reads the oracle key from the host |
+| `api` | `https://zyrcle-backend.deviego.xyz` | rate limited; reads the oracle and operator keys from the host (`ORACLE_KEY_PATH`, `OPERATOR_KEY_PATH`) |
 | `web` | `https://zyrcle.deviego.xyz` | the web app (`apps/web`): static files, unprivileged nginx, strict CSP |
 | `postgres`, `mosquitto`, `sim` | internal network only | never published |
 
@@ -36,7 +36,10 @@ the demo-page days (`ZYRCLE_DEMO_TAG`, `DEMO_HOST`) is renamed in place, and the
 container is removed (`--remove-orphans`; the L1 node is a separate compose project and is not
 touched).
 
-The operator token for `/v1/operator/*` is `OPERATOR_TOKEN` in `deploy/.env`.
+The shared operator token for `/v1/operator/*` is `OPERATOR_TOKEN` in `deploy/.env`. It is for
+machines (seed, scripts); people sign in to `/console` with their own operator account
+([ADR 0014](../docs/adr/0014-operator-accounts.md)). Full operation guide:
+[docs/infrastructure.md](../docs/infrastructure.md).
 
 ## Checks
 
