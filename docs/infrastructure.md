@@ -887,8 +887,7 @@ to pause the Treasury, or to remove an address from an allow list.
    ```
    The file lands in `~/.avalanche-cli/key/`. Keep it `0600`, owned by the deploy user, and add it
    to the offline inventory ([ADR 0022](adr/0022-keys-secrets-and-production-changes.md)).
-3. **Give it gas.** Send it a few ZYR from the L1 admin (a plain transfer). **Gap:** no script does
-   this yet.
+3. **Give it gas.** Send it a few ZYR from the L1 admin with `chain fund` (runbook 9.12).
 4. **Move the role.** With the L1 admin key, call the Treasury's `grantRole` for the new address and
    `revokeRole` for the old one (`OPERATOR_ROLE` or `ORACLE_ROLE`). **Gap:** no command exists.
 5. **Oracle only: move the guardian too.** The oracle key is also the AccountFactory guardian:
@@ -1171,7 +1170,6 @@ Each item is checked against the repository.
 - **Missing chain commands.** No command grants or revokes Treasury roles, pauses the Treasury,
   removes an allow-list entry, or tops up the validator. The wrapper does not pass the factory
   address that `chain accounts-guardian` needs.
-- **Gas funding** for the oracle and operator keys is not documented.
 - **RewardManager** has no reward address, although ADR 0002 says fees go to the treasury.
 
 **Deployment**
@@ -1203,8 +1201,8 @@ Each item is checked against the repository.
 
 **Mobile**
 
-- **Mobile builds are manual** and outside CI. ADR 0015 is still proposed. No iOS build and no store
-  submission are recorded.
+- **Mobile builds are manual** and outside CI (ADR 0015). No iOS build and no store submission are
+  recorded.
 
 **Documentation drift found while writing this**
 
