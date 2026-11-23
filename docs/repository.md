@@ -23,7 +23,8 @@ zyrcle/
 │   └── protocol/       Python: the signed device protocol, shared by the API and the simulator
 ├── device/
 │   └── simulator/      Simulated container: scale, distance, metal, camera, lock; control panel
-├── chain/              Solidity (Foundry): Treasury, AccountFactory, ZyrcleAccount, tests
+├── chain/              Solidity (Foundry): Treasury, AccountFactory, ZyrcleAccount, tests;
+│                       lib/safe-smart-account: Safe v1.4.1, vendored (ADR 0040)
 ├── infra/
 │   └── l1/             ZyrcleChain: genesis, validator container, scripts, fuji.env (addresses)
 ├── deploy/             Production compose stack, deploy script, broker config

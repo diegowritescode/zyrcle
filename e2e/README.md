@@ -7,6 +7,7 @@ and pull request.
 | File | What it walks through |
 |---|---|
 | `tests/journey.spec.ts` | A day on campus: the university's dashboard, a participant's deposits, the operator's console, a collection center and its prices, a collection from the phone, a sale read from a ticket photo, matched to the bank statement and settled on chain, an impact certificate verified against the chain and its IPFS copy, a merchant paid from a phone and paid out in pesos, matched to the statement |
+| `tests/multisig.spec.ts` | The Safe: deployed with three owners, a wallet signs on the multisig page, a stranger cannot, a paper key signs on the command line, the proposal runs |
 | `tests/recovery.spec.ts` | A lost phone: recovery email, the new phone, the 48-hour wait, the old phone locked out |
 
 ## Run them

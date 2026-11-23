@@ -11,6 +11,7 @@
   zyrcle-api chain balance --address 0x..                                     native ZYR balance
   zyrcle-api demo seed --keys-dir DIR --devices ctr-0001,ctr-0002            register demo bins
   zyrcle-api keys new --out FILE                                             new key file, 0600
+  zyrcle-api safe …                                                          the admin Safe
 
 Chain commands use ZYRCLE_CHAIN_RPC_URL and, except deploy, fund and balance,
 ZYRCLE_TREASURY_ADDRESS (minter-revoke refuses to revoke that one);
@@ -27,6 +28,7 @@ from decimal import Decimal
 
 import uvicorn
 
+from . import safe_cli
 from .chain import WEI_PER_COP, Chain, load_account_file
 from .main import create_app
 
@@ -152,6 +154,7 @@ def main() -> None:
         accounts.add_argument("--admin-key-file", required=True)
         accounts.add_argument("--guardian", required=True, help="address of the guardian key")
 
+    safe_cli.add_parser(sub)
     keys = sub.add_parser("keys").add_subparsers(dest="action", required=True)
     new_key = keys.add_parser("new", help="write a new key to a 0600 file, print its address")
     new_key.add_argument("--out", required=True)
@@ -169,6 +172,8 @@ def main() -> None:
             proxy_headers=True,
             forwarded_allow_ips="*",
         )
+    elif args.cmd == "safe":
+        asyncio.run(safe_cli.run(args))
     elif args.cmd == "keys":
         print(new_key_file(pathlib.Path(args.out)))
     elif args.cmd == "demo":

@@ -12,6 +12,7 @@ const Sites = lazy(() => import("./pages/Sites"));
 const Console = lazy(() => import("./pages/Console"));
 const CertificatePage = lazy(() => import("./pages/CertificatePage"));
 const Legal = lazy(() => import("./pages/Legal"));
+const Multisig = lazy(() => import("./pages/Multisig"));
 const RecyclingPage = lazy(() => import("./pages/RecyclingPage"));
 const ContainerScreen = lazy(() => import("./pages/ContainerScreen"));
 const ComingSoon = lazy(() => import("./pages/ComingSoon"));
@@ -38,6 +39,7 @@ const App = () => (
               <Route path="/" element={<Index />} />
               <Route path="/sites" element={<Sites />} />
               <Route path="/console" element={<Console />} />
+              <Route path="/multisig" element={<Multisig />} />
               {/* The mobile app links here (docs/adr/0011). */}
               <Route path="/residence" element={<Navigate to="/sites" replace />} />
               <Route path="/recycling" element={<RecyclingPage />} />

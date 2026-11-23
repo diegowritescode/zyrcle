@@ -1205,6 +1205,50 @@ health report then shows the guardian's gas next to the oracle's and the operato
 already started by the old guardian finish normally: the account checks the guardian when a
 recovery starts, not later.
 
+### 9.14 Move the admin powers to the Safe
+
+[ADR 0040](adr/0040-keys-guardian-and-multisig.md). Diego's three signers: his MetaMask, his
+phone's wallet and a paper key; two of three sign. Every step is a Fuji transaction and needs his
+approval. Commands run on the VPS through the wrapper (`W=infra/l1/scripts/zyrcle-api-docker.sh`).
+
+**Before:** the three owner addresses.
+
+- MetaMask and the phone: an account each. The multisig page adds the ZyrcleChain network to the
+  wallet the first time it signs.
+- The paper key: on Diego's computer with the network off, print a new key and its address, write
+  both on paper, and close the terminal:
+  `apps/api/.venv/bin/python -c "from eth_account import Account; a = Account.create(); print(a.address); print(a.key.hex())"`.
+  Keep the paper apart from the other two.
+
+**Steps:**
+
+```bash
+$W safe deploy --admin-key-file /keys/zyrcle-l1-admin.pk --owners <metamask>,<phone>,<paper> --threshold 2
+$W safe status --safe <SAFE> --admin 0xfdDD10F3BB701dCB21bF711bf3d28f96FA9a2f7d   # before: all "llave admin"
+$W safe grant --admin-key-file /keys/zyrcle-l1-admin.pk --safe <SAFE>              # 1: the Safe gets them too
+$W safe propose --safe <SAFE> --what proof --out ../../infra/l1/safe/1-proof.json   # 2: two owners sign it
+$W safe exec --proposal ../../infra/l1/safe/1-proof.json --key-file /keys/zyrcle-l1-admin.pk
+$W safe own --admin-key-file /keys/zyrcle-l1-admin.pk --safe <SAFE>                # 3: ownerships
+$W safe propose --safe <SAFE> --what revoke --admin 0xfdDD10F3BB701dCB21bF711bf3d28f96FA9a2f7d \
+   --multisend <SAFE_MULTISEND> --out ../../infra/l1/safe/2-revoke.json             # 4: two owners sign it
+$W safe exec --proposal ../../infra/l1/safe/2-revoke.json --key-file /keys/zyrcle-l1-admin.pk
+$W safe renounce --admin-key-file /keys/zyrcle-l1-admin.pk --safe <SAFE>           # 5: the key gives up
+$W safe status --safe <SAFE> --admin 0xfdDD10F3BB701dCB21bF711bf3d28f96FA9a2f7d   # after: all "Safe"
+```
+
+**Signing a proposal:** open `https://zyrcle.deviego.xyz/multisig` in MetaMask (the browser
+extension, or the browser inside the phone's wallet app), load or paste the proposal, press
+"Firmar con mi billetera", then download or copy the signed proposal and pass it on. The paper key
+signs on a computer with `zyrcle-api safe sign --proposal FILE --key-file -`, which asks for the key
+without showing it or writing it anywhere. The page and the command check that each signature is an
+owner's over that exact proposal; the Safe checks again on chain.
+
+**After:** record the addresses in `infra/l1/fuji.env` (`SAFE`, `SAFE_SINGLETON`, `SAFE_FACTORY`,
+`SAFE_FALLBACK_HANDLER`, `SAFE_MULTISEND`), commit the executed proposals in `infra/l1/safe/` as the
+audit trail, and move `zyrcle-l1-admin.pk` off the VPS into the encrypted offline inventory. The
+admin key still holds ZYR from the genesis float, which keeps paying gas for the backend's keys
+(runbook 9.12); move what is left to the Safe when that float is replaced.
+
 ## 10. Known gaps and risks
 
 Each item is checked against the repository.

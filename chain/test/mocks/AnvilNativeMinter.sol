@@ -4,7 +4,8 @@ pragma solidity 0.8.30;
 /// @dev NativeMinter stand-in for anvil, used by the backend's end-to-end tests. Anvil has no
 ///      Subnet-EVM precompiles, so this contract is placed at the precompile address with
 ///      anvil_setCode and pre-funded with anvil_setBalance; "minting" transfers from that float.
-///      Same allow-list ABI as the real precompile.
+///      Same allow-list ABI as the real precompile; the multisig tests also place it at the
+///      other allow-list precompiles (deployer, fee manager, reward manager).
 contract AnvilNativeMinter {
     mapping(address => uint256) private roles; // 0 none, 1 enabled, 2 admin
 
@@ -14,6 +15,14 @@ contract AnvilNativeMinter {
 
     function setNone(address addr) external {
         roles[addr] = 0;
+    }
+
+    function setAdmin(address addr) external {
+        roles[addr] = 2;
+    }
+
+    function setManager(address addr) external {
+        roles[addr] = 3;
     }
 
     function readAllowList(address addr) external view returns (uint256) {

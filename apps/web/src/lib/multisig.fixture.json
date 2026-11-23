@@ -1,0 +1,87 @@
+{
+  "safe": "0xabababababababababababababababababababab",
+  "chain_id": 20261121,
+  "to": "0x0200000000000000000000000000000000000001",
+  "data": "0x0aaf70430000000000000000000000001212121212121212121212121212121212121212",
+  "nonce": 3,
+  "description": "fixture",
+  "value": 0,
+  "operation": 0,
+  "signatures": {
+    "0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A": "0x9956e3c2ba68129680f22cc493a82e4ef2cef93c007e772d51e48289491a078504720f60bc6a57260785142cf7fe2917901e773617d48d13052048d729059dee1c"
+  },
+  "safe_tx_hash": "0xe73ade690961d20261c9113bc947597ed6b0f3033958523d98865a8a4ba91b0d",
+  "typed_data": {
+    "types": {
+      "EIP712Domain": [
+        {
+          "name": "chainId",
+          "type": "uint256"
+        },
+        {
+          "name": "verifyingContract",
+          "type": "address"
+        }
+      ],
+      "SafeTx": [
+        {
+          "name": "to",
+          "type": "address"
+        },
+        {
+          "name": "value",
+          "type": "uint256"
+        },
+        {
+          "name": "data",
+          "type": "bytes"
+        },
+        {
+          "name": "operation",
+          "type": "uint8"
+        },
+        {
+          "name": "safeTxGas",
+          "type": "uint256"
+        },
+        {
+          "name": "baseGas",
+          "type": "uint256"
+        },
+        {
+          "name": "gasPrice",
+          "type": "uint256"
+        },
+        {
+          "name": "gasToken",
+          "type": "address"
+        },
+        {
+          "name": "refundReceiver",
+          "type": "address"
+        },
+        {
+          "name": "nonce",
+          "type": "uint256"
+        }
+      ]
+    },
+    "primaryType": "SafeTx",
+    "domain": {
+      "chainId": 20261121,
+      "verifyingContract": "0xABaBaBaBABabABabAbAbABAbABabababaBaBABaB"
+    },
+    "message": {
+      "to": "0x0200000000000000000000000000000000000001",
+      "value": 0,
+      "data": "0x0aaf70430000000000000000000000001212121212121212121212121212121212121212",
+      "operation": 0,
+      "safeTxGas": 0,
+      "baseGas": 0,
+      "gasPrice": 0,
+      "gasToken": "0x0000000000000000000000000000000000000000",
+      "refundReceiver": "0x0000000000000000000000000000000000000000",
+      "nonce": 3
+    }
+  }
+}

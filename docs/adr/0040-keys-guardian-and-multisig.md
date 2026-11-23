@@ -46,3 +46,25 @@ every signed payment, also shared the oracle key (ADR 0028 asked to separate it)
   validators.
 - Every admin change needs two of three people and a few minutes; an emergency pause too.
 - Losing two of the three signer keys locks the admin powers for good: the signers need backups.
+
+## Amendments
+- **2026-11-23, Claude (building the multisig with the signers Diego chose):**
+  - Safe v1.4.1 is vendored unchanged in `chain/lib/safe-smart-account` and compiled with the
+    project's solc 0.8.30 (the audited release was built with 0.7.6; the source is the same).
+  - Eight powers, not seven: the validator manager is a transparent proxy whose proxy admin, able to
+    upgrade it, is also owned by the admin key. The handover reads the proxy admin from the EIP-1967
+    slot. Precompiles the chain does not enable (the transaction allow list) are skipped: an enabled
+    one reports the code `0x01`.
+  - The order keeps a way back until the end: (1) the admin key grants the Safe every role and
+    precompile admin, (2) the Safe proves it acts, with two signatures, by granting itself a role it
+    already has, (3) the ownerships move, (4) the Safe takes the admin key off the precompiles in one
+    batched transaction (MultiSendCallOnly), (5) the admin key renounces its contract roles, which
+    the command refuses while the Safe does not hold them.
+  - Proposals travel as JSON files carrying the EIP-712 data and the Safe's transaction hash; a
+    changed byte is refused. The web app's `/multisig` page signs with the wallet's
+    `eth_signTypedData_v4`, adding the ZyrcleChain network if needed; the command line signs with a
+    key file or with a key typed at a prompt (the paper key). Both check that a signature is an
+    owner's over that proposal.
+  - Tested on anvil (two signatures, the threshold, tampering, the five steps leaving the admin key
+    with nothing) and end to end in a browser with a stand-in wallet.
+

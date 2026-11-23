@@ -15,6 +15,12 @@ TARGETS = {
     ("AccountFactory.sol", "AccountFactory"): API / "src" / "zyrcle_api" / "contracts" / "AccountFactory.json",
     ("ZyrcleAccount.sol", "ZyrcleAccount"): API / "src" / "zyrcle_api" / "contracts" / "ZyrcleAccount.json",
     ("AnvilNativeMinter.sol", "AnvilNativeMinter"): API / "tests" / "fixtures" / "AnvilNativeMinter.json",
+    ("OwnableMock.sol", "OwnableMock"): API / "tests" / "fixtures" / "OwnableMock.json",
+    # The Safe the admin powers move to (docs/adr/0040), from lib/safe-smart-account v1.4.1.
+    ("SafeL2.sol", "SafeL2"): API / "src" / "zyrcle_api" / "contracts" / "SafeL2.json",
+    ("SafeProxyFactory.sol", "SafeProxyFactory"): API / "src" / "zyrcle_api" / "contracts" / "SafeProxyFactory.json",
+    ("CompatibilityFallbackHandler.sol", "CompatibilityFallbackHandler"): API / "src" / "zyrcle_api" / "contracts" / "CompatibilityFallbackHandler.json",
+    ("MultiSendCallOnly.sol", "MultiSendCallOnly"): API / "src" / "zyrcle_api" / "contracts" / "MultiSendCallOnly.json",
 }
 
 for (source, name), target in TARGETS.items():

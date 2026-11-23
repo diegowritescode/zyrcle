@@ -19,6 +19,7 @@ Design: [docs/architecture.md](../../docs/architecture.md), protocol:
 | `setup_routes.py` | Operator routes that set the system up: hosts, sites, schedules, devices, containers, prices, the review queue |
 | `email_codes.py`, `recovery.py`, `recovery_worker.py`, `account_routes.py` | Recovery email and lost-phone recovery ([ADR 0010](../../docs/adr/0010-smart-accounts-and-recovery.md)): emailed codes, starting and cancelling a recovery, and the worker that carries it through the chain |
 | `ipfs.py` | The certificate's public copy pinned on IPFS through Pinata ([ADR 0027](../../docs/adr/0027-impact-certificates.md), amendment) |
+| `multisig.py`, `safe_ops.py`, `safe_cli.py` | The Safe that takes the admin powers ([ADR 0040](../../docs/adr/0040-keys-guardian-and-multisig.md)): proposals and their EIP-712 signatures, deploying the Safe, the five-step handover, `zyrcle-api safe …` |
 | `ratelimit.py` | Rate limits per class of route and caller ([ADR 0035](../../docs/adr/0035-rate-limits.md)) |
 | `observability.py` | Error reports to Sentry, scrubbed of personal data ([ADR 0033](../../docs/adr/0033-error-reports-and-uptime.md)) |
 | `public.py` | Public read-only views: platform totals, a scanned container, host and site dashboards. Aggregates only, no access codes |
