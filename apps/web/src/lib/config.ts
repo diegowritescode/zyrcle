@@ -9,6 +9,6 @@ export const CHAIN_ID: number = Number(env.VITE_CHAIN_ID || 20261121);
 /** The domain residents sign in to (SIWE). Must match the API's ZYRCLE_SIWE_DOMAIN. */
 export const SIWE_DOMAIN: string = env.VITE_SIWE_DOMAIN || "zyrcle.deviego.xyz";
 export const TREASURY_ADDRESS: string =
-  env.VITE_TREASURY_ADDRESS || "0xB843946A42F2791B8b932F8c0205C9D277E351B1";
+  env.VITE_TREASURY_ADDRESS || "0xBc5035341C075CBd75508ff1a3a5EC0241e58201";
 export const REPO_URL = "https://github.com/diegowritescode/zyrcle";
 export const docUrl = (path: string) => `${REPO_URL}/blob/main/${path}`;

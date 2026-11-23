@@ -62,3 +62,11 @@ sites should also get something back ([roadmap](../roadmap-v1.md)).
 - The settlement report's hash is sha256 of its canonical JSON (keys sorted, no spaces), anchored on
   chain with the payments.
 - A sale's date is stored at noon local time of the day the operator enters.
+
+## Amendments
+- **2026-11-22, deployed with Diego's approval** ("sí, te autorizo para el despliegue"): Treasury
+  with the host share at `0xBc5035341C075CBd75508ff1a3a5EC0241e58201` on ZyrcleChain, same operator
+  and oracle roles, enabled on the NativeMinter; 1,000,000 COP of simulated seed recorded again
+  (tx `0x802b19d9…e009d`). The API, the web app and `infra/l1/fuji.env` point to it. The first
+  Treasury (`0xB843946A…51B1`) is still on the NativeMinter allow list; removing it is pending.
+
