@@ -79,8 +79,8 @@ export function Navbar() {
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         ))}
-                        <Link to="/my-certificates" className="text-eco-forest hover:bg-eco-emerald/5">
-                            Mis certificados
+                        <Link to="/sites" className="text-eco-forest hover:bg-eco-emerald/5">
+                            Certificados
                         </Link>
                         <WalletMenu />
                     </div>
@@ -126,8 +126,8 @@ export function Navbar() {
                                     </AccordionContent>
                                 </AccordionItem>
                             ))}
-                            <Link to="/my-certificates" className="block px-3 py-2 rounded-md hover:bg-eco-emerald/5 text-eco-forest">
-                                Mis certificados
+                            <Link to="/sites" className="block px-3 py-2 rounded-md hover:bg-eco-emerald/5 text-eco-forest">
+                                Certificados
                             </Link>
                         </Accordion>
                     </div>

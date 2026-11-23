@@ -110,7 +110,7 @@ H  Weighing station: hardware track, in parallel
   - Exports a sustainability office can use.
 - **Done when:** a host downloads a certificate, opens its verification link and sees it check out
   against the chain. A second certificate over the same grams is refused.
-- **Decision:** an ADR on impact certificates (factor source, anchoring, claim ledger).
+- **Decision:** [ADR 0027](adr/0027-impact-certificates.md), impact certificates. Built in block 2.
 - **Not in v1:** tradable carbon or plastic credits. They need an approved methodology, an
   accredited third-party audit, registration (RENARE in Colombia) and a scale no single campus
   reaches. The path is one Zyrcle program aggregating every site, with revenue shared with the

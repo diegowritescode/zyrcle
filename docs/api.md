@@ -488,6 +488,16 @@ Site ids are the old residence ids, so ids handed out earlier still work. New co
 site names. No code in `apps/web/src`, `apps/mobile` or `packages/client` reads the old names today.
 Operator routes were renamed outright, because only Zyrcle's own tools call them.
 
+
+#### Impact certificates (public)
+
+[ADR 0027](adr/0027-impact-certificates.md), [`impact_routes.py`](../apps/api/src/zyrcle_api/impact_routes.py).
+
+| Method and path | Returns |
+|---|---|
+| `GET /v1/hosts/{host_id}/certificates` | The host's certificates, newest month first: host, site, period, totals, `by_material`, `merkle_root`, `status`, `anchor_tx` |
+| `GET /v1/certificates/{id}` | One certificate plus `leaves: [{deposit_id, material, grams}]`, from which anyone recomputes `merkle_root` (`packages/client/src/certificate.ts` does it in the browser). 404 if unknown |
+
 ### 3.3 Participant
 
 All routes need a participant JWT, except the two sign-in routes.
@@ -1057,6 +1067,15 @@ The worker runs only when the chain and `ZYRCLE_OPERATOR_KEY_FILE` are configure
 `amount_cop`, `status` (`pending`, `waiting`, `settling`, `settled` or `failed`), `reason`,
 `residents_cop`, `collector_cop`, `host_cop`, `report_hash`, `txs` (`[{step, tx, at}]`),
 `settled_at`.
+
+
+#### Impact certificates (operator)
+
+| Method and path | Body | Returns |
+|---|---|---|
+| `POST /v1/operator/certificates/preview` | `{host_id, site_id?, period: "YYYY-MM"}` | What a certificate would hold now, claiming nothing |
+| `POST /v1/operator/certificates` | same | 201, the certificate (`issued`); the anchor worker anchors it. 409 `conflict` if nothing sold is left to certify in that month, or if another certificate just claimed some of it; 404 for an unknown host or a site of another host; 422 for a bad period |
+| `GET /v1/operator/certificates` | | Every certificate |
 
 ### 3.6 Admin only
 

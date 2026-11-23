@@ -10,6 +10,7 @@ scale and sensors (simulated until hardware exists). Treasury = the contract tha
 - [Booking a turn](#booking-a-turn)
 - [Collection](#collection)
 - [Sale and settlement](#sale-and-settlement)
+- [Impact certificate](#impact-certificate)
 - [Lost-phone recovery](#lost-phone-recovery)
 - [Push notifications](#push-notifications)
 - [The money](#the-money)
@@ -172,6 +173,31 @@ sequenceDiagram
 
 Shares: 65 % participants (pro rata to verified grams), 15 % collector, 10 % host, 10 % operations
 (stays in pesos). A host without a payout address waits; its part is paid when it is set.
+
+## Impact certificate
+
+ADR 0027. Only material that reached a buyer counts, and each gram is claimed once.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Op as Operator
+    participant API
+    participant W as Anchor worker
+    participant L1 as ZyrcleChain
+    actor V as Anyone
+    Op->>API: preview {host, site?, month}
+    API->>API: credited deposits of that host whose bag's sale settled in the month, co2e not claimed
+    API-->>Op: kg per material, CO2e avoided (EPA WARM v16), Merkle root
+    Op->>API: issue
+    API->>API: certificate + one impact_claim per deposit, in one transaction
+    W->>L1: transaction to itself, data = ZYRCLE-CERT-1 + certificate id + root
+    W->>API: anchored, tx hash
+    V->>API: GET /v1/certificates/{id} (leaves included)
+    V->>V: recompute the root in the browser
+    V->>L1: read the anchor transaction from the public RPC
+    V->>V: same root? verified
+```
 
 ## Lost-phone recovery
 

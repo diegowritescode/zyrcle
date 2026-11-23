@@ -339,6 +339,34 @@ class Chain:
         )
         return receipt["transactionHash"].to_0x_hex()
 
+    # ------------------------------------------------------------------ certificates (ADR 0027)
+
+    async def anchor(self, sender: LocalAccount, data: bytes) -> str:
+        """A plain transaction from `sender` to itself carrying `data` (a certificate root)."""
+        tx = {
+            "from": sender.address,
+            "to": sender.address,
+            "value": 0,
+            "data": data,
+            "nonce": await self.w3.eth.get_transaction_count(sender.address, "pending"),
+            "chainId": await self.w3.eth.chain_id,
+        }
+        tx["gas"] = await self.w3.eth.estimate_gas(tx)
+        fees = await self.w3.eth.fee_history(1, "latest")
+        base = fees["baseFeePerGas"][-1]
+        tx["maxPriorityFeePerGas"] = 0
+        tx["maxFeePerGas"] = base * 2 + 1
+        signed = sender.sign_transaction(tx)
+        tx_hash = await self.w3.eth.send_raw_transaction(signed.raw_transaction)
+        receipt = await self.w3.eth.wait_for_transaction_receipt(tx_hash, timeout=60)
+        if receipt["status"] != 1:
+            raise TxFailed("Reverted", f"transaction {tx_hash.to_0x_hex()} reverted")
+        return tx_hash.to_0x_hex()
+
+    async def transaction_input(self, tx_hash: str) -> bytes:
+        tx = await self.w3.eth.get_transaction(tx_hash)
+        return bytes(tx["input"])
+
     async def state(self) -> TreasuryState:
         assert self.treasury is not None
         f = self.treasury.functions

@@ -15,6 +15,8 @@ from .collection import CollectionService
 from .collection_routes import router as collection_router
 from .config import Settings, get_settings
 from .db import make_engine, make_sessionmaker
+from .impact import AnchorWorker, ImpactService
+from .impact_routes import router as impact_router
 from .live import LiveHub
 from .mail import EmailWorker, LogMail, ResendMail
 from .mqtt import MqttBridge
@@ -60,6 +62,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.settings, app.state.maker, app.state.hub = settings, maker, hub
         app.state.bridge, app.state.sessions = bridge, service
         app.state.collections = collections
+        app.state.impact = ImpactService(maker, settings)
 
         chain = None
         if settings.chain_enabled:
@@ -118,6 +121,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     _every(settings.settlement_interval_s, settlements.run_once, "settlements")
                 )
             )
+            anchors = AnchorWorker(maker, chain, load_account_file(settings.operator_key_file))  # type: ignore[arg-type]
+            app.state.anchors = anchors
+            tasks.append(
+                asyncio.create_task(
+                    _every(settings.settlement_interval_s, anchors.run_once, "anchors")
+                )
+            )
         if chain is not None and settings.accounts_enabled:
             guardian = load_account_file(settings.guardian_key_file or settings.oracle_key_file)  # type: ignore[arg-type]
             recoveries = RecoveryWorker(maker, chain, guardian, settings)
@@ -165,6 +175,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(collection_router)
     app.include_router(sale_router)
     app.include_router(operator_router)
+    app.include_router(impact_router)
     if settings.demo_simulator_url:
         from .demo import router as demo_router
 

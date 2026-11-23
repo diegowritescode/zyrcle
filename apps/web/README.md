@@ -10,6 +10,7 @@ https://zyrcle.deviego.xyz.
 | `/recycling` | The resident's deposit: scan the container's QR (camera or typed code), choose the material, live weight, "Terminé", verdict and payment; plus the resident's history | SIWE sign-in, `POST /v1/sessions`, WebSocket `/v1/sessions/{id}/live`, `GET /v1/me` |
 | `/sites` | A host's dashboard across its sites, or one site's: totals, kilos per day and material, pesos paid per day, each site's numbers or each container's fill level and weight. `/residence` redirects here | `GET /v1/hosts/{id}/dashboard`, `GET /v1/sites/{id}/dashboard` |
 | `/console` | Operations console ([ADR 0014](../../docs/adr/0014-operator-accounts.md)): sign-in by email code, review queue, incidents, collectors and printable bag labels, sales with the bank match and settlement report, hosts and sites, prices, operators | `/v1/operator/*` |
+| `/certificates/:id` | A host's impact certificate ([ADR 0027](../../docs/adr/0027-impact-certificates.md)): totals per material, CO2e avoided, print view, CSV of the deposits, and "Verificar", which recomputes the root in the browser and compares it with the anchor transaction on ZyrcleChain | `GET /v1/certificates/{id}`, the public RPC |
 | `/container/:id` | A container's screen, simulated: the QR whose code rotates every 30 s | `GET /v1/demo/containers` |
 | `/collectors`, `/validator`, `/marketplace`, `/my-certificates` | What comes next (phase 4 and later) | none |
 

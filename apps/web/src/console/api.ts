@@ -1,6 +1,6 @@
 /** The operator API (docs/adr/0014), used only by the console. Participants' calls live in
  * packages/client. Every call carries the operator's session token. */
-import type { Bag, Collection, Session } from "@zyrcle/client";
+import type { Bag, Certificate, Collection, Session } from "@zyrcle/client";
 import { API_URL } from "@/lib/config";
 
 export class OperatorApiError extends Error {
@@ -136,6 +136,17 @@ export interface Price {
     source: string | null;
 }
 
+export interface CertificatePreview {
+    period: string;
+    factors_version: string;
+    deposits: number;
+    participants: number;
+    grams: number;
+    co2e_g: number;
+    by_material: Record<string, { grams: number; co2e_g: number }>;
+    merkle_root: string;
+}
+
 export interface ContainerBalance {
     container_id: string;
     name: string;
@@ -204,6 +215,12 @@ export function operatorApi(token: string | null, onUnauthorized: () => void) {
         createSite: (host_id: string, name: string) => call<Omit<SiteRow, "host_name">>("/v1/operator/sites", json("POST", { host_id, name })),
         setSchedule: (id: string, opens_hour: number, closes_hour: number, slot_capacity: number) =>
             call<Omit<SiteRow, "host_name">>(`/v1/operator/sites/${id}/schedule`, json("PUT", { opens_hour, closes_hour, slot_capacity })),
+
+        certificates: () => call<Certificate[]>("/v1/operator/certificates"),
+        previewCertificate: (host_id: string, site_id: string | null, period: string) =>
+            call<CertificatePreview>("/v1/operator/certificates/preview", json("POST", { host_id, site_id, period })),
+        issueCertificate: (host_id: string, site_id: string | null, period: string) =>
+            call<Certificate>("/v1/operator/certificates", json("POST", { host_id, site_id, period })),
 
         prices: () => call<Price[]>("/v1/operator/prices"),
         setPrice: (material: string, cop_per_kg: number) => call<Price>(`/v1/operator/prices/${material}`, json("PUT", { cop_per_kg })),

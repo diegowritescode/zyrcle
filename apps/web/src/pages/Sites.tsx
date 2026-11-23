@@ -5,6 +5,7 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { IoTDashboard, type DashboardData } from "@/components/dashboard/IoTDashboard";
+import { CertificateList } from "@/components/dashboard/CertificateList";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { useHosts } from "@/hooks/useHosts";
@@ -76,7 +77,10 @@ const Sites = () => {
 
                         <TabsContent value="dashboard" className="m-0">
                             {data ? (
-                                <IoTDashboard data={data} onSite={pick} />
+                                <>
+                                    <IoTDashboard data={data} onSite={pick} />
+                                    {siteId === null && host && <CertificateList hostId={host.id} />}
+                                </>
                             ) : failed ? (
                                 <p className="text-center text-eco-forest/70 py-20">No pudimos cargar el panel.</p>
                             ) : (

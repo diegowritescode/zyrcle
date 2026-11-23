@@ -68,6 +68,30 @@ export interface HostDashboard extends DailySeries {
   sites: (SiteRef & { totals: Totals })[];
 }
 
+/** A host's impact certificate for a month (docs/adr/0027). */
+export interface Certificate {
+  id: string;
+  host: HostRef;
+  site: SiteRef | null;
+  /** YYYY-MM, in the deployment's time zone. */
+  period: string;
+  factors_version: string;
+  deposits: number;
+  participants: number;
+  grams: number;
+  /** Grams of CO2e avoided against landfilling, EPA WARM v16. */
+  co2e_g: number;
+  by_material: Record<string, { grams: number; co2e_g: number }>;
+  merkle_root: string;
+  status: "issued" | "anchored" | "failed";
+  anchor_tx: string | null;
+  issued_by: string;
+  created_at: string;
+  anchored_at: string | null;
+  /** Only on GET /v1/certificates/{id}: what the root is built from. */
+  leaves?: { deposit_id: string; material: string; grams: number }[];
+}
+
 /** A host and its sites (GET /v1/hosts). */
 export interface HostSummary extends HostRef {
   sites: (SiteRef & { containers: number })[];
@@ -323,6 +347,8 @@ export function createApi(baseUrl: string) {
 
     stats: () => call<Totals>("/v1/stats"),
     hosts: () => call<HostSummary[]>("/v1/hosts"),
+    hostCertificates: (hostId: string) => call<Certificate[]>(`/v1/hosts/${hostId}/certificates`),
+    certificate: (id: string) => call<Certificate>(`/v1/certificates/${id}`),
     hostDashboard: (hostId: string, days = 14) =>
       call<HostDashboard>(`/v1/hosts/${hostId}/dashboard?days=${days}`),
     dashboard: (siteId: string, days = 14) => call<Dashboard>(`/v1/sites/${siteId}/dashboard?days=${days}`),

@@ -52,10 +52,11 @@ code format. If a number in the code changes how money, weight or trust is handl
 | [0024](0024-monorepo-tooling.md) | No npm workspaces, shared TS client, StyleSheet on mobile | accepted 2026-11-22, recorded later | Claude |
 | [0025](0025-documentation-as-code.md) | Documentation in the repository, changed with the code | accepted 2026-11-22 | Diego asked; Claude proposed the structure |
 | [0026](0026-v1-scope-and-delivery.md) | v1: one university campus, delivered in two reviewed blocks | accepted 2026-11-22 | Diego (university, two blocks); Claude (scope, milestones) |
+| [0027](0027-impact-certificates.md) | Impact certificates: sold material only, EPA WARM v16, one claim per gram, anchored root | proposed 2026-11-22 | Claude proposed (v1 block 2, M5); Diego asked for host certificates; not yet confirmed |
 
 Records 0016 to 0024 describe decisions taken before this log existed. They were written on
 2026-11-22 from the code, the commit history and the conversations, and keep the date each decision
 was taken. Numbers follow the order records were written, not the order decisions were taken.
 
-Later records planned in the [roadmap](../roadmap-v1.md) (impact certificates, closed-loop payments)
-get a number when they are decided.
+Later records planned in the [roadmap](../roadmap-v1.md) (closed-loop payments, pilot readiness) get a
+number when they are decided.

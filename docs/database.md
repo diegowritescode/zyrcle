@@ -908,6 +908,46 @@ The published settlement report: what one party got from one sale line.
 **Read by:** `get_sale` in [`sale_routes.py`][sale-routes]; [`api.py`][api] (`/v1/me` shows what
 each deposit got); `notify_settlement` in [`notifications.py`][notifications].
 
+### 3.4b Impact certificates
+
+[ADR 0027](adr/0027-impact-certificates.md). Written by [`impact.py`](../apps/api/src/zyrcle_api/impact.py).
+
+**`certificate`.** A host's (or one site's) certificate for a month.
+
+| Column | Type | Null | Meaning |
+|---|---|---|---|
+| `id` | uuid | no | Primary key; its 16 bytes go into the anchor transaction. |
+| `host_id` | uuid | no | FK → `host.id`. |
+| `site_id` | uuid | yes | FK → `site.id`; null for the whole host. |
+| `period` | varchar(7) | no | `YYYY-MM`, local time. CHECK `certificate_period_valid`. |
+| `factors_version` | varchar(16) | no | Emission factor table used, `warm-v16`. |
+| `deposits`, `participants` | integer | no | How many deposits and distinct participants it covers. |
+| `grams`, `co2e_g` | bigint | no | Material sold, and grams of CO2e avoided against landfilling. |
+| `by_material` | jsonb | no | `{material: {"grams", "co2e_g"}}`. |
+| `merkle_root` | varchar(66) | no | `0x` + sha256 root of the leaves. |
+| `status` | varchar(16) | no | `issued`, `anchored`, `failed`. |
+| `anchor_tx` | varchar(66) | yes | The transaction whose data carries the root. |
+| `attempts`, `next_attempt_at`, `last_error` | | | Anchor worker bookkeeping. |
+| `issued_by` | varchar(254) | no | The operator's email, or `token`. |
+| `created_at`, `anchored_at` | timestamptz | | |
+
+Indexes: `certificate_host_period_idx`, `certificate_due_idx` (anchor worker).
+
+**`impact_claim`.** The claim ledger: one environmental attribute of one deposit, claimed once.
+
+| Column | Type | Null | Meaning |
+|---|---|---|---|
+| `id` | uuid | no | Primary key. |
+| `session_id` | uuid | no | FK → `deposit_session.id`. |
+| `attribute` | varchar(16) | no | `co2e` (CHECK `impact_claim_attribute_valid`). |
+| `certificate_id` | uuid | no | FK → `certificate.id`. |
+| `grams` | integer | no | The deposit's verified grams at the time of the claim. |
+| `created_at` | timestamptz | no | |
+
+`one_claim_per_deposit_attribute` (unique `session_id, attribute`) is what makes "one gram, one
+claim" a database rule: a second certificate over the same deposit fails on it, even under
+concurrent requests.
+
 ### 3.5 Participants and accounts
 
 #### `resident`
@@ -1497,6 +1537,7 @@ Until a worker runs, its rows stay `pending`.
 | [`0006`][m0006] | 2026-11-22 | `bag`, `collector`, `collection` with `one_active_collection_per_container`, `collection_fill` with `one_open_fill_per_collection`, `incident`; `deposit_session.collection_id`. | [ADR 0012][adr-0012] |
 | [`0007`][m0007] | 2026-11-22 | `sale`, `sale_line`, `settlement` with `one_settlement_per_party`. | [ADR 0013][adr-0013] |
 | [`0008`][m0008] | 2026-11-22 | `operator`, `operator_code`. | [ADR 0014][adr-0014] |
+| [`0010`][m0010] | 2026-11-22 | `certificate`, `impact_claim` with `one_claim_per_deposit_attribute`. | [ADR 0027](adr/0027-impact-certificates.md) |
 | [`0009`][m0009] | 2026-11-22 | The three CHECKs the models declared but no migration created (`container.area_mm2`, `container.depth_mm`, `material_price.cop_per_kg`); operator identity columns widened to 254. | section 9 below |
 
 The dates are the `Create Date` lines of the migration files. Every migration has a downgrade.
@@ -1658,6 +1699,7 @@ Found on 2026-11-22 by comparing the code with its comments, docstrings and ADRs
 [m0007]: ../apps/api/migrations/versions/0007_sales_and_settlement.py
 [m0008]: ../apps/api/migrations/versions/0008_operators.py
 [m0009]: ../apps/api/migrations/versions/0009_checks_and_operator_names.py
+[m0010]: ../apps/api/migrations/versions/0010_impact_certificates.py
 [adr-0002]: adr/0002-own-avalanche-l1.md
 [adr-0003]: adr/0003-advance-and-settlement.md
 [adr-0005]: adr/0005-device-link-mqtt.md

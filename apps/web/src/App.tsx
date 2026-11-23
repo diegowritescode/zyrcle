@@ -10,6 +10,7 @@ import Index from "./pages/Index";
 // The landing page loads first; the rest (charts, QR scanner, QR drawing) load when visited.
 const Sites = lazy(() => import("./pages/Sites"));
 const Console = lazy(() => import("./pages/Console"));
+const CertificatePage = lazy(() => import("./pages/CertificatePage"));
 const RecyclingPage = lazy(() => import("./pages/RecyclingPage"));
 const ContainerScreen = lazy(() => import("./pages/ContainerScreen"));
 const ComingSoon = lazy(() => import("./pages/ComingSoon"));
@@ -43,7 +44,9 @@ const App = () => (
               <Route path="/collectors" element={<ComingSoon section="collectors" />} />
               <Route path="/validator" element={<Navigate to="/console" replace />} />
               <Route path="/marketplace" element={<ComingSoon section="marketplace" />} />
-              <Route path="/my-certificates" element={<ComingSoon section="certificates" />} />
+              <Route path="/certificates/:certificateId" element={<CertificatePage />} />
+              {/* The hackathon's "Mis certificados": hosts' certificates are listed on their dashboard. */}
+              <Route path="/my-certificates" element={<Navigate to="/sites" replace />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
