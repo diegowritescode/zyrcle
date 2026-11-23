@@ -2,7 +2,8 @@
 
 A certificate counts the credited deposits of a host (or one site) whose bag's sale settled in the
 month, and claims their `co2e` attribute in the same transaction, so no gram enters two
-certificates. The anchor worker then writes the Merkle root on ZyrcleChain.
+certificates. The anchor worker then pins a public copy on IPFS (when Pinata is configured) and
+writes the Merkle root, with the copy's CID, on ZyrcleChain.
 """
 
 import logging
@@ -18,9 +19,17 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from .chain import Chain
 from .config import Settings
-from .domain.impact import FACTORS_VERSION, Leaf, anchor_data, co2e_g, merkle_root
+from .domain.impact import (
+    FACTORS_VERSION,
+    Leaf,
+    anchor_data,
+    certificate_document,
+    co2e_g,
+    merkle_root,
+)
 from .domain.session_machine import CREDITED
 from .errors import Conflict, Invalid, NotFound
+from .ipfs import PinataPin, gateway_url
 from .models import (
     Certificate,
     CollectionFill,
@@ -50,7 +59,7 @@ def month_bounds(period: str, tz: ZoneInfo) -> tuple[datetime, datetime]:
     return start, end
 
 
-def certificate_view(c: Certificate, host: Host, site: Site | None) -> dict[str, Any]:
+def certificate_view(c: Certificate, host: Host, site: Site | None, gateway: str) -> dict[str, Any]:
     return {
         "id": str(c.id),
         "host": {"id": str(host.id), "name": host.name, "kind": host.kind},
@@ -65,10 +74,26 @@ def certificate_view(c: Certificate, host: Host, site: Site | None) -> dict[str,
         "merkle_root": c.merkle_root,
         "status": c.status,
         "anchor_tx": c.anchor_tx,
+        "ipfs_cid": c.ipfs_cid,
+        "ipfs_url": gateway_url(gateway, c.ipfs_cid),
         "issued_by": c.issued_by,
         "created_at": c.created_at.isoformat(),
         "anchored_at": c.anchored_at.isoformat() if c.anchored_at else None,
     }
+
+
+async def certificate_leaves(db: AsyncSession, certificate_id: uuid.UUID) -> list[dict[str, Any]]:
+    """The deposits a certificate claimed, in a fixed order: what its Merkle root is built from."""
+    rows = await db.execute(
+        select(ImpactClaim.session_id, DepositSession.declared_material, ImpactClaim.grams)
+        .join(DepositSession, DepositSession.id == ImpactClaim.session_id)
+        .where(ImpactClaim.certificate_id == certificate_id)
+        .order_by(ImpactClaim.session_id)
+    )
+    return [
+        {"deposit_id": str(sid), "material": material, "grams": grams}
+        for sid, material, grams in rows
+    ]
 
 
 class ImpactService:
@@ -80,6 +105,7 @@ class ImpactService:
     ):
         self._maker = maker
         self._tz = ZoneInfo(settings.timezone)
+        self._gateway = settings.ipfs_gateway
         self._now = clock
 
     async def _eligible(
@@ -196,7 +222,7 @@ class ImpactService:
             except IntegrityError:
                 # Another certificate claimed some of these deposits at the same moment.
                 raise Conflict("some of that material was just certified; preview again") from None
-            return certificate_view(c, host, site)
+            return certificate_view(c, host, site, self._gateway)
 
     async def get(self, certificate_id: uuid.UUID, with_leaves: bool = True) -> dict[str, Any]:
         async with self._maker() as db:
@@ -206,20 +232,9 @@ class ImpactService:
             host = await db.get(Host, c.host_id)
             site = await db.get(Site, c.site_id) if c.site_id else None
             assert host is not None
-            view = certificate_view(c, host, site)
+            view = certificate_view(c, host, site, self._gateway)
             if with_leaves:
-                rows = await db.execute(
-                    select(
-                        ImpactClaim.session_id, DepositSession.declared_material, ImpactClaim.grams
-                    )
-                    .join(DepositSession, DepositSession.id == ImpactClaim.session_id)
-                    .where(ImpactClaim.certificate_id == c.id)
-                    .order_by(ImpactClaim.session_id)
-                )
-                view["leaves"] = [
-                    {"deposit_id": str(sid), "material": material, "grams": grams}
-                    for sid, material, grams in rows
-                ]
+                view["leaves"] = await certificate_leaves(db, c.id)
             return view
 
     async def list(self, host_id: uuid.UUID | None = None) -> list[dict[str, Any]]:
@@ -232,22 +247,28 @@ class ImpactService:
             )
             if host_id is not None:
                 query = query.where(Certificate.host_id == host_id)
-            return [certificate_view(c, h, s) for c, h, s in await db.execute(query)]
+            return [certificate_view(c, h, s, self._gateway) for c, h, s in await db.execute(query)]
 
 
 class AnchorWorker:
-    """Writes each issued certificate's Merkle root on chain, from the Treasury operator key."""
+    """Anchors each issued certificate from the Treasury operator key. With Pinata configured it
+    first pins the certificate's public copy on IPFS and keeps the CID, so a retry after a failed
+    anchor reuses it; the anchor then carries the CID too."""
 
     def __init__(
         self,
         maker: async_sessionmaker[AsyncSession],
         chain: Chain,
         operator,
+        pinata: PinataPin | None = None,
+        gateway: str = "",
         clock: Callable[[], datetime] = utcnow,
     ):
         self._maker = maker
         self._chain = chain
         self._operator = operator
+        self._pinata = pinata
+        self._gateway = gateway
         self._now = clock
 
     async def run_once(self, batch: int = 5) -> int:
@@ -272,18 +293,46 @@ class AnchorWorker:
             for c in rows:
                 c.attempts, c.next_attempt_at = c.attempts + 1, now + timedelta(minutes=5)
             await db.commit()
-            work = [(c.id, c.merkle_root) for c in rows]
-        for cid, root in work:
-            await self._anchor(cid, root)
+            work = [(c.id, c.merkle_root, c.ipfs_cid) for c in rows]
+        for cid, root, ipfs_cid in work:
+            await self._anchor(cid, root, ipfs_cid)
         return len(work)
 
-    async def _anchor(self, cid: uuid.UUID, root: str) -> None:
+    async def _pin(self, certificate_id: uuid.UUID) -> str:
+        """Pin the public copy and keep its CID before anything is written on chain."""
+        assert self._pinata is not None
+        async with self._maker() as db:
+            c = await db.get(Certificate, certificate_id)
+            assert c is not None
+            host = await db.get(Host, c.host_id)
+            site = await db.get(Site, c.site_id) if c.site_id else None
+            assert host is not None
+            document = certificate_document(
+                certificate_view(c, host, site, self._gateway),
+                await certificate_leaves(db, c.id),
+            )
+        cid = await self._pinata.pin_json(
+            document,
+            name=f"zyrcle-certificate-{certificate_id}",
+            keyvalues={"host": str(document["host"]["id"]), "period": document["period"]},
+        )
+        async with self._maker() as db:
+            c = await db.get(Certificate, certificate_id, with_for_update=True)
+            assert c is not None
+            c.ipfs_cid = cid
+            await db.commit()
+        return cid
+
+    async def _anchor(self, cid: uuid.UUID, root: str, ipfs_cid: str | None) -> None:
         tx, error = None, None
         try:
+            if self._pinata is not None and ipfs_cid is None:
+                ipfs_cid = await self._pin(cid)
             tx = await self._chain.anchor(
-                self._operator, anchor_data(cid.bytes, bytes.fromhex(root.removeprefix("0x")))
+                self._operator,
+                anchor_data(cid.bytes, bytes.fromhex(root.removeprefix("0x")), ipfs_cid),
             )
-        except Exception as e:  # the chain is down or the key has no gas: try again later
+        except Exception as e:  # Pinata or the chain is down, or the key has no gas: retry
             error = f"{type(e).__name__}: {e}"
         async with self._maker() as db:
             c = await db.get(Certificate, cid, with_for_update=True)

@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { CheckCircle2, Download, Leaf, Loader2, Printer, ShieldCheck, XCircle } from "lucide-react";
-import { MATERIALS, anchorData, certificateRoot, kg, type Certificate } from "@zyrcle/client";
+import { CheckCircle2, Download, ExternalLink, Leaf, Loader2, Printer, ShieldCheck, XCircle } from "lucide-react";
+import { MATERIALS, certificateRoot, kg, parseAnchor, type Certificate, type CertificateDocument } from "@zyrcle/client";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { api } from "@/lib/api";
-import { RPC_URL } from "@/lib/config";
+import { IPFS_GATEWAY, RPC_URL } from "@/lib/config";
 
 const MONTHS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 const monthLabel = (period: string) => {
@@ -20,8 +20,11 @@ const monthLabel = (period: string) => {
 const kgOf = (grams: number) => kg(grams / 1000, 2);
 
 type Check = { state: "idle" | "checking" | "ok" | "bad"; detail?: string };
+const short = (h: string) => `${h.slice(0, 10)}…`;
 
-/** Recompute the root from the leaves and compare it with the anchor transaction (ADR 0027). */
+/** Recompute the root from the leaves and compare it with the anchor transaction (ADR 0027). When
+ * the anchor names an IPFS copy, read that copy by the CID written on chain (not the one our server
+ * reports) and check that its own leaves give the anchored root too. */
 async function verify(c: Certificate): Promise<Check> {
     const root = await certificateRoot(c.leaves ?? []);
     if (root !== c.merkle_root) return { state: "bad", detail: "Las hojas publicadas no dan la raíz del certificado." };
@@ -33,8 +36,23 @@ async function verify(c: Certificate): Promise<Check> {
     });
     const tx = (await res.json()).result;
     if (!tx) return { state: "bad", detail: "No encontramos la transacción de anclaje en ZyrcleChain." };
-    if (String(tx.input).toLowerCase() !== anchorData(c.id, root)) return { state: "bad", detail: "La transacción ancla otra raíz." };
-    return { state: "ok", detail: `Raíz ${root.slice(0, 10)}… anclada en la transacción ${c.anchor_tx.slice(0, 10)}…` };
+    const anchor = parseAnchor(String(tx.input));
+    if (!anchor || anchor.certificateId !== c.id || anchor.root !== root) return { state: "bad", detail: "La transacción ancla otra raíz." };
+    const onChain = `Raíz ${short(root)} anclada en la transacción ${short(c.anchor_tx)}`;
+    if (!anchor.cid) return { state: "ok", detail: `${onChain}.` };
+    if (anchor.cid !== c.ipfs_cid) return { state: "bad", detail: "La copia en IPFS que nombra la cadena no es la que muestra esta página." };
+    let copy: CertificateDocument;
+    try {
+        const r = await fetch(`${IPFS_GATEWAY.replace(/\/?$/, "/")}${anchor.cid}`);
+        if (!r.ok) throw new Error(String(r.status));
+        copy = await r.json();
+    } catch {
+        return { state: "ok", detail: `${onChain}. No pudimos abrir la copia en IPFS en este momento; inténtalo más tarde.` };
+    }
+    if (copy.id !== c.id || (await certificateRoot(copy.leaves ?? [])) !== root) {
+        return { state: "bad", detail: "La copia en IPFS no da la raíz anclada." };
+    }
+    return { state: "ok", detail: `${onChain}, y la copia permanente en IPFS da la misma raíz.` };
 }
 
 function downloadCsv(c: Certificate) {
@@ -126,8 +144,8 @@ const CertificatePage = () => {
                                         <ShieldCheck className="h-5 w-5 text-eco-emerald" /> Verifícalo tú
                                     </CardTitle>
                                     <CardDescription>
-                                        Tu navegador recalcula la huella de los {c.leaves?.length ?? 0} depósitos y la compara con la que quedó escrita en ZyrcleChain.
-                                        No depende de nuestro servidor.
+                                        Tu navegador recalcula la huella de los {c.leaves?.length ?? 0} depósitos y la compara con la que quedó escrita en ZyrcleChain
+                                        {c.ipfs_cid ? " y con la copia permanente del certificado en IPFS" : ""}. No depende de nuestro servidor.
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent className="space-y-3">
@@ -150,6 +168,14 @@ const CertificatePage = () => {
                                         <p className="text-sm text-red-700 flex items-center gap-2"><XCircle className="h-4 w-4" /> No coincide. {check.detail}</p>
                                     )}
                                     <p className="text-xs text-eco-forest/60 font-mono break-all">Raíz: {c.merkle_root}</p>
+                                    {c.ipfs_url && (
+                                        <p className="text-xs text-eco-forest/70 break-all">
+                                            <a href={c.ipfs_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 underline text-eco-forest">
+                                                Copia permanente en IPFS <ExternalLink className="h-3 w-3" />
+                                            </a>
+                                            <span className="font-mono text-eco-forest/60"> · {c.ipfs_cid}</span>
+                                        </p>
+                                    )}
                                 </CardContent>
                             </Card>
                         </div>

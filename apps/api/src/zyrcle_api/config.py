@@ -95,6 +95,13 @@ class Settings(BaseSettings):
     # Local development only: write emails to the log instead of sending them.
     email_log_only: bool = False
 
+    # A permanent public copy of each impact certificate on IPFS, through Pinata (docs/adr/0027,
+    # amendment of 2026-11-22). No JWT, no copy: certificates are anchored as before.
+    pinata_jwt: str | None = None
+    pinata_api_url: str = "https://api.pinata.cloud"
+    # Where browsers read the copy. The web page's Content-Security-Policy must allow its origin.
+    ipfs_gateway: str = "https://gateway.pinata.cloud/ipfs/"
+
     # Browser origins allowed to call the API (comma-separated), e.g. the demo page.
     cors_origins: str = ""
     # Demo mode: URL of the simulator's control panel. Empty disables the /v1/demo routes.
@@ -119,6 +126,10 @@ class Settings(BaseSettings):
     @property
     def email_enabled(self) -> bool:
         return bool(self.resend_api_key) or self.email_log_only
+
+    @property
+    def ipfs_enabled(self) -> bool:
+        return bool(self.pinata_jwt)
 
     @property
     def recovery_enabled(self) -> bool:

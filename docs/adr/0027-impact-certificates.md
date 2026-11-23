@@ -57,3 +57,53 @@ certificate whose every gram anyone can check.
 - A host sees its numbers grow only as bags are sold, which is slower but defensible.
 - Changing the factors means a new table version; certificates already issued keep theirs.
 - The claim ledger is what a later carbon or plastic credit program (v2) builds on.
+
+## Amendments
+- **2026-11-22, Diego (a permanent public copy on IPFS, through Pinata):** he recalled that the
+  2025 project pinned certificates on IPFS through Pinata ([history](../history.md)) and chose,
+  among the options Claude laid out, to pin each certificate's document and write its CID on chain
+  ("option A"). Claude designed and built it the same day.
+  - **What changes.** Before anchoring, the anchor worker pins the certificate as a JSON document on
+    IPFS through Pinata (`pinJSONToIPFS`, CID version 1) and keeps its CID in `certificate.ipfs_cid`
+    (migration 0013). The anchor's data becomes `ZYRCLE-CERT-2`, the 16-byte certificate id, the
+    32-byte root and the CID as ASCII text. Without a Pinata JWT nothing changes: the worker anchors
+    `ZYRCLE-CERT-1` as before.
+  - **Why.** The certificate stays checkable if Zyrcle's servers disappear. IPFS names a file by the
+    hash of its content (the CID), so the chain says which document it is and any IPFS gateway can
+    serve it; a changed byte would give another CID. The document's own leaves rebuild the anchored
+    root. A host can keep the file, or pin it itself, and needs nothing from Zyrcle to check it.
+  - **The document** (schema `zyrcle-certificate/1`): id, issuer, host, site, period, `issued_at`,
+    totals, `by_material`, the factor table with its version and source, the Merkle rule in words, the
+    root and the leaves. It is built from the database the same way every time, so pinning it again
+    gives the same CID.
+  - **No personal data in it.** A copy on IPFS cannot be recalled once others hold it. The document
+    leaves out the operator's email (`issued_by`). The leaves carry random deposit ids, and only
+    Zyrcle's database links an id to a person: if a participant asks to be deleted (Ley 1581),
+    removing that link leaves the id in the copy anonymous. The legal review of ADR 0028 should
+    confirm this reading.
+  - **Pin first, then anchor.** The CID is stored before the transaction is sent, so a retry after a
+    failed anchor reuses it. If Pinata does not answer, the certificate waits in `issued` and the
+    worker tries again every 30 seconds; the health report shows the queue as stuck (ADR 0028). Once
+    Pinata is configured the worker never anchors without the CID, because an anchor is written once.
+  - **Verification in the browser** takes the CID from the anchor transaction, not from Zyrcle's API,
+    reads the document from the IPFS gateway, and checks that its leaves give the anchored root. If the
+    gateway does not answer, the page still checks against the chain and says the copy could not be
+    opened.
+  - **Only the JWT** is used (`PINATA_JWT` in `deploy/.env`, placed by Diego over SSH, ADR 0022).
+    Pinata's API key and secret pair is not needed. The key should allow pinning only.
+  - **Gateway.** Browsers read from `https://gateway.pinata.cloud/ipfs/` by default; it answers with
+    `Access-Control-Allow-Origin: *`, and the web page's Content-Security-Policy allows it. A dedicated
+    gateway (`<name>.mypinata.cloud`) can replace it by changing `ZYRCLE_IPFS_GATEWAY`,
+    `VITE_IPFS_GATEWAY` and `apps/web/security-headers.conf` together.
+  - **Limits.** The browser trusts the gateway to return the bytes of that CID; it does not recompute
+    the CID, which needs an IPFS library. Anyone in doubt can fetch the same CID from another gateway or
+    their own IPFS node. The copy stays online while someone pins it: if Zyrcle's Pinata account
+    lapses and nobody else pins it, it can disappear from IPFS, while the anchor and the database
+    remain. Pinata's free plan holds about 500 files; at one certificate per host or site a month,
+    that lasts years.
+  - **Code:** [`ipfs.py`](../../apps/api/src/zyrcle_api/ipfs.py),
+    [`impact.py`](../../apps/api/src/zyrcle_api/impact.py) (`AnchorWorker`),
+    [`domain/impact.py`](../../apps/api/src/zyrcle_api/domain/impact.py) (`anchor_data`,
+    `certificate_document`),
+    [`certificate.ts`](../../packages/client/src/certificate.ts) (`anchorData`, `parseAnchor`),
+    [`CertificatePage.tsx`](../../apps/web/src/pages/CertificatePage.tsx).

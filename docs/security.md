@@ -12,7 +12,7 @@ production are [ADR 0022](adr/0022-keys-secrets-and-production-changes.md).
 | Payments | Moving a participant's ZYR | Only an EIP-712 `Execute` signed by the account's own key moves it; the account checks the signature and its nonce; the backend only relays (ADR 0029) |
 | A participant's account | Their balance | Smart account controlled by a key in the phone's secure storage; recovery needs the verified email and waits 48 hours with warnings to the owner (ADR 0010) |
 | Weights | Payment for material never delivered | Signed, sequenced device messages (protocol); verification score; container, collection and bag mass balances that open incidents (ADR 0012, 0013) |
-| A certificate | Claiming impact twice or inventing it | Only sold material, one claim per gram, root anchored on chain and verifiable by anyone (ADR 0027) |
+| A certificate | Claiming impact twice or inventing it | Only sold material, one claim per gram, root anchored on chain and verifiable by anyone; with Pinata on, a permanent copy on IPFS whose CID is on chain too, so it can be checked without Zyrcle (ADR 0027 and its amendment) |
 | Operator powers | Approving deposits, recording sales | Named operator accounts with email codes, sessions checked on every request, every action signed (ADR 0014) |
 
 ## Static analysis of the contracts
@@ -47,3 +47,8 @@ cd chain && ../.slither/bin/slither . --filter-paths "test|lib|dependencies" --e
   (ADR 0028).
 - One VPS and one validator; backups stay on the same machine until an off-site copy is decided
   (ADR 0028).
+- The certificate page trusts the IPFS gateway to return the bytes of the CID read from the chain;
+  it does not recompute the CID. Fetching the same CID from another gateway or an own IPFS node
+  removes that trust (ADR 0027, amendment).
+- A Pinata key from 2025 sat in a public `VITE_*` variable of the old web app ([history](history.md)).
+  It must be revoked in Pinata's dashboard; the rebuild uses a new JWT that stays on the VPS.

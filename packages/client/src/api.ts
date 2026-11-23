@@ -85,6 +85,10 @@ export interface Certificate {
   merkle_root: string;
   status: "issued" | "anchored" | "failed";
   anchor_tx: string | null;
+  /** CID of the certificate's permanent public copy on IPFS, when Pinata is configured. */
+  ipfs_cid: string | null;
+  /** Where a browser can read that copy (the deployment's IPFS gateway). */
+  ipfs_url: string | null;
   issued_by: string;
   created_at: string;
   anchored_at: string | null;

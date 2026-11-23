@@ -8,12 +8,14 @@ import pytest
 
 from zyrcle_api.domain.impact import (
     ANCHOR_PREFIX,
+    ANCHOR_PREFIX_IPFS,
     G_CO2E_PER_KG,
     Leaf,
     anchor_data,
     co2e_g,
     merkle_root,
 )
+from zyrcle_api.ipfs import PinataPin, PinRejected, PinUnavailable
 
 from .helpers import OPS, wait_for, wait_state
 from .test_chain_e2e import deposit
@@ -44,6 +46,32 @@ def test_anchor_data_is_prefix_id_and_root():
     assert data == ANCHOR_PREFIX + cid.bytes + root
     with pytest.raises(ValueError):
         anchor_data(b"short", root)
+
+
+def test_with_an_ipfs_copy_the_anchor_also_carries_its_cid():
+    cid, root = uuid.uuid4(), bytes(range(32))
+    ipfs = "bafkreigh2akiscaildcqabsyg3dfr6chu3fgpregiymsck7e7aqa4s52zy"
+    data = anchor_data(cid.bytes, root, ipfs)
+    assert data == ANCHOR_PREFIX_IPFS + cid.bytes + root + ipfs.encode()
+    for bad in ("short", "bafy/../etc", "bafkrei ñ" + "a" * 20):
+        with pytest.raises(ValueError):
+            anchor_data(cid.bytes, root, bad)
+
+
+async def test_pinata_answers_are_told_apart(pinata):
+    import httpx
+
+    async with httpx.AsyncClient() as http:
+        good = PinataPin(http, pinata.url, pinata.JWT)
+        cid = await good.pin_json({"a": 1}, name="t", keyvalues={})
+        assert cid.startswith("bafkrei") and await good.pin_json({"a": 1}, "t", {}) == cid
+        pinata.fail_next = 1
+        with pytest.raises(PinUnavailable):  # try again later
+            await good.pin_json({"a": 2}, "t", {})
+        with pytest.raises(PinRejected):  # a wrong JWT needs a person
+            await PinataPin(http, pinata.url, "wrong").pin_json({"a": 3}, "t", {})
+        with pytest.raises(PinUnavailable):
+            await PinataPin(http, "http://127.0.0.1:9", "x").pin_json({}, "t", {})
 
 
 async def sell_one_bag(client, settings, bin4, collector, deposits: list[int]) -> list[dict]:
@@ -79,7 +107,7 @@ async def sell_one_bag(client, settings, bin4, collector, deposits: list[int]) -
 
 
 async def test_a_host_certifies_sold_material_once_and_anyone_can_verify_it(
-    client, settings, chain_env, bin4, collector
+    client, settings, chain_env, bin4, collector, pinata
 ):
     made = await sell_one_bag(client, settings, bin4, collector, [8, 4])
     host = next(
@@ -116,9 +144,22 @@ async def test_a_host_certifies_sold_material_once_and_anyone_can_verify_it(
         return (await client.get(f"/v1/certificates/{cert['id']}")).json()["status"] == "anchored"
 
     await wait_for(anchored, timeout=15)
-    tx = (await client.get(f"/v1/certificates/{cert['id']}")).json()["anchor_tx"]
-    data = await chain_env["chain"].transaction_input(tx)
-    assert data == anchor_data(uuid.UUID(cert["id"]).bytes, bytes.fromhex(cert["merkle_root"][2:]))
+    done = (await client.get(f"/v1/certificates/{cert['id']}")).json()
+    data = await chain_env["chain"].transaction_input(done["anchor_tx"])
+    root = bytes.fromhex(cert["merkle_root"][2:])
+    assert data == anchor_data(uuid.UUID(cert["id"]).bytes, root, done["ipfs_cid"])
+    assert data.startswith(b"ZYRCLE-CERT-2")
+
+    # Before anchoring, a public copy was pinned on IPFS; its CID is on chain too. The copy alone
+    # rebuilds the root, and it names no operator: it is permanent.
+    assert done["ipfs_url"] == settings.ipfs_gateway + done["ipfs_cid"]
+    copy = pinata.pins[done["ipfs_cid"]]["pinataContent"]
+    assert copy["schema"] == "zyrcle-certificate/1" and copy["id"] == cert["id"]
+    assert copy["merkle"]["root"] == cert["merkle_root"]
+    copied = [Leaf(x["deposit_id"], x["material"], x["grams"]) for x in copy["leaves"]]
+    assert merkle_root(copied) == root
+    assert copy["factors"]["g_co2e_per_kg"]["pet"] == 1_168
+    assert "issued_by" not in copy and "token" not in str(copy)
 
     listed = (await client.get(f"/v1/hosts/{host['id']}/certificates")).json()
     assert cert["id"] in {c["id"] for c in listed}

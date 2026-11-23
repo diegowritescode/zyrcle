@@ -748,6 +748,9 @@ class Certificate(Base):
     merkle_root: Mapped[str] = mapped_column(String(66))
     status: Mapped[str] = mapped_column(String(16))
     anchor_tx: Mapped[str | None] = mapped_column(String(66))
+    # CID of the public copy on IPFS, pinned before anchoring when Pinata is configured; the
+    # anchor then carries it too (amendment of 2026-11-22).
+    ipfs_cid: Mapped[str | None] = mapped_column(String(100))
     attempts: Mapped[int] = mapped_column(Integer, server_default=text("0"))
     next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_error: Mapped[str | None] = mapped_column(Text)

@@ -35,6 +35,7 @@ flowchart TB
     subgraph External
         EX[Expo push / FCM]
         RS[Resend email]
+        IP[Pinata / IPFS<br/>certificate copies]
         CC[Collection center<br/>buyer, pays in COP]
         BK[Operator's bank]
     end
@@ -46,7 +47,8 @@ flowchart TB
     API --- DB
     API <-->|signed messages| MQ <--> SIM
     API -->|web3| L1 --- T & F
-    API --> EX & RS
+    API --> EX & RS & IP
+    W -. reads certificate copy .-> IP
     Co -->|sealed bags| CC -->|COP| BK -. confirmed by operator .-> W
 ```
 

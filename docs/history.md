@@ -31,7 +31,7 @@ which wrote to a JSON file without authentication.
 | Avalanche, Fuji C-Chain (chain id 43113) for the contracts | `apps/web/src/lib/network.ts` | Replaced by the project's own L1 (ADR 0002) |
 | Three contracts: ZyrcleToken (ERC-20), ZyrcleCertificate (ERC-721), ZyrcleCore | `contracts/`, `deployments.json` | Lost and rebuilt from their ABI in 2026; removed in the rebuild (ADR 0019) |
 | An own L1, ZyrcleChain v1, created and converted to an L1 on 4 May 2025 | P-Chain records | Never used by the app; its validator stopped when its fee balance ran out |
-| Carbon-credit certificates as NFTs, images on IPFS through Pinata | `VITE_API_PINATA_ENV` | The secret sat in a public `VITE_*` variable. The idea returns as impact certificates (roadmap M5) |
+| Carbon-credit certificates as NFTs, images on IPFS through Pinata | `VITE_API_PINATA_ENV` | The secret sat in a public `VITE_*` variable. The idea returns as impact certificates (roadmap M5), with their copy on IPFS through Pinata again (ADR 0027, amendment) and the key kept on the server |
 | Route optimisation for collectors with Gemini | `apps/api/services/gemini.py` | Not carried over; route optimisation is out of v1 scope. The key was rotated |
 | The container: scale, sensors and infrared to check the material, opened from the app at a booked turn | Pitch and design only | Never built. The rebuild simulates it with the same protocol a real one will use (ADR 0016) |
 
@@ -108,6 +108,9 @@ Fuji. The backend moved to FastAPI with Pydantic v2 on Python 3.13. It still ser
   Slither review ([security.md](security.md)).
 - **M6, spending on campus** (`b393faa`, ADR 0029): merchants, QR payments signed by the phone and
   relayed without gas, redemptions of ZYR for pesos, and a Treasury with redemptions (to deploy).
+- **Certificates on IPFS** (ADR 0027, amendment): Diego recalled that the 2025 project kept
+  certificates on IPFS through Pinata and chose to bring that back. Each certificate is now pinned
+  as a JSON document and its CID is anchored with the root, so it can be checked without Zyrcle.
 
 ## Where the old things are
 

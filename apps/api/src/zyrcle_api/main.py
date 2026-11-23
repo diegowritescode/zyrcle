@@ -19,6 +19,7 @@ from .health import AlertWorker
 from .health import report as health_report
 from .impact import AnchorWorker, ImpactService
 from .impact_routes import router as impact_router
+from .ipfs import PinataPin
 from .live import LiveHub
 from .mail import EmailWorker, LogMail, ResendMail
 from .mqtt import MqttBridge
@@ -94,6 +95,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             ),
         ]
         push_http = None
+        pin_http = None
         if settings.push_enabled:
             push_http = httpx.AsyncClient(timeout=10)
             notifier = NotificationWorker(
@@ -126,7 +128,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     _every(settings.settlement_interval_s, settlements.run_once, "settlements")
                 )
             )
-            anchors = AnchorWorker(maker, chain, load_account_file(settings.operator_key_file))  # type: ignore[arg-type]
+            pinata = None
+            if settings.ipfs_enabled:
+                pin_http = httpx.AsyncClient(timeout=30)
+                pinata = PinataPin(pin_http, settings.pinata_api_url, settings.pinata_jwt)  # type: ignore[arg-type]
+            anchors = AnchorWorker(
+                maker,
+                chain,
+                load_account_file(settings.operator_key_file),  # type: ignore[arg-type]
+                pinata,
+                settings.ipfs_gateway,
+            )
             app.state.anchors = anchors
             tasks.append(
                 asyncio.create_task(
@@ -192,6 +204,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 await push_http.aclose()
             if mail_http is not None:
                 await mail_http.aclose()
+            if pin_http is not None:
+                await pin_http.aclose()
             await engine.dispose()
 
     docs = (

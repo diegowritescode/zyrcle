@@ -495,7 +495,7 @@ Operator routes were renamed outright, because only Zyrcle's own tools call them
 
 | Method and path | Returns |
 |---|---|
-| `GET /v1/hosts/{host_id}/certificates` | The host's certificates, newest month first: host, site, period, totals, `by_material`, `merkle_root`, `status`, `anchor_tx` |
+| `GET /v1/hosts/{host_id}/certificates` | The host's certificates, newest month first: host, site, period, totals, `by_material`, `merkle_root`, `status`, `anchor_tx`, `ipfs_cid` and `ipfs_url` (the permanent public copy on IPFS and where to read it; null until pinned or when Pinata is off) |
 | `GET /v1/certificates/{id}` | One certificate plus `leaves: [{deposit_id, material, grams}]`, from which anyone recomputes `merkle_root` (`packages/client/src/certificate.ts` does it in the browser). 404 if unknown |
 
 ### 3.3 Participant

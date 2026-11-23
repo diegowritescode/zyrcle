@@ -177,7 +177,10 @@ Shares: 65 % participants (pro rata to verified grams), 15 % collector, 10 % hos
 
 ## Impact certificate
 
-ADR 0027. Only material that reached a buyer counts, and each gram is claimed once.
+ADR 0027. Only material that reached a buyer counts, and each gram is claimed once. With Pinata
+configured, a public copy is pinned on IPFS first and its CID goes on chain with the root
+(amendment of 2026-11-22); without it, steps 6 and 7 and the IPFS reads are skipped and the data
+starts with `ZYRCLE-CERT-1`.
 
 ```mermaid
 sequenceDiagram
@@ -185,6 +188,7 @@ sequenceDiagram
     actor Op as Operator
     participant API
     participant W as Anchor worker
+    participant P as Pinata / IPFS
     participant L1 as ZyrcleChain
     actor V as Anyone
     Op->>API: preview {host, site?, month}
@@ -192,12 +196,16 @@ sequenceDiagram
     API-->>Op: kg per material, CO2e avoided (EPA WARM v16), Merkle root
     Op->>API: issue
     API->>API: certificate + one impact_claim per deposit, in one transaction
-    W->>L1: transaction to itself, data = ZYRCLE-CERT-1 + certificate id + root
+    W->>P: pin the certificate document (JSON, no personal data)
+    P-->>W: CID, stored before anything goes on chain
+    W->>L1: transaction to itself, data = ZYRCLE-CERT-2 + certificate id + root + CID
     W->>API: anchored, tx hash
     V->>API: GET /v1/certificates/{id} (leaves included)
     V->>V: recompute the root in the browser
     V->>L1: read the anchor transaction from the public RPC
-    V->>V: same root? verified
+    V->>V: same root? verified on chain
+    V->>P: GET gateway/ipfs/CID, the CID read from the chain
+    V->>V: the copy's own leaves give the anchored root too
 ```
 
 ## Paying a campus merchant

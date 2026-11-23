@@ -52,7 +52,7 @@ code format. If a number in the code changes how money, weight or trust is handl
 | [0024](0024-monorepo-tooling.md) | No npm workspaces, shared TS client, StyleSheet on mobile | accepted 2026-11-22, recorded later | Claude |
 | [0025](0025-documentation-as-code.md) | Documentation in the repository, changed with the code | accepted 2026-11-22 | Diego asked; Claude proposed the structure |
 | [0026](0026-v1-scope-and-delivery.md) | v1: one university campus, delivered in two reviewed blocks | accepted 2026-11-22 | Diego (university, two blocks); Claude (scope, milestones) |
-| [0027](0027-impact-certificates.md) | Impact certificates: sold material only, EPA WARM v16, one claim per gram, anchored root | proposed 2026-11-22 | Claude proposed (v1 block 2, M5); Diego asked for host certificates; not yet confirmed |
+| [0027](0027-impact-certificates.md) | Impact certificates: sold material only, EPA WARM v16, one claim per gram, anchored root; amended 2026-11-22 with a permanent copy on IPFS (Pinata) | proposed 2026-11-22 | Claude proposed (v1 block 2, M5); Diego asked for host certificates and chose the IPFS copy; not yet confirmed |
 | [0028](0028-pilot-readiness.md) | Pilot readiness: backups, alerts, consent, production switches | proposed 2026-11-23 | Claude proposed (v1 block 2, M7); several items wait for Diego; not yet confirmed |
 | [0029](0029-closed-loop-payments.md) | Paying campus merchants; redeeming ZYR for pesos; Treasury v3 | proposed 2026-11-23 | Claude proposed (v1 block 2, M6, after ADR 0004); not yet confirmed |
 

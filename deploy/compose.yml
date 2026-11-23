@@ -37,6 +37,9 @@ x-api-env: &api-env
   ZYRCLE_ACCOUNT_FACTORY_ADDRESS: ${ACCOUNT_FACTORY:-}
   ZYRCLE_RESEND_API_KEY: ${RESEND_API_KEY:-}
   ZYRCLE_EMAIL_FROM: ${EMAIL_FROM:-Zyrcle <no-reply@zyrcle.deviego.xyz>}
+  # A permanent public copy of each impact certificate on IPFS (ADR 0027, amendment 2026-11-22).
+  # Empty: certificates are anchored without it.
+  ZYRCLE_PINATA_JWT: ${PINATA_JWT:-}
 
 services:
   postgres:

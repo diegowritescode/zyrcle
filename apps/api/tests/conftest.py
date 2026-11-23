@@ -275,12 +275,79 @@ async def resend() -> FakeResend:
     await task
 
 
+class FakePinata:
+    """Pinata's pinJSONToIPFS endpoint. The CID is a stand-in derived from the content's hash, so
+    the same document always gets the same CID; `fail_next` answers 503 that many times."""
+
+    JWT = "pinata_test_jwt"
+
+    def __init__(self) -> None:
+        self.pins: dict[str, dict] = {}
+        self.fail_next = 0
+        self.url = ""
+
+    def app(self):
+        import hashlib
+        import json
+
+        from fastapi import FastAPI, Request
+        from fastapi.responses import JSONResponse
+
+        api = FastAPI()
+
+        @api.post("/pinning/pinJSONToIPFS")
+        async def pin(request: Request):
+            if request.headers.get("authorization") != f"Bearer {self.JWT}":
+                return JSONResponse({"error": {"reason": "INVALID_CREDENTIALS"}}, status_code=401)
+            if self.fail_next:
+                self.fail_next -= 1
+                return JSONResponse({"error": "busy"}, status_code=503)
+            body = await request.json()
+            if body.get("pinataOptions", {}).get("cidVersion") != 1 or "pinataContent" not in body:
+                return JSONResponse({"error": "bad body"}, status_code=400)
+            digest = hashlib.sha256(
+                json.dumps(body["pinataContent"], sort_keys=True).encode()
+            ).hexdigest()
+            cid = "bafkrei" + digest[:52]
+            duplicate = cid in self.pins
+            self.pins[cid] = body
+            return {"IpfsHash": cid, "PinSize": 1, "Timestamp": "", "isDuplicate": duplicate}
+
+        return api
+
+
+@pytest.fixture(scope="session")
+async def pinata() -> FakePinata:
+    import socket
+
+    import uvicorn
+
+    fake = FakePinata()
+    sock = socket.socket()
+    sock.bind(("127.0.0.1", 0))
+    port = sock.getsockname()[1]
+    sock.close()
+    server = uvicorn.Server(uvicorn.Config(fake.app(), port=port, log_level="warning"))
+    task = asyncio.create_task(server.serve())
+    await wait_for(lambda: server.started, timeout=5)
+    fake.url = f"http://127.0.0.1:{port}"
+    yield fake
+    server.should_exit = True
+    await task
+
+
 @pytest.fixture(scope="session")
 def settings(
-    chain_env: dict, simulator_control: str, expo: FakeExpo, resend: FakeResend
+    chain_env: dict,
+    simulator_control: str,
+    expo: FakeExpo,
+    resend: FakeResend,
+    pinata: FakePinata,
 ) -> Settings:
     return Settings(
         account_factory_address=chain_env["factory"],
+        pinata_api_url=pinata.url,
+        pinata_jwt=FakePinata.JWT,
         resend_api_url=resend.url,
         resend_api_key="re_test_key",
         email_interval_s=0.2,

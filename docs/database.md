@@ -927,6 +927,7 @@ each deposit got); `notify_settlement` in [`notifications.py`][notifications].
 | `merkle_root` | varchar(66) | no | `0x` + sha256 root of the leaves. |
 | `status` | varchar(16) | no | `issued`, `anchored`, `failed`. |
 | `anchor_tx` | varchar(66) | yes | The transaction whose data carries the root. |
+| `ipfs_cid` | varchar(100) | yes | CID of the public copy pinned on IPFS before anchoring, when Pinata is configured; the anchor then carries it too ([amendment of 2026-11-22](adr/0027-impact-certificates.md#amendments)). |
 | `attempts`, `next_attempt_at`, `last_error` | | | Anchor worker bookkeeping. |
 | `issued_by` | varchar(254) | no | The operator's email, or `token`. |
 | `created_at`, `anchored_at` | timestamptz | | |
@@ -1557,6 +1558,7 @@ Until a worker runs, its rows stay `pending`.
 | [`0006`][m0006] | 2026-11-22 | `bag`, `collector`, `collection` with `one_active_collection_per_container`, `collection_fill` with `one_open_fill_per_collection`, `incident`; `deposit_session.collection_id`. | [ADR 0012][adr-0012] |
 | [`0007`][m0007] | 2026-11-22 | `sale`, `sale_line`, `settlement` with `one_settlement_per_party`. | [ADR 0013][adr-0013] |
 | [`0008`][m0008] | 2026-11-22 | `operator`, `operator_code`. | [ADR 0014][adr-0014] |
+| [`0013`][m0013] | 2026-11-23 | `certificate.ipfs_cid`: the CID of the certificate's public copy on IPFS. | [ADR 0027, amendment](adr/0027-impact-certificates.md#amendments) |
 | [`0012`][m0012] | 2026-11-23 | `merchant`, `payment_request` with `one_payment_in_flight_per_payer`, `redemption_request`. | [ADR 0029](adr/0029-closed-loop-payments.md) |
 | [`0011`][m0011] | 2026-11-23 | `resident.privacy_version`, `privacy_accepted_at`: the data-processing policy each participant accepted. | [ADR 0028](adr/0028-pilot-readiness.md) |
 | [`0010`][m0010] | 2026-11-22 | `certificate`, `impact_claim` with `one_claim_per_deposit_attribute`. | [ADR 0027](adr/0027-impact-certificates.md) |
@@ -1724,6 +1726,7 @@ Found on 2026-11-22 by comparing the code with its comments, docstrings and ADRs
 [m0010]: ../apps/api/migrations/versions/0010_impact_certificates.py
 [m0011]: ../apps/api/migrations/versions/0011_privacy_consent.py
 [m0012]: ../apps/api/migrations/versions/0012_merchants_payments_redemptions.py
+[m0013]: ../apps/api/migrations/versions/0013_certificate_ipfs_cid.py
 [adr-0002]: adr/0002-own-avalanche-l1.md
 [adr-0003]: adr/0003-advance-and-settlement.md
 [adr-0005]: adr/0005-device-link-mqtt.md
