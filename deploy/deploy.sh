@@ -64,6 +64,7 @@ if [ ! -f .env ]; then
       -e "s|^MQTT_CTR_0004_PASSWORD=.*|MQTT_CTR_0004_PASSWORD=$(secret 24)|" \
       -e "s|^ORACLE_KEY_PATH=.*|ORACLE_KEY_PATH=$HOME/.avalanche-cli/key/zyrcle-oracle.pk|" \
       -e "s|^OPERATOR_KEY_PATH=.*|OPERATOR_KEY_PATH=$HOME/.avalanche-cli/key/zyrcle-operator.pk|" \
+      -e "s|^GUARDIAN_KEY_PATH=.*|GUARDIAN_KEY_PATH=$HOME/.avalanche-cli/key/zyrcle-oracle.pk|" \
       -e "s|^DEPLOY_UID=.*|DEPLOY_UID=$(id -u)|" -e "s|^DEPLOY_GID=.*|DEPLOY_GID=$(id -g)|" \
       .env.example > .env
   echo "created deploy/.env with fresh secrets"
@@ -71,6 +72,11 @@ fi
 # The web app replaced the minimal demo page (same domain): carry over an older .env.
 sed -i.bak -e "s|^ZYRCLE_DEMO_TAG=|ZYRCLE_WEB_TAG=|" -e "s|^DEMO_HOST=|WEB_HOST=|" .env && rm -f .env.bak
 grep -q '^ZYRCLE_API_IMAGE=' .env || echo 'ZYRCLE_API_IMAGE=' >> .env
+# Until the guardian has its own key (runbook 9.13), it is the oracle key, as before ADR 0040.
+if ! grep -q '^GUARDIAN_KEY_PATH=' .env; then
+  oracle_line="$(grep '^ORACLE_KEY_PATH=' .env)"
+  echo "GUARDIAN_${oracle_line#ORACLE_}" >> .env
+fi
 grep -q '^ZYRCLE_WEB_IMAGE=' .env || echo 'ZYRCLE_WEB_IMAGE=' >> .env
 sed -i.bak -e "s|^ZYRCLE_API_TAG=.*|ZYRCLE_API_TAG=$api_tag|" \
   -e "s|^ZYRCLE_WEB_TAG=.*|ZYRCLE_WEB_TAG=$web_tag|" \

@@ -31,6 +31,9 @@ x-api-env: &api-env
   # The Treasury's OPERATOR_ROLE key: records a sale once an operator confirmed the bank match
   # (ADR 0013).
   ZYRCLE_OPERATOR_KEY_FILE: /run/secrets/operator.key
+  # The AccountFactory guardian: starts recoveries and relays signed payments (ADR 0010, 0029, 0040).
+  # deploy.sh points GUARDIAN_KEY_PATH at the oracle key until the guardian has its own.
+  ZYRCLE_GUARDIAN_KEY_FILE: /run/secrets/guardian.key
   # Interactive API docs are for development (ADR 0028).
   ZYRCLE_DOCS_ENABLED: "false"
   # Only if "enhanced security for push notifications" is on in the Expo project (ADR 0008).
@@ -99,6 +102,7 @@ services:
     volumes:
       - ${ORACLE_KEY_PATH:?}:/run/secrets/oracle.key:ro
       - ${OPERATOR_KEY_PATH:?set OPERATOR_KEY_PATH in deploy/.env (ADR 0013)}:/run/secrets/operator.key:ro
+      - ${GUARDIAN_KEY_PATH:?run deploy/deploy.sh, which sets GUARDIAN_KEY_PATH}:/run/secrets/guardian.key:ro
     depends_on:
       postgres: { condition: service_healthy }
       mosquitto: { condition: service_started }

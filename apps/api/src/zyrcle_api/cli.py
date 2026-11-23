@@ -10,6 +10,7 @@
   zyrcle-api chain fund --from-key-file F --to 0x.. --amount-zyr N            gas for a key
   zyrcle-api chain balance --address 0x..                                     native ZYR balance
   zyrcle-api demo seed --keys-dir DIR --devices ctr-0001,ctr-0002            register demo bins
+  zyrcle-api keys new --out FILE                                             new key file, 0600
 
 Chain commands use ZYRCLE_CHAIN_RPC_URL and, except deploy, fund and balance,
 ZYRCLE_TREASURY_ADDRESS (minter-revoke refuses to revoke that one);
@@ -21,6 +22,7 @@ process arguments.
 import argparse
 import asyncio
 import os
+import pathlib
 from decimal import Decimal
 
 import uvicorn
@@ -104,6 +106,19 @@ async def _chain(args: argparse.Namespace) -> None:
             print(f"{k:24} {v:>16,}")
 
 
+def new_key_file(path: pathlib.Path) -> str:
+    """A fresh key in a file only its owner can read. The key itself is never printed."""
+    from eth_account import Account
+
+    if path.exists():
+        raise SystemExit(f"{path} exists; not overwritten")
+    account = Account.create()
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "w") as f:
+        f.write(account.key.hex() + "\n")
+    return account.address
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="zyrcle-api")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -137,6 +152,9 @@ def main() -> None:
         accounts.add_argument("--admin-key-file", required=True)
         accounts.add_argument("--guardian", required=True, help="address of the guardian key")
 
+    keys = sub.add_parser("keys").add_subparsers(dest="action", required=True)
+    new_key = keys.add_parser("new", help="write a new key to a 0600 file, print its address")
+    new_key.add_argument("--out", required=True)
     demo = sub.add_parser("demo").add_subparsers(dest="action", required=True)
     demo_seed = demo.add_parser("seed")
     demo_seed.add_argument("--keys-dir", required=True)
@@ -151,9 +169,9 @@ def main() -> None:
             proxy_headers=True,
             forwarded_allow_ips="*",
         )
+    elif args.cmd == "keys":
+        print(new_key_file(pathlib.Path(args.out)))
     elif args.cmd == "demo":
-        import pathlib
-
         from .demo_seed import seed
 
         devices = [d.strip() for d in args.devices.split(",") if d.strip()]

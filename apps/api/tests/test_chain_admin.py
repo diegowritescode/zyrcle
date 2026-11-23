@@ -7,7 +7,7 @@ import sys
 
 from eth_account import Account
 
-from zyrcle_api.chain import load_account
+from zyrcle_api.chain import load_account, load_account_file
 
 from .conftest import ANVIL_KEYS
 
@@ -58,3 +58,25 @@ async def test_minter_revoke_retires_an_old_treasury_but_never_the_current_one(c
     r = cli(chain_env, "minter-revoke", "--admin-key-file", str(admin_file), "--address", current)
     assert r.returncode != 0 and "in use" in r.stderr
     assert await chain.minting_role(current) == 1
+
+
+def test_a_new_key_file_is_private_and_only_its_address_is_printed(tmp_path):
+    out = tmp_path / "guardian.pk"
+    r = subprocess.run(
+        [sys.executable, "-m", "zyrcle_api.cli", "keys", "new", "--out", str(out)],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert r.returncode == 0, r.stderr
+    address = r.stdout.strip()
+    assert oct(out.stat().st_mode & 0o777) == "0o600"
+    assert load_account_file(str(out)).address == address
+    assert out.read_text().strip() not in r.stdout
+    again = subprocess.run(
+        [sys.executable, "-m", "zyrcle_api.cli", "keys", "new", "--out", str(out)],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert again.returncode != 0 and "not overwritten" in again.stderr

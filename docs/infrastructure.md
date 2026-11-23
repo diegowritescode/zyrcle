@@ -400,7 +400,7 @@ has none). Unknown variables are ignored. "Default" means the column is not set 
 | `ZYRCLE_NOTIFICATION_INTERVAL_S` | `2.0` | default | no | Push worker interval. |
 | `ZYRCLE_PUSH_RECEIPT_DELAY_S` | `900` | default | no | When to ask Expo for delivery receipts (15 min). |
 | `ZYRCLE_ACCOUNT_FACTORY_ADDRESS` | none | `${ACCOUNT_FACTORY:-}` | no | AccountFactory address. Empty turns smart accounts and recovery off ([ADR 0010](adr/0010-smart-accounts-and-recovery.md)). |
-| `ZYRCLE_GUARDIAN_KEY_FILE` | none, falls back to the oracle key | not set | the file is | Key that starts and cancels recoveries. Compose does not set it, so production uses the oracle key. |
+| `ZYRCLE_GUARDIAN_KEY_FILE` | none, falls back to the oracle key | `/run/secrets/guardian.key`, from `GUARDIAN_KEY_PATH` | the file is | The AccountFactory guardian: starts and cancels recoveries, relays signed payments. `GUARDIAN_KEY_PATH` points at the oracle key until runbook 9.13 ([ADR 0040](adr/0040-keys-guardian-and-multisig.md)). |
 | `ZYRCLE_RECOVERY_INTERVAL_S` | `5.0` | default | no | Recovery worker interval. |
 | `ZYRCLE_RESEND_API_KEY` | none | `${RESEND_API_KEY:-}` | yes | Resend key. Without it, no email: no codes, no recovery, no operator sign-in. |
 | `ZYRCLE_RESEND_API_URL` | `https://api.resend.com` | default | no | Resend API base URL. |
@@ -1182,6 +1182,28 @@ infra/l1/scripts/zyrcle-api-docker.sh chain fund --from-key-file /keys/zyrcle-l1
 
 It is a transaction on Fuji and needs Diego's approval. The float is finite; minting more gas with
 the admin key would create ZYR without backing, so it is not done.
+
+### 9.13 Give the guardian its own key
+
+The AccountFactory guardian starts lost-phone recoveries and relays signed payments (ADR 0010,
+0029). It shared the oracle key; [ADR 0040](adr/0040-keys-guardian-and-multisig.md) gives it its own.
+`deploy.sh` points `GUARDIAN_KEY_PATH` at the oracle key until this runbook runs. It is a Fuji
+transaction and needs Diego's approval.
+
+```bash
+cd ~/apps/zyrcle
+W=infra/l1/scripts/zyrcle-api-docker.sh
+$W keys new --out /keys/zyrcle-guardian.pk          # prints only the new address
+$W chain fund --from-key-file /keys/zyrcle-l1-admin.pk --to <new address> --amount-zyr 10
+$W chain accounts-guardian --admin-key-file /keys/zyrcle-l1-admin.pk --guardian <new address>
+sed -i "s|^GUARDIAN_KEY_PATH=.*|GUARDIAN_KEY_PATH=$HOME/.avalanche-cli/key/zyrcle-guardian.pk|" deploy/.env
+deploy/deploy.sh <api-sha> <web-sha>                # the API now relays with the new key
+```
+
+Record the address in `infra/l1/fuji.env` (`ACCOUNT_GUARDIAN`) and in the offline inventory. The
+health report then shows the guardian's gas next to the oracle's and the operator's. Recoveries
+already started by the old guardian finish normally: the account checks the guardian when a
+recovery starts, not later.
 
 ## 10. Known gaps and risks
 

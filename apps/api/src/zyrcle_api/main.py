@@ -170,6 +170,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             gas_keys["oráculo"] = load_account_file(settings.oracle_key_file).address  # type: ignore[arg-type]
         if settings.sales_enabled:
             gas_keys["operador"] = load_account_file(settings.operator_key_file).address  # type: ignore[arg-type]
+        if settings.accounts_enabled and settings.guardian_key_file:
+            guardian_address = load_account_file(settings.guardian_key_file).address
+            if guardian_address != gas_keys.get("oráculo"):
+                gas_keys["guardián"] = guardian_address
 
         async def snapshot():
             return await health_report(maker, settings, chain, gas_keys, bridge.connected.is_set())

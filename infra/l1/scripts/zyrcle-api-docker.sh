@@ -10,11 +10,14 @@ repo="$(cd "$(dirname "$0")/../../.." && pwd)"
 # shellcheck source-path=SCRIPTDIR/.. source=fuji.env
 source "$repo/infra/l1/fuji.env"
 rpc="http://127.0.0.1:9650/ext/bc/${BLOCKCHAIN_ID}/rpc"
+# `keys new` writes a key file, so only it gets the key folder writable.
+keys_mode=ro
+[ "${1:-}" = "keys" ] && keys_mode=rw
 run() {
   docker run -i --rm --network host --user "$(id -u):$(id -g)" -e HOME=/tmp \
     -e ZYRCLE_CHAIN_RPC_URL="$rpc" -e ZYRCLE_TREASURY_ADDRESS="$TREASURY" \
     -e ZYRCLE_ACCOUNT_FACTORY_ADDRESS="${ACCOUNT_FACTORY:-}" \
-    -v "$repo:/repo" -v "$HOME/.avalanche-cli/key:/keys:ro" -w /repo/apps/api \
+    -v "$repo:/repo" -v "$HOME/.avalanche-cli/key:/keys:$keys_mode" -w /repo/apps/api \
     python:3.13-slim "$@"
 }
 if [ ! -x "$repo/apps/api/.venv-docker/bin/zyrcle-api" ]; then
