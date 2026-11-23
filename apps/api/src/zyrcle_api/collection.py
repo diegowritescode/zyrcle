@@ -501,8 +501,10 @@ class CollectionService:
     async def _close_fill(self, db: AsyncSession, c: Collection, fill: CollectionFill) -> None:
         end = c.last_weight_g if c.last_weight_g is not None else fill.start_g
         fill.end_g = end
-        # Readings carry a few grams of noise: a bag never weighs less than nothing.
-        fill.grams = max(fill.start_g - end, 0)
+        # Readings carry a few grams of noise either way: below the same threshold that tells
+        # material is going in, nothing came out.
+        taken = fill.start_g - end
+        fill.grams = taken if taken >= self._s.weight_change_g else 0
         fill.done_at = c.last_activity_at = c.updated_at = self._now()
         if fill.bag_id is not None:
             bag = await db.get(Bag, fill.bag_id, with_for_update=True)

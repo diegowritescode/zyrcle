@@ -96,7 +96,7 @@ async def chain_env(anvil: str, tmp_path_factory) -> dict:
     key_file.write_text(ANVIL_KEYS["oracle"])
     operator_file = key_file.parent / "operator.key"
     operator_file.write_text(ANVIL_KEYS["operator"])
-    return {
+    yield {
         "rpc": anvil,
         "treasury": address,
         "factory": factory,
@@ -104,6 +104,7 @@ async def chain_env(anvil: str, tmp_path_factory) -> dict:
         "operator_key_file": str(operator_file),
         "chain": chain,
     }
+    await chain.w3.provider.disconnect()
 
 
 SIM_RUNNERS: dict = {}  # filled by the devices fixture, served by the simulator control panel
