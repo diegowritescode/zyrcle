@@ -8,7 +8,8 @@ export function startErrorReports(dsn: string, release: string | undefined) {
         dsn,
         release,
         environment: import.meta.env.MODE,
-        sendDefaultPii: false,
+        // Nothing about the person or the request leaves the browser; scrubReport cleans the rest.
+        dataCollection: { userInfo: false, cookies: false, httpHeaders: false, httpBodies: [], urlQueryParams: false },
         beforeSend: (event) => scrubReport(event),
         beforeBreadcrumb: (crumb) => scrubReport(crumb),
     });

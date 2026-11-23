@@ -52,7 +52,7 @@ export function Centers() {
                 </div>
                 <Button type="submit" disabled={!name.trim()}>Agregar centro</Button>
             </form>
-            {!centers.data ? <Loading /> : centers.data.length === 0 ? <Empty text="Aún no hay centros de acopio." /> : (
+            {!centers.data ? <Loading /> : centers.data.length === 0 ? <Empty>Aún no hay centros de acopio.</Empty> : (
                 <div className="space-y-6">
                     {centers.data.map((c) => <CenterCard key={c.id} center={c} sites={sites.data ?? []} />)}
                 </div>

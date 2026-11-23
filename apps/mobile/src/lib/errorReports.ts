@@ -12,6 +12,8 @@ export function startErrorReports(): boolean {
   Sentry.init({
     dsn: SENTRY_DSN,
     release: `zyrcle@${Constants.expoConfig?.version ?? "dev"}`,
+    // Nothing about the person leaves the phone (this SDK still uses sendDefaultPii); scrubReport
+    // cleans the rest.
     sendDefaultPii: false,
     beforeSend: (event) => scrubReport(event),
     beforeBreadcrumb: (crumb) => scrubReport(crumb),
