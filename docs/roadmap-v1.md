@@ -110,7 +110,7 @@ H  Weighing station: hardware track, in parallel
   - Exports a sustainability office can use.
 - **Done when:** a host downloads a certificate, opens its verification link and sees it check out
   against the chain. A second certificate over the same grams is refused.
-- **Decision:** [ADR 0027](adr/0027-impact-certificates.md), impact certificates. Built in block 2.
+- **Decision:** [ADR 0027](adr/0027-impact-certificates.md), impact certificates. Built in block 2, deployed on 2026-11-23 with the IPFS copy (amendment).
 - **Not in v1:** tradable carbon or plastic credits. They need an approved methodology, an
   accredited third-party audit, registration (RENARE in Colombia) and a scale no single campus
   reaches. The path is one Zyrcle program aggregating every site, with revenue shared with the
@@ -125,7 +125,7 @@ H  Weighing station: hardware track, in parallel
   - Only businesses go through KYC.
 - **Done when:** in the demo, a participant buys something at a simulated campus merchant, and the
   merchant's redemption appears in the Treasury and the reconciliation.
-- **Decision:** [ADR 0029](adr/0029-closed-loop-payments.md). Built in block 2; needs the Treasury redeployed.
+- **Decision:** [ADR 0029](adr/0029-closed-loop-payments.md). Built in block 2; deployed on 2026-11-23 with Treasury v3.
 
 ### M7. Pilot readiness
 - **Why:** none of the above should touch a real person's data or money without this.
@@ -140,7 +140,7 @@ H  Weighing station: hardware track, in parallel
   - Static analysis of the contracts, and a review of how the oracle and guardian keys are held.
   - A decision on the chain for real value: Fuji, or an L1 on mainnet and what it costs per month.
 - **Done when:** the checklist is complete and the host has approved the pilot.
-- **Decision:** [ADR 0028](adr/0028-pilot-readiness.md). Built in block 2: backups with a restore check, health and alerts, consent, production switches, Slither review. Waiting for Diego: cron, off-site copy, lawyer, Play account, chain decision.
+- **Decision:** [ADR 0028](adr/0028-pilot-readiness.md). Built in block 2: backups with a restore check, health and alerts, consent, production switches, Slither review. Daily backup cron installed on 2026-11-23. Waiting for Diego: off-site copy, lawyer, Play account, chain decision.
 
 ### H. Weighing station (hardware track, in parallel)
 - **Why:** an autonomous container with a camera and NIR is the long-term design, but the pilot

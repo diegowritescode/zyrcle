@@ -22,7 +22,7 @@ python3 export-artifacts.py   # refresh the ABI/bytecode the backend deploys (CI
 
 | | |
 |---|---|
-| Treasury | `0xBc5035341C075CBd75508ff1a3a5EC0241e58201` (on the NativeMinter allow list), with the host share ([ADR 0013](../docs/adr/0013-sale-and-settlement.md)). The first one, `0xB843946A42F2791B8b932F8c0205C9D277E351B1`, is no longer used |
+| Treasury | `0xd7052201140224018b123ecFF7b83B4251790Aeb` (on the NativeMinter allow list), with the host share ([ADR 0013](../docs/adr/0013-sale-and-settlement.md)) and redemptions ([ADR 0029](../docs/adr/0029-closed-loop-payments.md)). The earlier ones, `0xBc5035341C075CBd75508ff1a3a5EC0241e58201` and `0xB843946A42F2791B8b932F8c0205C9D277E351B1`, are no longer used and can no longer mint |
 | Operator | `0x528815e03Aa80b045B32840f3e26B394D0838d0d` |
 | Oracle (backend) | `0xd3cBCecC587Bd5f9504bFdea1D3B7e198E66ca50` |
 | Shares | 65% residents, 15% collector, 10% host, 10% operations ([ADR 0013](../docs/adr/0013-sale-and-settlement.md)) |

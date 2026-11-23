@@ -112,6 +112,15 @@ Fuji. The backend moved to FastAPI with Pydantic v2 on Python 3.13. It still ser
   certificates on IPFS through Pinata and chose to bring that back. Each certificate is now pinned
   as a JSON document and its CID is anchored with the root, so it can be checked without Zyrcle.
 
+## 23 November 2026: block 2 deployed
+
+With Diego's approval, naming each step: the commits pushed to `main`; a database backup checked by
+restoring it; Treasury v3 with redemptions deployed on ZyrcleChain
+(`0xd7052201140224018b123ecFF7b83B4251790Aeb`) and the simulated seed recorded again; migrations
+`0010` to `0013` and the images of `a3f395e` deployed; 20 ZYR of gas each for the oracle and operator
+keys; the two earlier Treasuries taken off the NativeMinter allow list; the daily backup installed in
+cron. Diego placed the Pinata JWT on the server himself.
+
 ## Where the old things are
 
 | What | Where |
@@ -121,3 +130,4 @@ Fuji. The backend moved to FastAPI with Pydantic v2 on Python 3.13. It still ser
 | Hackathon contracts (2026 rebuild of them) | Fuji C-Chain, addresses in `contracts/deployments.json` at tag `v0-hackathon` |
 | ZyrcleChain v1 (2025) | Fuji P-Chain, inactive |
 | Treasury before the host share | `0xB843946A42F2791B8b932F8c0205C9D277E351B1` on ZyrcleChain v2, replaced on 2026-11-22 by `0xBc5035341C075CBd75508ff1a3a5EC0241e58201` (ADR 0013) |
+| Treasury before redemptions | `0xBc5035341C075CBd75508ff1a3a5EC0241e58201`, replaced on 2026-11-23 by `0xd7052201140224018b123ecFF7b83B4251790Aeb` (ADR 0029). Both old ones are off the NativeMinter allow list |
