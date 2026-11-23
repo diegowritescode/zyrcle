@@ -7,7 +7,7 @@ import pytest
 from sqlalchemy import func, select, update
 
 from zyrcle_api.models import Notification, PushToken
-from zyrcle_api.notifications import enqueue
+from zyrcle_api.notifications import enqueue, pesos
 
 from .helpers import OPS, headers, qr, sign_in, wait_for, wait_state
 from .test_chain_e2e import deposit, wait_payout
@@ -69,7 +69,7 @@ async def test_a_paid_deposit_reaches_the_residents_phone(app, client, devices, 
     await wait_for(lambda: expo.to(token), timeout=5)
 
     [message] = expo.to(token)
-    assert message["title"] == f"Te pagamos ${payout.amount_cop}"
+    assert message["title"] == f"Te pagamos {pesos(payout.amount_cop)}"
     assert "latas en Contenedor ctr-0002" in message["body"]
     assert message["channelId"] == "payments" and message["sound"] == "default"
     assert message["data"]["url"] == "/history"

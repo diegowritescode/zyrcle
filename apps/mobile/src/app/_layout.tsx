@@ -7,6 +7,9 @@ import { RetiredGate } from "@/account/RetiredGate";
 import { colors } from "@/ui/theme";
 import { NotificationsProvider } from "@/notifications/NotificationsProvider";
 import { WalletProvider } from "@/wallet/WalletProvider";
+import { startErrorReports } from "@/lib/errorReports";
+
+startErrorReports();
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 5_000, refetchOnWindowFocus: false } },

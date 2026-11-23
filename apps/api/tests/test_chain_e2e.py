@@ -1,5 +1,6 @@
 """Deposits that end as ZYR in the resident's wallet: API + simulator + Treasury on anvil."""
 
+import asyncio
 import uuid
 
 import pytest
@@ -15,9 +16,15 @@ pytestmark = pytest.mark.integration
 
 
 async def deposit(client, resident, runner, material, item, count, finish=True):
-    r = await client.post(
-        "/v1/sessions", json={"qr": qr(runner), "material": material}, headers=headers(resident)
-    )
+    # The code on the screen rotates every few seconds in tests; under load it can turn over between
+    # reading it and posting it. A person would scan again, and so does the test.
+    for _ in range(3):
+        r = await client.post(
+            "/v1/sessions", json={"qr": qr(runner), "material": material}, headers=headers(resident)
+        )
+        if not (r.status_code == 403 and "scan the container again" in r.text):
+            break
+        await asyncio.sleep(1)
     assert r.status_code == 201, r.text
     session = r.json()
     await wait_state(client, resident, session["id"], "open")

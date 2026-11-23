@@ -1,0 +1,72 @@
+name: Uptime
+
+# Every 10 minutes, from outside the VPS (ADR 0033): the API answers and is connected to the broker,
+# the web app answers, and the public RPC answers. A failure opens an issue labelled "uptime", which
+# GitHub notifies to the repository's owner; the next healthy check closes it. GitHub may delay
+# scheduled runs by some minutes, and pauses them after 60 days without activity in the repository.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: uptime
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      API: https://zyrcle-backend.deviego.xyz
+      WEB: https://zyrcle.deviego.xyz
+      RPC: https://rpc.zyrcle.deviego.xyz/ext/bc/hXdnq6H8N9gH3o5cpKWGMzspesNyogKjuDwZESQhQNNtM5jN8/rpc
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check the API, the web app and the RPC
+        id: check
+        run: |
+          problems=()
+          health=$(curl -s -m 15 "$API/health" || true)
+          echo "$health" | grep -q '"ok":true' || problems+=("La API no responde bien: ${health:-sin respuesta}")
+          echo "$health" | grep -q '"mqtt":true' || problems+=("La API no está conectada al broker MQTT.")
+          web=$(curl -s -o /dev/null -m 15 -w '%{http_code}' "$WEB/" || true)
+          [ "$web" = "200" ] || problems+=("La web responde ${web:-nada} en lugar de 200.")
+          block=$(curl -s -m 15 -X POST -H 'content-type: application/json' \
+            --data '{"jsonrpc":"2.0","id":1,"method":"eth_blockNumber","params":[]}' "$RPC" || true)
+          echo "$block" | grep -q '"result":"0x' || problems+=("El RPC público de ZyrcleChain no responde: ${block:-sin respuesta}")
+          {
+            echo "problems<<EOF"
+            printf -- '- %s\n' "${problems[@]}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+          echo "count=${#problems[@]}" >> "$GITHUB_OUTPUT"
+          printf '%s\n' "${problems[@]}"
+      - name: Open or update the issue
+        if: steps.check.outputs.count != '0'
+        env:
+          PROBLEMS: ${{ steps.check.outputs.problems }}
+        run: |
+          gh label create uptime --repo "$GITHUB_REPOSITORY" --color B60205 \
+            --description "Zyrcle is not answering (uptime workflow)" 2>/dev/null || true
+          open=$(gh issue list --repo "$GITHUB_REPOSITORY" --label uptime --state open --json number --jq '.[0].number')
+          body="$(date -u +%Y-%m-%dT%H:%M:%SZ): $PROBLEMS"
+          if [ -n "$open" ]; then
+            gh issue comment "$open" --repo "$GITHUB_REPOSITORY" --body "$body"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --label uptime \
+              --title "Zyrcle no responde" --body "$body
+
+          Runbook: docs/infrastructure.md, 9.9 The API is unhealthy."
+          fi
+          exit 1
+      - name: Close the issue once it answers again
+        if: steps.check.outputs.count == '0'
+        run: |
+          for n in $(gh issue list --repo "$GITHUB_REPOSITORY" --label uptime --state open --json number --jq '.[].number'); do
+            gh issue close "$n" --repo "$GITHUB_REPOSITORY" --comment "Responde de nuevo: $(date -u +%Y-%m-%dT%H:%M:%SZ)."
+          done

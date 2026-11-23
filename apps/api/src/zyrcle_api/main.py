@@ -24,6 +24,7 @@ from .live import LiveHub
 from .mail import EmailWorker, LogMail, ResendMail
 from .mqtt import MqttBridge
 from .notifications import ExpoPush, NotificationWorker
+from .observability import start_error_reports
 from .operator_auth import router as operator_router
 from .payment_routes import router as payment_router
 from .payments import PaymentService, RelayWorker
@@ -48,6 +49,7 @@ async def _every(seconds: float, job, name: str) -> None:
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
+    start_error_reports(settings)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):

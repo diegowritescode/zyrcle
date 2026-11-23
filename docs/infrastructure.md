@@ -384,6 +384,8 @@ has none). Unknown variables are ignored. "Default" means the column is not set 
 | `ZYRCLE_CHAIN_RPC_URL` | none | `http://zyrcle-l1-node-1:9650/ext/bc/${BLOCKCHAIN_ID}/rpc` | no | ZyrcleChain JSON-RPC endpoint, reached over `edge`. |
 | `ZYRCLE_TREASURY_ADDRESS` | none | `${TREASURY}` | no | Treasury contract address. |
 | `ZYRCLE_ORACLE_KEY_FILE` | none | `/run/secrets/oracle.key` | the file is | Path to the hex private key with the Treasury's ORACLE_ROLE. |
+| `ZYRCLE_SENTRY_DSN` | none | `${SENTRY_DSN_API:-}` | no | Sentry DSN of the API's project. Empty: no error reports ([ADR 0033](adr/0033-error-reports-and-uptime.md)). |
+| `ZYRCLE_RELEASE` | none | `${ZYRCLE_API_TAG:-}` | no | The deployed commit, named in error reports. |
 | `ZYRCLE_CHAIN_HEALTH_URL` | none | `http://zyrcle-l1-node-1:9650/ext/health` | no | The validator node's health endpoint, checked by the health report ([ADR 0028, amendment](adr/0028-pilot-readiness.md#amendments)). Unset: not checked. |
 | `ZYRCLE_OPERATOR_KEY_FILE` | none | `/run/secrets/operator.key` | the file is | Path to the hex private key with the Treasury's OPERATOR_ROLE. Without it, confirmed sales wait. |
 | `ZYRCLE_SETTLEMENT_INTERVAL_S` | `3.0` | default | no | Settlement worker interval. |
@@ -470,6 +472,7 @@ Both clients bake their settings in at build time. A different deployment needs 
 | `VITE_CHAIN_ID` | `EXPO_PUBLIC_CHAIN_ID` | `20261121` | `ZYRCLE_CHAIN_ID` |
 | `VITE_RPC_URL` | `EXPO_PUBLIC_RPC_URL` | the public RPC URL above | `BLOCKCHAIN_ID` |
 | `VITE_TREASURY_ADDRESS` | none | `0xd7052201140224018b123ecFF7b83B4251790Aeb` | `TREASURY` |
+| `VITE_SENTRY_DSN` | `EXPO_PUBLIC_SENTRY_DSN` | empty (error reports off) | repository variable `SENTRY_DSN_WEB` for the web image; EAS variable for the app ([ADR 0033](adr/0033-error-reports-and-uptime.md)) |
 | none | `EXPO_PUBLIC_ACCOUNT_FACTORY` | `0x0bE806Ca77340aA50AF6586CDC2FE2561668DaEA` | `ACCOUNT_FACTORY`, `infra/l1/fuji.env` |
 | none | `EXPO_PUBLIC_WEB_URL` | `https://zyrcle.deviego.xyz` | `WEB_HOST` |
 
@@ -1124,6 +1127,17 @@ failed row, no block for 10 min while a transaction has waited for the chain as 
 node reporting itself unhealthy, under 100,000 COP mintable, under 1 ZYR of gas. ZyrcleChain makes
 no empty blocks, so a quiet night leaves the last block hours old without anything being wrong.
 
+From outside the VPS ([ADR 0033](adr/0033-error-reports-and-uptime.md)):
+
+- **Uptime.** [.github/workflows/uptime.yml](../.github/workflows/uptime.yml) checks every 10 minutes
+  that the API answers and is connected to the broker, that the web app answers and that the public
+  RPC answers. A failure opens a GitHub issue labelled `uptime` (GitHub notifies the owner), later
+  failures comment on it, and the first healthy check closes it. Run it by hand from the Actions
+  tab. GitHub pauses scheduled workflows after 60 days without activity in the repository.
+- **Error reports.** With a Sentry DSN, the API, the web app and the mobile app report unhandled
+  errors and every logged exception, with the commit or app version. Reports are scrubbed before
+  they leave: no emails, keys, tokens, request bodies, cookies or headers.
+
 ### 9.12 Top up gas for the backend's keys
 
 The oracle key (advances, and as guardian it relays payments and deploys accounts) and the operator
@@ -1159,10 +1173,10 @@ Each item is checked against the repository.
   its exact command is not recorded ([runbook 9.8](#98-top-up-the-validator)).
 - **Testnet only.** ZyrcleChain runs on Fuji. ZYR has no value and the seed capital is simulated
   ([ADR 0023](adr/0023-testnet-economics.md)). The chain for real value is an open M7 decision.
-- **No monitoring or alerts in the repository.** ADR 0002 mentions the VPS's existing Grafana; its
-  configuration is not here. Roadmap M7 lists monitoring for the API, the broker, the validator and
-  the Treasury reserve. The `/health` endpoint reports `ok` even when MQTT is down, and an unhealthy
-  container is not restarted.
+- **Monitoring has limits.** The health report emails admins (runbook 9.11), the uptime workflow
+  watches from outside and Sentry collects errors once its DSNs are set, but GitHub may delay a
+  scheduled check by some minutes, the VPS's Grafana is configured outside this repository, and an
+  unhealthy container is not restarted on its own.
 
 **Chain and keys**
 

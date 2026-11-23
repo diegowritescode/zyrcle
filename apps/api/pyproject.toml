@@ -20,6 +20,7 @@ dependencies = [
   "pyjwt>=2.15",
   "web3>=8.0",
   "httpx>=0.28",
+  "sentry-sdk[fastapi]>=2.40",
   "zyrcle-protocol",
 ]
 

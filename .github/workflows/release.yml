@@ -59,6 +59,10 @@ jobs:
           context: .
           file: apps/web/Dockerfile
           push: true
+          # Error reports (ADR 0033): the repository variable SENTRY_DSN_WEB; unset means off.
+          build-args: |
+            VITE_SENTRY_DSN=${{ vars.SENTRY_DSN_WEB }}
+            VITE_RELEASE=${{ env.SHA }}
           tags: ghcr.io/diegowritescode/zyrcle-web:${{ env.SHA }}
           labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
           cache-from: type=gha,scope=web

@@ -104,6 +104,13 @@ class Settings(BaseSettings):
     # Where browsers read the copy. The web page's Content-Security-Policy must allow its origin.
     ipfs_gateway: str = "https://gateway.pinata.cloud/ipfs/"
 
+    # Error reports to Sentry (docs/adr/0033), without personal data. No DSN, no reports.
+    sentry_dsn: str | None = None
+    sentry_environment: str = "production"
+    sentry_traces_sample_rate: float = 0.0
+    # The commit this build came from, so a report names the code that failed.
+    release: str | None = None
+
     # Browser origins allowed to call the API (comma-separated), e.g. the demo page.
     cors_origins: str = ""
     # Demo mode: URL of the simulator's control panel. Empty disables the /v1/demo routes.

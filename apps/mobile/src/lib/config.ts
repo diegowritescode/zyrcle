@@ -12,3 +12,5 @@ export const SIWE_DOMAIN = process.env.EXPO_PUBLIC_SIWE_DOMAIN || "zyrcle.devieg
 export const ACCOUNT_FACTORY = process.env.EXPO_PUBLIC_ACCOUNT_FACTORY || "0x0bE806Ca77340aA50AF6586CDC2FE2561668DaEA";
 export const WEB_URL = process.env.EXPO_PUBLIC_WEB_URL || "https://zyrcle.deviego.xyz";
 export const REPO_URL = "https://github.com/diegowritescode/zyrcle";
+/** Sentry's DSN for the app; empty means no error reports (docs/adr/0033). Set as an EAS variable. */
+export const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN || "";

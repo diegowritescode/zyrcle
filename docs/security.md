@@ -47,6 +47,9 @@ cd chain && ../.slither/bin/slither . --filter-paths "test|lib|dependencies" --e
   (ADR 0028).
 - One VPS and one validator; backups stay on the same machine until an off-site copy is decided
   (ADR 0028).
+- Error reports go to Sentry, a third party, when its DSNs are set. They are scrubbed before they
+  leave (emails, long hex strings, tokens, request bodies, cookies, headers, the user), but stack
+  traces and account addresses remain (ADR 0033).
 - The certificate page trusts the IPFS gateway to return the bytes of the CID read from the chain;
   it does not recompute the CID. Fetching the same CID from another gateway or an own IPFS node
   removes that trust (ADR 0027, amendment).

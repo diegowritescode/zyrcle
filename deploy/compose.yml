@@ -42,6 +42,9 @@ x-api-env: &api-env
   # A permanent public copy of each impact certificate on IPFS (ADR 0027, amendment 2026-11-22).
   # Empty: certificates are anchored without it.
   ZYRCLE_PINATA_JWT: ${PINATA_JWT:-}
+  # Error reports to Sentry, without personal data (ADR 0033). Empty: off.
+  ZYRCLE_SENTRY_DSN: ${SENTRY_DSN_API:-}
+  ZYRCLE_RELEASE: ${ZYRCLE_API_TAG:-}
 
 services:
   postgres:

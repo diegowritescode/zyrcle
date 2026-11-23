@@ -13,5 +13,10 @@ export const TREASURY_ADDRESS: string =
 /** Where the browser reads a certificate's copy on IPFS (docs/adr/0027, amendment 2026-11-22).
  * Its origin must be in the Content-Security-Policy's connect-src (security-headers.conf). */
 export const IPFS_GATEWAY: string = env.VITE_IPFS_GATEWAY || "https://gateway.pinata.cloud/ipfs/";
+/** Sentry's DSN for the web app; empty means no error reports (docs/adr/0033). Its ingest origin is
+ * allowed in security-headers.conf. */
+export const SENTRY_DSN: string = env.VITE_SENTRY_DSN || "";
+/** The commit the build came from, set by the release workflow. */
+export const RELEASE: string | undefined = env.VITE_RELEASE || undefined;
 export const REPO_URL = "https://github.com/diegowritescode/zyrcle";
 export const docUrl = (path: string) => `${REPO_URL}/blob/main/${path}`;
