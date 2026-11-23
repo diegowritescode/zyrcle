@@ -1,8 +1,8 @@
 # ADR 0029: Paying campus merchants with ZYR, and merchants redeeming it for pesos
 
-- Status: proposed (2026-11-23)
-- Decided by: Claude proposed in v1 block 2 (M6), following ADR 0004 (closed loop first). Not yet
-  confirmed.
+- Status: accepted (2026-11-23)
+- Decided by: Claude proposed in v1 block 2 (M6), following ADR 0004 (closed loop first). Diego confirmed it on 2026-11-23: "confirmo 0015, 0027, 0028 y 0029".
+  Treasury v3 was deployed the same day.
 
 ## Context
 A balance nobody can spend stops people from coming back. ADR 0004 chose a closed loop: participants

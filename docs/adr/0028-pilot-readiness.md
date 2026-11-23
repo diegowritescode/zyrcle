@@ -1,8 +1,9 @@
 # ADR 0028: Pilot readiness: backups, alerts, consent, production switches
 
-- Status: proposed (2026-11-23)
-- Decided by: Claude proposed in v1 block 2 (M7). Not yet confirmed. Items marked **for Diego**
-  need his decision or his accounts.
+- Status: accepted (2026-11-23)
+- Decided by: Claude proposed in v1 block 2 (M7). Diego confirmed it on 2026-11-23: "confirmo 0015, 0027, 0028 y 0029". Confirming the record does not settle the
+  items marked **for Diego**: they still need his decision or his accounts. The backup cron was
+  installed on 2026-11-23.
 
 ## Context
 Before a real person's data or money touches Zyrcle, the roadmap's M7 asks for backups, monitoring,

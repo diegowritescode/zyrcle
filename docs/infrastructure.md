@@ -766,7 +766,7 @@ state cannot be rolled back.
 ### 8.5 Mobile build path
 
 Builds run on EAS in the project `@diegowritescode/zyrcle`
-([ADR 0015](adr/0015-android-builds.md), proposed, not yet confirmed). CI only typechecks, lints and
+([ADR 0015](adr/0015-android-builds.md)). CI only typechecks, lints and
 bundles the app; it never calls EAS.
 
 | Profile ([eas.json](../apps/mobile/eas.json)) | Output | Use |

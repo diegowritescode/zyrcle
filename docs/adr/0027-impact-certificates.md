@@ -1,8 +1,8 @@
 # ADR 0027: Impact certificates for hosts
 
-- Status: proposed (2026-11-22)
+- Status: accepted (2026-11-23; proposed 2026-11-22)
 - Decided by: Claude proposed in v1 block 2 (M5); Diego asked for carbon certificates for the host
-  institutions on 2026-11-22. Not yet confirmed.
+  institutions on 2026-11-22 and chose the IPFS copy (amendment). Diego confirmed it on 2026-11-23: "confirmo 0015, 0027, 0028 y 0029".
 
 ## Context
 A host lets containers stand on its sites. Besides a share of each sale (ADR 0013), it wants

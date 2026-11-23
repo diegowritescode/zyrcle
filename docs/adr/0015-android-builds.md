@@ -1,8 +1,8 @@
 # ADR 0015: Android builds with EAS, push through Firebase, ARM code only
 
-- Status: proposed (2026-11-22)
+- Status: accepted (2026-11-23; proposed 2026-11-22)
 - Decided by: Claude proposed; Diego created the Expo and Firebase accounts and ran the first
-  build. Not yet confirmed.
+  build. Diego confirmed it on 2026-11-23: "confirmo 0015, 0027, 0028 y 0029".
 
 ## Context
 Expo Go on Android cannot receive push from a server (ADR 0008), so payments and recovery warnings
