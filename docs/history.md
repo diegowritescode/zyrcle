@@ -133,6 +133,9 @@ bank statement matched to sales and redemptions (0039), and the guardian's own k
 stalled one (ADR 0028, amendment). Diego confirmed every record, chose the multisig signers (his
 MetaMask, his phone and a paper key) and authorized the merge and the deploy: commit `ac09179`,
 migrations `0014` to `0016`, images pinned by digest and recorded in `deploy/history.log`.
+The multisig code of M17 followed the same day with his approval (`48fd1d1`): the Safe contracts, the
+`zyrcle-api safe` commands and the `/multisig` signing page. The Safe itself is not deployed yet: it
+waits for the owners' three addresses and the approval of the Fuji transactions (runbook 9.14).
 
 ## Where the old things are
 
