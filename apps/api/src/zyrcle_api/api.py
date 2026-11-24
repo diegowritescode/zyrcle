@@ -2,6 +2,7 @@ import asyncio
 import logging
 import uuid
 from typing import Annotated, Any, Literal
+from zoneinfo import ZoneInfo
 
 from fastapi import (
     APIRouter,
@@ -27,9 +28,9 @@ from .models import (
     Merchant,
     Payout,
     PushToken,
-    Settlement,
 )
 from .models import Resident as ResidentRow
+from .participant import deposit_steps, personal_impact
 from .sessions import MATERIALS, session_view
 
 router = APIRouter()
@@ -207,17 +208,11 @@ async def me(resident: Resident, request: Request) -> dict[str, Any]:
         ).all()
         collector = await db.get(Collector, resident)
         merchant = await db.get(Merchant, resident)
-        # What each deposit got when its bag was sold (docs/adr/0013), on top of the advance.
-        settled = {
-            ref: paid
-            for ref, paid in await db.execute(
-                select(Settlement.party_ref, Settlement.paid_cop).where(
-                    Settlement.party == "deposit",
-                    Settlement.party_ref.in_([str(s.id) for s, _, _ in deposits]),
-                    Settlement.paid_cop.is_not(None),
-                )
-            )
-        }
+        # Each deposit's steps up to the settlement, and what its sales paid on top of the
+        # advance (docs/adr/0013, 0041).
+        steps = await deposit_steps(
+            db, [s for s, _, _ in deposits], {s.id: p for s, _, p in deposits}
+        )
     chain = request.app.state.chain
     balance = None
     if chain is not None:
@@ -256,11 +251,21 @@ async def me(resident: Resident, request: Request) -> dict[str, Any]:
                 "payout": None
                 if p is None
                 else {"amount_cop": p.amount_cop, "status": p.status, "tx_hash": p.tx_hash},
-                "settled_cop": settled.get(str(s.id)),
+                "settled_cop": steps[s.id]["settled_cop"],
+                "steps": steps[s.id]["steps"],
             }
             for s, name, p in deposits
         ],
     }
+
+
+@router.get("/v1/me/impact")
+async def my_impact(resident: Resident, request: Request) -> dict[str, Any]:
+    """The participant's verified and sold kilograms and the CO2e avoided by what was sold, per
+    material and per month (docs/adr/0041; factors and rule of docs/adr/0027)."""
+    settings: Settings = request.app.state.settings
+    async with request.app.state.maker() as db:
+        return await personal_impact(db, resident, ZoneInfo(settings.timezone), auth.utcnow())
 
 
 class ConsentIn(BaseModel):

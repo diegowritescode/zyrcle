@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .auth import utcnow
 from .config import Settings
 from .domain.session_machine import ACTIVE, CREDITED
+from .fill import fill_levels
 from .models import Container, DepositSession, Device, Host, Payout, SaleLine, Settlement, Site
 
 router = APIRouter(prefix="/v1", tags=["public"])
@@ -369,8 +370,9 @@ async def site_dashboard(
             .group_by(DepositSession.container_id)
         ):
             paid_per_container[cid] = int(paid_per_container.get(cid) or 0) + int(cop or 0)
-        # The latest closed lid of each container tells how full it is and what it weighs, whether
-        # or not that deposit was paid: rejected material is still physically inside.
+        # The latest closed lid of each container, a deposit's or a collection's, tells how full it
+        # is and what it weighs (docs/adr/0042). Rejected material is still physically inside.
+        levels = await fill_levels(db, [c for c, _ in rows])
         latest = {
             s.container_id: s
             for s in await db.scalars(
@@ -388,17 +390,13 @@ async def site_dashboard(
     containers = []
     for c, device in rows:
         last = latest.get(c.id)
-        fill_pct = None
-        weight_kg = None
-        if last is not None and last.fill_after_mm is not None:
-            fill_pct = round(max(0, min(100, 100 * (c.depth_mm - last.fill_after_mm) / c.depth_mm)))
-            weight_kg = _kg(last.final_g)
+        level = levels[c.id]
         deposits, grams = per_container.get(c.id, (0, 0))
         containers.append(
             {
                 **_container_view(c, device, now, settings, busy),
-                "fill_pct": fill_pct,
-                "weight_kg": weight_kg,
+                "fill_pct": level.pct,
+                "weight_kg": _kg(level.weight_g) if level.weight_g is not None else None,
                 "deposits_verified": deposits,
                 "kg_verified": _kg(grams),
                 "paid_cop": int(paid_per_container.get(c.id) or 0),

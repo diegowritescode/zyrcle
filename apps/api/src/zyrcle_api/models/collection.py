@@ -27,6 +27,8 @@ class Collector(Base):
     name: Mapped[str] = mapped_column(String(200))
     active: Mapped[bool] = mapped_column(default=True, server_default=text("true"))
     created_at: Mapped[datetime] = _now()
+    # The host whose containers they empty (docs/adr/0042); None: every host's.
+    host_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("host.id"))
 
 
 BAG_STATUSES = ("open", "sealed", "sold", "settled")
@@ -91,6 +93,8 @@ class Collection(Base):
     # What the container should have weighed when it opened, from its previous collection and the
     # deposits since then. None when there is nothing to compare with yet.
     expected_g: Mapped[int | None] = mapped_column(Integer)
+    # The distance sensor after the lid closed (docs/adr/0042): how full the container was left.
+    fill_after_mm: Mapped[int | None] = mapped_column(Integer)
     created_at: Mapped[datetime] = _now()
     updated_at: Mapped[datetime] = _now()
     last_activity_at: Mapped[datetime] = _now()

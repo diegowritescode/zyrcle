@@ -25,6 +25,7 @@ from .models import (
     Settlement,
     TicketScan,
 )
+from .participant import notify_sold
 from .setup_routes import host_view
 
 router = APIRouter(prefix="/v1/operator", tags=["sales"])
@@ -222,6 +223,8 @@ async def record_sale(body: SaleIn, operator: Operator, request: Request) -> dic
                         created_at=now,
                     )
                 )
+        # The participants whose material this was hear it was sold (docs/adr/0041).
+        await notify_sold(db, [bags[code].id for code in codes], body.buyer, now)
         await db.commit()
         return await sale_view(db, sale)
 

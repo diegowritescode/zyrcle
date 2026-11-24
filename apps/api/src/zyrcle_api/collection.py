@@ -383,6 +383,7 @@ class CollectionService:
         if tare is None or final is None:
             return
         c.tare_g, c.final_g, c.last_weight_g = tare, final, final
+        c.fill_after_mm = _int(body.get("fill_after_mm"))  # how full it was left (ADR 0042)
         c.state, c.closed_at, c.updated_at = "closed", now, now
         fills = list(
             await db.scalars(select(CollectionFill).where(CollectionFill.collection_id == c.id))

@@ -70,6 +70,8 @@ class Settings(BaseSettings):
     advance_ratio_bps: int = 5_000
     max_advance_cop: int = 5_000
     payout_interval_s: float = 2.0
+    # A container at or above this fill level pushes its host's collectors (docs/adr/0042).
+    fill_alert_pct: int = 80
 
     # Push notifications through Expo's push service (docs/adr/0008-push-notifications.md). The
     # access token is needed only if "enhanced security for push notifications" is on in Expo.

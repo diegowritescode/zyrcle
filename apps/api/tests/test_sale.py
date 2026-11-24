@@ -11,9 +11,11 @@ from eth_account import Account
 from sqlalchemy import select
 
 from zyrcle_api.chain import WEI_PER_COP
+from zyrcle_api.domain.impact import co2e_g
 from zyrcle_api.models import Notification
 
 from .collecting import bags, incidents, open_collection, take, wait_collection
+from .conftest import BIN
 from .helpers import OPS, headers, sign_in, wait_for, wait_state
 from .test_centers import new_center
 from .test_chain_e2e import deposit, wait_payout
@@ -33,6 +35,11 @@ async def fill_and_seal(client, collector, runner, kind: str) -> dict:
     assert r.status_code == 200, r.text
     assert await incidents(client, c["id"]) == []
     return r.json()
+
+
+async def steps_of(client, person, session_id: str) -> list[dict]:
+    history = (await client.get("/v1/me", headers=headers(person))).json()["sessions"]
+    return next(h for h in history if h["id"] == session_id)["steps"]
 
 
 async def sale_of(client, sale_id: str) -> dict:
@@ -100,6 +107,23 @@ async def test_a_sold_bag_pays_residents_collector_and_host_from_the_buyer(
         "/v1/operator/sales", headers=OPS, json={**sale_payload(bag), "ticket_ref": "T-1002"}
     )
     assert r.status_code == 409  # a bag is sold once
+    # Both participants hear their material was sold, once (docs/adr/0041), and see where it is.
+    async with app.state.maker() as db:
+        sold = list(
+            await db.scalars(
+                select(Notification.resident_id).where(
+                    Notification.kind == "deposit_sold",
+                    Notification.resident_id.in_([uuid.UUID(ana["id"]), uuid.UUID(beto["id"])]),
+                )
+            )
+        )
+    assert sorted(map(str, sold)) == sorted([ana["id"], beto["id"]])
+    steps = await steps_of(client, ana, a["id"])
+    keys = ["deposited", "verified", "advance", "collected", "sold", "paid"]
+    assert [s["key"] for s in steps] == keys
+    assert [s["status"] for s in steps] == ["done"] * 5 + ["pending"]
+    assert steps[2]["amount_cop"] == advance_a and steps[2]["tx_hash"]
+    assert steps[4]["note"] == "Centro de acopio La 80" and steps[4]["at"].startswith("2026-11-22")
 
     before = {
         "ana": await balance(chain, ana["address"]),
@@ -154,6 +178,25 @@ async def test_a_sold_bag_pays_residents_collector_and_host_from_the_buyer(
     assert state.minted_cop <= state.backing_cop
     history = (await client.get("/v1/me", headers=headers(ana))).json()["sessions"]
     assert next(h for h in history if h["id"] == a["id"])["settled_cop"] == expected_a - advance_a
+    paid = (await steps_of(client, ana, a["id"]))[5]
+    assert paid["status"] == "done" and paid["tx_hash"]
+    assert (paid["share_cop"], paid["amount_cop"]) == (expected_a, expected_a - advance_a)
+
+    # Her impact counts the sold grams, with the certificates' factors (docs/adr/0027, 0041).
+    impact = (await client.get("/v1/me/impact", headers=headers(ana))).json()
+    pet = {"verified_g": grams_a, "sold_g": grams_a, "co2e_g": co2e_g("pet", grams_a)}
+    assert impact["totals"] == pet
+    assert impact["materials"] == [{"material": "pet", **pet}]
+    assert impact["months"][-1]["sold_g"] == grams_a and len(impact["months"]) == 12
+
+    # The collector sees what that collection paid, and the emptied container (docs/adr/0042).
+    earned = (await client.get("/v1/collector/earnings", headers=headers(collector))).json()
+    assert any(c["earned_cop"] == 4_500 and c["pending_g"] == 0 for c in earned["collections"])
+    assert earned["months"][-1]["earned_cop"] >= 4_500
+    home = (await client.get("/v1/collector", headers=headers(collector))).json()
+    emptied = next(c for c in home["containers"] if c["id"] == BIN)
+    assert emptied["last_emptied_at"] and emptied["deposits_since"] == 0
+    assert emptied["fill_pct"] is not None and emptied["fill_pct"] <= 10
 
     bags_now = (await client.get("/v1/operator/bags?status=settled", headers=OPS)).json()
     assert bag["code"] in {b["code"] for b in bags_now}

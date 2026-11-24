@@ -31,6 +31,12 @@ class Merchant(Base):
     host_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("host.id"))
     active: Mapped[bool] = mapped_column(default=True, server_default=text("true"))
     created_at: Mapped[datetime] = _now()
+    # Where participants find it (docs/adr/0041): its campus, the spot inside it, its hours and what
+    # it sells. Free text, filled by the operator; shown publicly, unlike `nit`.
+    site_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("site.id"))
+    place: Mapped[str | None] = mapped_column(String(200))
+    hours: Mapped[str | None] = mapped_column(String(120))
+    offer: Mapped[str | None] = mapped_column(String(300))
 
 
 PAYMENT_STATUSES = ("open", "paying", "paid", "failed", "expired")

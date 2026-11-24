@@ -34,6 +34,7 @@ from .errors import (
     RecoveryPending,
     Unavailable,
 )
+from .fill import alert_if_full
 from .live import LiveHub
 from .models import (
     COLLECTION_ACTIVE,
@@ -377,6 +378,8 @@ class SessionService:
         session.score = verdict.score
         session.reasons = verdict.reasons
         await self._apply(db, session, OUTCOME_EVENT[verdict.outcome], outbox, data=body)
+        # Whatever the verdict, the material is inside now: tell collectors if it is full.
+        await alert_if_full(db, container, after, self._s.fill_alert_pct, self._now())
 
     # ------------------------------------------------------------------ periodic jobs
 

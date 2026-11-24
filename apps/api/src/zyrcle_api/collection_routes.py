@@ -2,6 +2,7 @@
 
 import uuid
 from typing import Annotated, Any, Literal
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
@@ -10,9 +11,10 @@ from sqlalchemy.exc import IntegrityError
 
 from .auth import utcnow
 from .collection import CollectionService, bag_view, new_bag_code
+from .collector_views import earnings, my_containers
 from .deps import Operator, Resident
 from .errors import SessionError
-from .models import Bag, Collection, Collector, Container, Incident, SaleLine
+from .models import Bag, Collection, Collector, Container, Host, Incident, SaleLine
 from .models import Resident as ResidentRow
 from .sessions import MATERIALS
 
@@ -47,16 +49,33 @@ class FillIn(BaseModel):
 async def collector_home(
     resident: Resident, collections: Collections, request: Request
 ) -> dict[str, Any]:
-    """What the collector screen shows: who they are, their collection in progress, their bags."""
+    """What the collector screen shows: who they are, their collection in progress, their bags, and
+    their containers fullest first (docs/adr/0042)."""
     async with request.app.state.maker() as db:
-        collector = await db.get(Collector, resident)
-    if collector is None or not collector.active:
-        raise HTTPException(403, {"code": "forbidden", "detail": "not a collector"})
+        collector = await _collector(db, resident)
+        containers = await my_containers(db, collector)
     return {
         "name": collector.name,
         "current": await collections.current(resident),
         "bags": await collections.my_bags(resident),
+        "containers": containers,
     }
+
+
+@router.get("/collector/earnings")
+async def collector_earnings(resident: Resident, request: Request) -> dict[str, Any]:
+    """What each collection of the last months paid, and a total per month (docs/adr/0042)."""
+    tz = ZoneInfo(request.app.state.settings.timezone)
+    async with request.app.state.maker() as db:
+        await _collector(db, resident)
+        return await earnings(db, resident, tz, utcnow())
+
+
+async def _collector(db, resident: uuid.UUID) -> Collector:
+    collector = await db.get(Collector, resident)
+    if collector is None or not collector.active:
+        raise HTTPException(403, {"code": "forbidden", "detail": "not a collector"})
+    return collector
 
 
 @router.post("/collections", status_code=201)
@@ -126,6 +145,8 @@ class CollectorIn(BaseModel):
     address: str = Field(pattern=r"^0x[0-9a-fA-F]{40}$")
     name: str = Field(min_length=1, max_length=200)
     active: bool = True
+    # The host whose containers they empty (docs/adr/0042); None: every host's.
+    host_id: uuid.UUID | None = None
 
 
 class BagsIn(BaseModel):
@@ -169,19 +190,25 @@ async def name_collector(body: CollectorIn, _: Operator, request: Request) -> di
             raise HTTPException(
                 404, {"code": "not_found", "detail": "no participant has signed in with that"}
             )
+        if body.host_id is not None and await db.get(Host, body.host_id) is None:
+            raise HTTPException(404, {"code": "not_found", "detail": "unknown host"})
         collector = await db.get(Collector, resident.id)
         if collector is None:
             collector = Collector(resident_id=resident.id, name=body.name, active=body.active)
             db.add(collector)
-        else:
-            collector.name, collector.active = body.name, body.active
+        collector.name, collector.active, collector.host_id = body.name, body.active, body.host_id
         await db.commit()
-        return {
-            "resident_id": str(resident.id),
-            "address": resident.address,
-            "name": collector.name,
-            "active": collector.active,
-        }
+        return collector_view(collector, resident)
+
+
+def collector_view(c: Collector, r: ResidentRow) -> dict[str, Any]:
+    return {
+        "resident_id": str(c.resident_id),
+        "address": r.address,
+        "name": c.name,
+        "active": c.active,
+        "host_id": str(c.host_id) if c.host_id else None,
+    }
 
 
 @router.get("/operator/collectors")
@@ -192,15 +219,7 @@ async def list_collectors(_: Operator, request: Request) -> list[dict[str, Any]]
             .join(ResidentRow, ResidentRow.id == Collector.resident_id)
             .order_by(Collector.name)
         )
-        return [
-            {
-                "resident_id": str(c.resident_id),
-                "address": r.address,
-                "name": c.name,
-                "active": c.active,
-            }
-            for c, r in rows
-        ]
+        return [collector_view(c, r) for c, r in rows]
 
 
 @router.post("/operator/bags", status_code=201)

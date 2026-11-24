@@ -10,7 +10,7 @@ from sqlalchemy import or_, select
 from .chain import load_account_file
 from .deps import Operator, Resident
 from .errors import SessionError
-from .models import Host, Merchant, RedemptionRequest
+from .models import Host, Merchant, RedemptionRequest, Site
 from .models import Resident as ResidentRow
 from .payments import PaymentService, redemption_view
 
@@ -125,10 +125,34 @@ class MerchantIn(BaseModel):
     nit: str = Field(min_length=3, max_length=32, description="tax id, the KYC reference")
     host_id: uuid.UUID | None = None
     active: bool = True
+    # Where participants find it (docs/adr/0041); shown publicly.
+    site_id: uuid.UUID | None = None
+    place: str | None = Field(default=None, max_length=200)
+    hours: str | None = Field(default=None, max_length=120)
+    offer: str | None = Field(default=None, max_length=300)
 
 
 class SettleIn(BaseModel):
     bank_ref: str = Field(min_length=1, max_length=100)
+
+
+def _text(value: str | None) -> str | None:
+    return (value or "").strip() or None
+
+
+def merchant_view(m: Merchant, r: ResidentRow) -> dict[str, Any]:
+    return {
+        "resident_id": str(m.resident_id),
+        "address": r.address,
+        "name": m.name,
+        "nit": m.nit,
+        "host_id": str(m.host_id) if m.host_id else None,
+        "active": m.active,
+        "site_id": str(m.site_id) if m.site_id else None,
+        "place": m.place,
+        "hours": m.hours,
+        "offer": m.offer,
+    }
 
 
 @router.post("/operator/merchants", status_code=201)
@@ -146,20 +170,22 @@ async def name_merchant(body: MerchantIn, _: Operator, request: Request) -> dict
             )
         if body.host_id is not None and await db.get(Host, body.host_id) is None:
             raise HTTPException(404, {"code": "not_found", "detail": "unknown host"})
+        if body.site_id is not None:
+            site = await db.get(Site, body.site_id)
+            if site is None or site.host_id != body.host_id:
+                raise HTTPException(
+                    422,
+                    {"code": "invalid", "detail": "the site must belong to the merchant's host"},
+                )
         m = await db.get(Merchant, resident.id)
         if m is None:
             m = Merchant(resident_id=resident.id, name=body.name, nit=body.nit)
             db.add(m)
         m.name, m.nit, m.host_id, m.active = body.name, body.nit, body.host_id, body.active
+        m.site_id, m.place = body.site_id, _text(body.place)
+        m.hours, m.offer = _text(body.hours), _text(body.offer)
         await db.commit()
-        return {
-            "resident_id": str(resident.id),
-            "address": resident.address,
-            "name": m.name,
-            "nit": m.nit,
-            "host_id": str(m.host_id) if m.host_id else None,
-            "active": m.active,
-        }
+        return merchant_view(m, resident)
 
 
 @router.get("/operator/merchants")
@@ -170,16 +196,31 @@ async def list_merchants(_: Operator, request: Request) -> list[dict[str, Any]]:
             .join(ResidentRow, ResidentRow.id == Merchant.resident_id)
             .order_by(Merchant.name)
         )
+        return [merchant_view(m, r) for m, r in rows]
+
+
+@router.get("/merchants")
+async def where_to_spend(request: Request) -> list[dict[str, Any]]:
+    """Public: the active merchants of each host, where to find them and what they sell
+    (docs/adr/0041). Never the tax id or the account."""
+    async with request.app.state.maker() as db:
+        rows = await db.execute(
+            select(Merchant, Host, Site)
+            .join(Host, Host.id == Merchant.host_id)
+            .outerjoin(Site, Site.id == Merchant.site_id)
+            .where(Merchant.active.is_(True))
+            .order_by(Host.name, Site.name.nulls_last(), Merchant.name)
+        )
         return [
             {
-                "resident_id": str(m.resident_id),
-                "address": r.address,
                 "name": m.name,
-                "nit": m.nit,
-                "host_id": str(m.host_id) if m.host_id else None,
-                "active": m.active,
+                "host": {"id": str(h.id), "name": h.name},
+                "site": {"id": str(s.id), "name": s.name} if s is not None else None,
+                "place": m.place,
+                "hours": m.hours,
+                "offer": m.offer,
             }
-            for m, r in rows
+            for m, h, s in rows
         ]
 
 

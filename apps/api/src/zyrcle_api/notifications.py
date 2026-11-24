@@ -32,12 +32,14 @@ RECEIPTS_KEPT = timedelta(hours=24)  # Expo deletes receipts after a day
 CHANNEL = {
     "payout_confirmed": "payments",
     "settlement_paid": "payments",
+    "deposit_sold": "payments",  # docs/adr/0041
     "deposit_approved": "payments",
     "deposit_review": "deposits",
     "deposit_rejected": "deposits",
     "recovery_started": "account",
     "recovery_done": "account",
     "recovery_cancelled": "account",
+    "container_full": "collection",  # docs/adr/0042; the default channel until the app creates it
 }
 MATERIAL_NAMES = {
     "pet": "PET",
