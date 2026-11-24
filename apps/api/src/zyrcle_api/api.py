@@ -151,8 +151,13 @@ async def live(websocket: WebSocket, session_id: uuid.UUID) -> None:
         await websocket.close(code=4404)
         return
     await websocket.accept()
+    # Subscribe first, then read the state to send: a change committed between the read above and
+    # the subscription would otherwise be lost, and the page would wait on a stale state forever
+    # (it only polls while the socket is down). Changes are published after their commit, so any
+    # change missing from this read is already in the queue.
     queue = app.state.hub.subscribe(str(session_id))
     try:
+        session = await app.state.sessions.get(session_id)
         await websocket.send_json({"type": "state", **session_view(session)})
         if session.state not in ("authorized", "open", "depositing", "closing"):
             await websocket.close()  # nothing more will happen to a finished session

@@ -195,6 +195,42 @@ async def test_live_websocket_streams_readings_and_states(
     assert any(e["type"] == "reading" for e in events)
 
 
+async def test_live_websocket_keeps_a_change_made_while_it_connects(
+    app, client, devices, resident, server_url, monkeypatch
+):
+    """A change committed while the socket is being set up must still reach the page: CI caught
+    the page stuck on "Abriendo la tapa…" because the lid opened between the server's read and its
+    subscription. Here every read races a change, published the instant after it returns."""
+    import asyncio
+
+    import websockets
+
+    from zyrcle_api.sessions import session_view
+
+    runner = devices["ctr-0002"]
+    session = await start(client, resident, runner)
+    read = app.state.sessions.get
+
+    async def read_then_change(session_id):
+        s = await read(session_id)
+        event = {"type": "state", **session_view(s), "state": "depositing"}
+        app.state.hub.publish(str(session_id), event)
+        return s
+
+    monkeypatch.setattr(app.state.sessions, "get", read_then_change)
+    token = resident["Authorization"].removeprefix("Bearer ")
+    url = f"ws://{server_url}/v1/sessions/{session['id']}/live?token={token}"
+    async with websockets.connect(url) as ws:
+        assert json.loads(await ws.recv())["state"] == "open"  # the read
+        async with asyncio.timeout(5):  # the change that raced it, not lost
+            while (event := json.loads(await ws.recv()))["type"] != "state":
+                pass
+        assert event["state"] == "depositing"
+    monkeypatch.undo()
+    await client.post(f"/v1/sessions/{session['id']}/finish", headers=headers(resident))
+    await wait_state(client, resident, session["id"], "empty", "verified")
+
+
 async def test_websocket_rejects_other_residents(client, devices, resident, settings, server_url):
     import websockets
 

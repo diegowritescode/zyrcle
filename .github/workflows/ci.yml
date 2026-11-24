@@ -131,6 +131,7 @@ jobs:
             e2e/.stack/*.log
             e2e/test-results/
             e2e/playwright-report/
+          include-hidden-files: true # e2e/.stack starts with a dot; without this the logs are skipped
           retention-days: 14
 
   chain:
