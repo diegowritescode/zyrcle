@@ -2,7 +2,7 @@
 
 A Safe transaction is EIP-712 typed data. Each owner signs it with whatever holds their key: a
 browser or phone wallet (the multisig page asks it for `eth_signTypedData_v4`) or a key file kept
-offline (`zyrcle-api chain safe-sign`). The signatures travel in a proposal file, one JSON document,
+offline (`zyrcle-api safe sign`). The signatures travel in a proposal file, one JSON document,
 from signer to signer; when two of three are in, anyone executes it. Nothing here needs the
 backend's database or its keys.
 

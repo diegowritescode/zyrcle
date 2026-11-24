@@ -6,7 +6,8 @@ who are new to the codebase.
 
 The code is the source of truth: [`models/`][models] and the migrations in
 [`migrations/versions/`][versions]. If this document and the code disagree, the code wins, and this
-document needs a fix. This document describes the schema at migration `0008`.
+document needs a fix. This document describes the schema at migration `0016`: 37 tables, plus
+Alembic's own.
 
 ## Contents
 
@@ -93,13 +94,18 @@ document needs a fix. This document describes the schema at migration `0008`.
 - **Primary keys** are `id uuid`. The API generates them with `uuid4`; there is no server default,
   so a raw SQL insert must supply the id. Exceptions, where a natural key is the identity:
   `device.id` and `container.id` (strings the operator chooses, such as `ctr-0001`),
-  `material_price.material`, `auth_nonce.nonce`, `push_token.token`, `collector.resident_id`,
+  `material_price.material`, `center_price (center_id, material)`, `auth_nonce.nonce`,
+  `push_token.token`, `collector.resident_id`, `merchant.resident_id`,
   `device_message (device_id, seq)`, and `session_event.id` (`bigserial`).
 - **Foreign keys** are named `<table>_id`. Exceptions: `collector_id` on `bag` and `collection`
-  points to `resident.id` (not to `collector`), `new_resident_id` points to `resident.id`, and
-  `line_id` points to `sale_line.id`.
-- **Logical links without a foreign key:** `settlement.party_ref`, `incident.bag_ids`, and
-  `deposit_session.declared_material` matched to `material_price.material`.
+  points to `resident.id` (not to `collector`), `merchant_id` and `payer_id` on `payment_request`
+  and `redemption_request` point to `resident.id` (not to `merchant`), `new_resident_id` points to
+  `resident.id`, `line_id` points to `sale_line.id`, and `center_id` points to
+  `collection_center.id`.
+- **Logical links without a foreign key:** `settlement.party_ref`, `incident.bag_ids`,
+  `bank_line.matched_id` (a sale or a redemption, as `matched_kind` says), and
+  `deposit_session.declared_material` matched to `material_price.material` and
+  `center_price.material`.
 - **Lifecycle columns** are called `state` when device events drive the lifecycle
   (`deposit_session`, `collection`) and `status` everywhere else. Both are `varchar(16)` with a
   CHECK constraint that lists the allowed values. There are no PostgreSQL ENUM types.
@@ -134,13 +140,18 @@ Two ids are also ids on chain. Never change or regenerate them.
 No job deletes old rows. The only deletes happen when an account recovery completes
 (`account_recovery`, [section 3.5](#35-participants-and-accounts)). Tables such as
 `device_message` (one row per device message, readings included), `session_event`, `auth_nonce`,
-`email_code` and `operator_code` grow without limit.
+`email_code`, `operator_code`, `bank_line` and `ticket_scan` (a photo of up to 5 MB per row) grow
+without limit.
 
-Nothing backs up the database yet ([ADR 0020][adr-0020]).
+**Backups.** [`deploy/backup.sh`][backup] dumps the database every day on the VPS, keeps 14 days,
+and with `--check` restores a dump into a throwaway Postgres to prove it ([ADR 0028][adr-0028]).
+`deploy.sh` also runs it before every migration ([ADR 0032][adr-0032]). Encrypted copies off the
+VPS are built ([ADR 0034][adr-0034]) and wait for the bucket and the `age` key. The ticket photos
+are in the database, so the backups carry them.
 
 ## 2. Entity-relationship diagrams
 
-The schema is split into three diagrams by domain. Each shows key columns only.
+The schema is split into four diagrams by domain. Each shows key columns only.
 
 - A solid line is a foreign key.
 - A dashed line is a logical link that code follows, without a foreign key.
@@ -367,6 +378,85 @@ erDiagram
     }
 ```
 
+### Centers, tickets, bank, certificates and payments
+
+```mermaid
+erDiagram
+    collection_center ||--o{ center_price : "price per material"
+    collection_center |o--o{ site : "sells to"
+    collection_center |o--o{ sale : "bought"
+    sale |o--o{ ticket_scan : "read from"
+    bank_statement ||--|{ bank_line : "movements"
+    bank_line |o..o| sale : "matched_id (no FK)"
+    bank_line |o..o| redemption_request : "matched_id (no FK)"
+    host ||--o{ certificate : "certified"
+    site |o--o{ certificate : "one site, or the whole host"
+    certificate ||--o{ impact_claim : "claims"
+    deposit_session ||--o{ impact_claim : "claimed once per attribute"
+    resident ||--o| merchant : "named merchant"
+    host |o--o{ merchant : "campus"
+    resident ||--o{ payment_request : "merchant_id, payer_id"
+    resident ||--o{ redemption_request : "merchant_id"
+
+    collection_center {
+        uuid id PK
+        string name UK
+    }
+    center_price {
+        uuid center_id PK, FK
+        string material PK
+        int cop_per_kg
+    }
+    ticket_scan {
+        uuid id PK
+        string status
+        jsonb reading
+        uuid sale_id FK
+    }
+    bank_statement {
+        uuid id PK
+        string file_sha256
+    }
+    bank_line {
+        uuid id PK
+        uuid statement_id FK
+        bigint amount_cop
+        string fingerprint UK
+        uuid matched_id UK
+    }
+    certificate {
+        uuid id PK
+        uuid host_id FK
+        uuid site_id FK
+        string period
+        string merkle_root
+        string status
+    }
+    impact_claim {
+        uuid id PK
+        uuid session_id FK
+        string attribute
+        uuid certificate_id FK
+    }
+    merchant {
+        uuid resident_id PK, FK
+        string nit
+    }
+    payment_request {
+        uuid id PK
+        uuid merchant_id FK
+        uuid payer_id FK
+        bigint amount_cop
+        string status
+    }
+    redemption_request {
+        uuid id PK
+        uuid merchant_id FK
+        bigint amount_cop
+        string status
+    }
+```
+
 ## 3. Tables
 
 Each table section gives its purpose, its columns, its constraints and indexes with the reason for
@@ -412,16 +502,19 @@ building, a residential complex. It was the `residence` table until migration `0
 | `opens_hour` | smallint | no | Default 0. First open hour, local time. |
 | `closes_hour` | smallint | no | Default 24. Closing hour, not included. The site is open in `[opens_hour, closes_hour)`. |
 | `slot_capacity` | smallint | no | Default 20. Participants per container per hour ([ADR 0009][adr-0009]). |
+| `center_id` | uuid | yes | FK → `collection_center.id`: the center this site sells to. Its price sizes the advances of the site's deposits ([ADR 0037][adr-0037]). Null: the general table. Since migration `0014`. |
 | `created_at` | timestamptz | no | |
 
 - `site_hours_valid`: `0 <= opens_hour AND opens_hour < closes_hour AND closes_hour <= 24`. The
   booking code assumes a non-empty window inside one day.
 - `site_slot_capacity_positive`: `slot_capacity > 0`. A capacity of 0 would make every hour full.
-- `ix_site_host_id`.
+- `ix_site_host_id`, `ix_site_center_id`.
 
-**Written by:** `create_site` and `set_schedule` in [`setup_routes.py`][setup-routes]; [`demo_seed.py`][demo-seed].
+**Written by:** `create_site` and `set_schedule` in [`setup_routes.py`][setup-routes];
+`set_site_center` in [`center_routes.py`][center-routes] (`center_id`); [`demo_seed.py`][demo-seed].
 **Read by:** [`bookings.py`][bookings] (hours and capacity), [`settlement.py`][settlement] (which
-host a bag's material came from), [`public.py`][public].
+host a bag's material came from), `reference_price` in [`centers.py`][centers] (which center's
+price an advance uses), [`public.py`][public].
 
 #### `device`
 
@@ -548,7 +641,8 @@ Two terms used below:
 
 **Written by:** [`sessions.py`][sessions] (`start`, `finish`, `review`, device messages, `sweep`);
 `on_measurement` in [`collection.py`][collection] (`collection_id`); `_complete` in
-[`recovery.py`][recovery] (moves rows from the new phone's resident to the recovered account).
+[`recovery_worker.py`][recovery-worker] (moves rows from the new phone's resident to the recovered
+account).
 **Read by:** [`api.py`][api] (`/v1/me`), [`public.py`][public], [`collection.py`][collection],
 [`settlement.py`][settlement], [`notifications.py`][notifications].
 
@@ -605,7 +699,8 @@ that participant at that container in that hour.
 
 #### `material_price`
 
-Reference price per material, used to size advances.
+The general reference price per material, used to size advances when the site's collection center
+has no price for that material ([`center_price`](#center_price), [ADR 0037][adr-0037]).
 
 | Column | Type | Null | Meaning |
 |---|---|---|---|
@@ -617,12 +712,15 @@ Reference price per material, used to size advances.
 - `material_price_cop_per_kg_check` (`cop_per_kg >= 0`), since migration `0009`. The API also caps
   it at 1,000,000.
 - The advance is `min(deposited_g × cop_per_kg × advance_ratio_bps / 10,000,000,
-  max_advance_cop)`, rounded down ([`pricing.py`][pricing]). The defaults are 5,000 bps (50 %) and
-  5,000 COP. A material without a row earns no advance, and the session logs `no_advance`.
+  max_advance_cop)`, rounded down ([`pricing.py`][pricing]). `cop_per_kg` is the center's price
+  when the container's site sells to a center that has one for the material, else this table's
+  (`reference_price` in [`centers.py`][centers]). The defaults are 5,000 bps (50 %) and 5,000 COP.
+  A deposit with neither price earns no advance, and the session logs `no_advance`.
 
 **Written by:** `set_price` in [`setup_routes.py`][setup-routes] (`PUT /v1/operator/prices/{material}`);
 [`demo_seed.py`][demo-seed].
-**Read by:** `_queue_advance` in [`sessions.py`][sessions]; `list_prices` in [`setup_routes.py`][setup-routes].
+**Read by:** `reference_price` in [`centers.py`][centers], which `_queue_advance` in
+[`sessions.py`][sessions] calls; `list_prices` in [`setup_routes.py`][setup-routes].
 
 #### `payout`
 
@@ -814,49 +912,127 @@ retry at once.
 
 ### 3.3b Collection centers
 
-[ADR 0037](adr/0037-prices-per-collection-center.md). Written by
-[`center_routes.py`](../apps/api/src/zyrcle_api/center_routes.py); read by `reference_price` in
-[`centers.py`](../apps/api/src/zyrcle_api/centers.py), which sizes each advance.
+Collection centers are described in [ADR 0037][adr-0037]. A center buys sealed bags; each site
+sells to one, and its price per material sizes the advances of that site's deposits.
 
-**`collection_center`.** A buyer of sealed bags: `id` (uuid), `name` (varchar(200), unique), `tax_id`
-(NIT, varchar(32)), `address`, `contact`, `active` (boolean, default true), `created_at`.
-
-**`center_price`.** What a center pays per kilogram of a material.
+#### `collection_center`
 
 | Column | Type | Null | Meaning |
 |---|---|---|---|
-| `center_id`, `material` | uuid, varchar(32) | no | Primary key. FK → `collection_center.id`. |
-| `cop_per_kg` | integer | no | CHECK `center_price_cop_per_kg_check` (≥ 0). |
-| `source` | varchar(16) | no | `manual`, or `sales` when the operator took the median of the center's recent sales. CHECK `center_price_source_valid`. |
-| `updated_by`, `updated_at` | | no | Who set it and when. |
+| `id` | uuid | no | Primary key. |
+| `name` | varchar(200) | no | Unique. Also how a ticket scan finds its center (a case-insensitive match on the name the model read). |
+| `tax_id` | varchar(32) | yes | The center's NIT. |
+| `address` | varchar(300) | yes | |
+| `contact` | varchar(200) | yes | |
+| `active` | boolean | no | Default true. A sale cannot name an inactive center. No route changes it yet. |
+| `created_at` | timestamptz | no | |
 
-`site.center_id` (FK, indexed, nullable) names the center a site sells to; `sale.center_id` (FK,
-indexed, nullable) the center that bought, when it is one on record.
+- `collection_center_name_key` (unique).
+
+**Written by:** `create_center` in [`center_routes.py`][center-routes]
+(`POST /v1/operator/centers`).
+**Read by:** [`center_routes.py`][center-routes], `record_sale` in [`sale_routes.py`][sale-routes],
+`scan_view` in [`ticket_routes.py`][ticket-routes].
+
+#### `center_price`
+
+What a center pays per kilogram of a material.
+
+| Column | Type | Null | Meaning |
+|---|---|---|---|
+| `center_id` | uuid | no | Part of the primary key. FK → `collection_center.id`. |
+| `material` | varchar(32) | no | Part of the primary key: a material code (checked by the API, not the database). |
+| `cop_per_kg` | integer | no | Price in COP per kilogram. The API caps it at 1,000,000. |
+| `source` | varchar(16) | no | `manual`, or `sales` when the operator took the suggested median of the center's confirmed sales of the last 90 days. |
+| `updated_by` | varchar(254) | no | The operator's email, or `token`. |
+| `updated_at` | timestamptz | no | Default `now()`. Set by code on change. |
+
+- `center_price_cop_per_kg_check` (`cop_per_kg >= 0`), `center_price_source_valid`.
+- A suggestion never writes this table by itself: the operator accepts it or types another price.
+
+**Written by:** `set_center_price` in [`center_routes.py`][center-routes]
+(`PUT /v1/operator/centers/{id}/prices/{material}`).
+**Read by:** `reference_price` in [`centers.py`][centers] (each advance), `center_view`.
 
 ### 3.3c Ticket scans
 
-[ADR 0038](adr/0038-reading-scale-tickets-with-ai.md). Written by
-[`ticket_routes.py`](../apps/api/src/zyrcle_api/ticket_routes.py) and `record_sale` in
-[`sale_routes.py`][sale-routes].
+Reading the scale ticket from a photo is described in [ADR 0038][adr-0038].
 
-**`ticket_scan`.** A photo of a scale ticket and what the model read: `id`, `image` (bytea, at most
-5 MB), `media_type`, `image_sha256` (indexed), `status` (`read`, `failed`; CHECK
-`ticket_scan_status_valid`), `model` and `request_id` of the call, `reading` (jsonb, the structured
-output), `error`, `created_by` (the operator), `sale_id` (FK → `sale.id`, indexed, set when a sale is
-recorded from it), `created_at`. The photos are in the database, so the backups carry them.
+#### `ticket_scan`
+
+A photo of a scale ticket and what the model read from it, kept for audit.
+
+| Column | Type | Null | Meaning |
+|---|---|---|---|
+| `id` | uuid | no | Primary key. |
+| `image` | bytea | no | The photo, at most 5 MB (checked by the API). The browser sends it shrunk to 1600 pixels. |
+| `media_type` | varchar(32) | no | `image/jpeg`, `image/png` or `image/webp` (checked by the API). |
+| `image_sha256` | varchar(64) | no | sha256 of the photo, hex. |
+| `status` | varchar(16) | no | `read` or `failed`, set once. |
+| `model` | varchar(64) | yes | The model that answered, for example `claude-opus-5-5`. |
+| `request_id` | varchar(100) | yes | The API request id, to trace the call. |
+| `reading` | jsonb | yes | The structured output: `readable`, `center_name`, `ticket_ref`, `date`, `lines` (`material`, `label`, `kg`, `cop_per_kg`, `amount_cop`), `total_cop`, `notes`. Null when the reading failed. |
+| `error` | text | yes | Why the reading failed. |
+| `created_by` | varchar(254) | no | The operator who sent the photo. |
+| `sale_id` | uuid | yes | FK → `sale.id`: the sale recorded from this scan. Set once. |
+| `created_at` | timestamptz | no | Default `now()`. |
+
+- `ticket_scan_status_valid`.
+- `ix_ticket_scan_image_sha256`, `ix_ticket_scan_sale_id`.
+- One scan becomes at most one sale: `record_sale` locks the scan and refuses one that already has
+  a `sale_id` (409). No unique index enforces it.
+- The arithmetic checks and the proposed bags are computed when the scan is read back, not stored.
+
+**Written by:** `scan_ticket` in [`ticket_routes.py`][ticket-routes]
+(`POST /v1/operator/ticket-scans`); `record_sale` in [`sale_routes.py`][sale-routes] (`sale_id`).
+**Read by:** [`ticket_routes.py`][ticket-routes].
 
 ### 3.3d Bank statements
 
-[ADR 0039](adr/0039-bank-statement-matching.md). Written by
-[`bank_routes.py`](../apps/api/src/zyrcle_api/bank_routes.py).
+Matching the bank statement is described in [ADR 0039][adr-0039].
 
-**`bank_statement`.** An uploaded export: `id`, `filename`, `file_sha256`, `lines`, `uploaded_by`,
-`created_at`.
+#### `bank_statement`
 
-**`bank_line`.** One movement: `posted_on` (date), `description`, `reference`, `amount_cop` (credits
-positive, debits negative), `fingerprint` (unique: the same movement in two statements is kept
-once), and once matched `matched_kind` (`sale`, `redemption`; CHECK `bank_line_matched_kind_valid`),
-`matched_id` (unique: a sale or redemption is paid by one movement), `matched_by`, `matched_at`.
+One uploaded export of the bank account.
+
+| Column | Type | Null | Meaning |
+|---|---|---|---|
+| `id` | uuid | no | Primary key. |
+| `filename` | varchar(200) | no | The file's name as uploaded. |
+| `file_sha256` | varchar(64) | no | sha256 of the file, hex. Not unique: the same file can be uploaded twice. |
+| `lines` | integer | no | How many movements the file held, new or already known. |
+| `uploaded_by` | varchar(254) | no | The operator's email, or `token`. |
+| `created_at` | timestamptz | no | Default `now()`. |
+
+**Written by:** `upload_statement` in [`bank_routes.py`][bank-routes]. The file itself is not kept.
+
+#### `bank_line`
+
+One movement of the bank account. Credits pay sales; debits pay redemptions.
+
+| Column | Type | Null | Meaning |
+|---|---|---|---|
+| `id` | uuid | no | Primary key. |
+| `statement_id` | uuid | no | FK → `bank_statement.id`: the upload that first brought it. |
+| `posted_on` | date | no | The bank's date. |
+| `description` | varchar(300) | no | The bank's description, as exported. |
+| `reference` | varchar(100) | no | The bank's reference or document number, or empty. Becomes the sale's or redemption's `bank_ref` when matched. |
+| `amount_cop` | bigint | no | Credits positive, debits negative. |
+| `fingerprint` | varchar(64) | no | Unique. A hash of date, amount, reference, description and the movement's repeat number in its file, so the same movement in two statements is kept once. |
+| `matched_kind` | varchar(16) | yes | `sale` or `redemption`, once matched. |
+| `matched_id` | uuid | yes | Unique. The sale or redemption it pays. No foreign key: it points to one of two tables. |
+| `matched_by` | varchar(254) | yes | The operator who confirmed the match. |
+| `matched_at` | timestamptz | yes | |
+| `created_at` | timestamptz | no | Default `now()`. |
+
+- `bank_line_fingerprint_key` (unique), `bank_line_matched_id_key` (unique: a sale or redemption is
+  paid by one movement), `bank_line_matched_kind_valid` (null or one of the two kinds).
+- `ix_bank_line_statement_id`.
+
+**Written by:** `upload_statement` (inserts) and `match_line` (`matched_*`, under a row lock) in
+[`bank_routes.py`][bank-routes].
+**Read by:** `proposals` in [`bank_routes.py`][bank-routes], which scores unmatched lines against
+`recorded` sales and `pending` redemptions ([`bank.py`][bank]).
 
 ### 3.4 Sales and settlement
 
@@ -873,6 +1049,7 @@ means an operator saw the money in the bank.
 |---|---|---|---|
 | `id` | uuid | no | Primary key. |
 | `buyer` | varchar(200) | no | Who bought the material. |
+| `center_id` | uuid | yes | FK → `collection_center.id`: the center that bought, when it is one on record ([ADR 0037][adr-0037]). Its confirmed sales feed the center's suggested prices. Since migration `0014`. |
 | `ticket_ref` | varchar(100) | no | The ticket's reference. Not unique. |
 | `sold_on` | timestamptz | no | Noon, local time, of the date the operator entered. |
 | `total_cop` | bigint | no | The sum of the line amounts, computed by the code. |
@@ -885,11 +1062,14 @@ means an operator saw the money in the bank.
 | `created_at` | timestamptz | no | |
 
 - `sale_status_valid`, `sale_total_positive` (`total_cop > 0`).
+- `ix_sale_center_id`.
 
-**Written by:** `record_sale` and `confirm_sale` in [`sale_routes.py`][sale-routes].
-`confirm_sale` requires the amount the bank received to equal `total_cop`.
+**Written by:** `record_sale` and `confirm_sale` in [`sale_routes.py`][sale-routes], and
+`match_line` in [`bank_routes.py`][bank-routes], which confirms through the same
+`apply_bank_match`. Confirming requires the amount the bank received to equal `total_cop`.
 **Read by:** [`settlement.py`][settlement] (only lines of confirmed sales are claimed; the evidence
-hash goes on chain).
+hash goes on chain); `suggested_prices` in [`centers.py`][centers]; the bank proposals
+(`recorded` sales wait for their movement).
 
 #### `sale_line`
 
@@ -956,9 +1136,13 @@ each deposit got); `notify_settlement` in [`notifications.py`][notifications].
 
 ### 3.4b Impact certificates
 
-[ADR 0027](adr/0027-impact-certificates.md). Written by [`impact.py`](../apps/api/src/zyrcle_api/impact.py).
+Impact certificates are described in [ADR 0027][adr-0027]. Both tables are written by
+[`impact.py`][impact]: `issue` inserts a certificate and its claims in one transaction, and the
+`AnchorWorker` pins the public copy and anchors the root.
 
-**`certificate`.** A host's (or one site's) certificate for a month.
+#### `certificate`
+
+A host's (or one site's) certificate for a month.
 
 | Column | Type | Null | Meaning |
 |---|---|---|---|
@@ -971,16 +1155,23 @@ each deposit got); `notify_settlement` in [`notifications.py`][notifications].
 | `grams`, `co2e_g` | bigint | no | Material sold, and grams of CO2e avoided against landfilling. |
 | `by_material` | jsonb | no | `{material: {"grams", "co2e_g"}}`. |
 | `merkle_root` | varchar(66) | no | `0x` + sha256 root of the leaves. |
-| `status` | varchar(16) | no | `issued`, `anchored`, `failed`. |
+| `status` | varchar(16) | no | `issued`, `anchored`, `failed`. The code writes the first two: a failed anchor is retried every 30 seconds. |
 | `anchor_tx` | varchar(66) | yes | The transaction whose data carries the root. |
-| `ipfs_cid` | varchar(100) | yes | CID of the public copy pinned on IPFS before anchoring, when Pinata is configured; the anchor then carries it too ([amendment of 2026-11-22](adr/0027-impact-certificates.md#amendments)). |
-| `attempts`, `next_attempt_at`, `last_error` | | | Anchor worker bookkeeping. |
+| `ipfs_cid` | varchar(100) | yes | CID of the public copy pinned on IPFS before anchoring, when Pinata is configured; the anchor then carries it too ([amendment of 2026-11-22](adr/0027-impact-certificates.md#amendments), migration `0013`). |
+| `attempts` | integer | no | Default 0. Incremented on every claim. |
+| `next_attempt_at` | timestamptz | yes | Not due before this. A claimed row is set 5 minutes ahead as a lease. |
+| `last_error` | text | yes | Why the last anchor failed (Pinata, the chain, gas). |
 | `issued_by` | varchar(254) | no | The operator's email, or `token`. |
-| `created_at`, `anchored_at` | timestamptz | | |
+| `created_at` | timestamptz | no | |
+| `anchored_at` | timestamptz | yes | |
 
-Indexes: `certificate_host_period_idx`, `certificate_due_idx` (anchor worker).
+- `certificate_status_valid`, `certificate_period_valid`.
+- `certificate_host_period_idx` on `(host_id, period)`; `certificate_due_idx` on
+  `(status, next_attempt_at)`, the anchor worker's claim query.
 
-**`impact_claim`.** The claim ledger: one environmental attribute of one deposit, claimed once.
+#### `impact_claim`
+
+The claim ledger: one environmental attribute of one deposit, claimed once.
 
 | Column | Type | Null | Meaning |
 |---|---|---|---|
@@ -991,29 +1182,89 @@ Indexes: `certificate_host_period_idx`, `certificate_due_idx` (anchor worker).
 | `grams` | integer | no | The deposit's verified grams at the time of the claim. |
 | `created_at` | timestamptz | no | |
 
-`one_claim_per_deposit_attribute` (unique `session_id, attribute`) is what makes "one gram, one
-claim" a database rule: a second certificate over the same deposit fails on it, even under
-concurrent requests.
+- `one_claim_per_deposit_attribute` (unique `session_id, attribute`) is what makes "one gram, one
+  claim" a database rule: a second certificate over the same deposit fails on it, even under
+  concurrent requests.
+- `impact_claim_attribute_valid`; `ix_impact_claim_certificate_id`.
 
 ### 3.4c Merchants, payments and redemptions
 
-[ADR 0029](adr/0029-closed-loop-payments.md). Written by [`payments.py`](../apps/api/src/zyrcle_api/payments.py).
+Spending on campus is described in [ADR 0029][adr-0029]. The rows are written by
+[`payments.py`][payments] and the operator routes in [`payment_routes.py`][payment-routes]; the
+`RelayWorker` puts the signed `Execute` of each payment and redemption on chain with the guardian
+key.
 
-**`merchant`.** A participant named a merchant: `resident_id` (PK, FK → `resident.id`), `name`,
-`nit` (the tax id, KYC reference), `host_id` (optional campus), `active`, `created_at`.
+#### `merchant`
 
-**`payment_request`.** A merchant's charge. `merchant_id` and `payer_id` (FK → `resident.id`),
-`amount_cop` (CHECK > 0), `concept`, `status` (`open`, `paying`, `paid`, `failed`, `expired`), the
-payer's `signature`, `deadline` and `nonce`, `tx_hash`, relay bookkeeping (`attempts`,
-`next_attempt_at`, `last_error`), `expires_at` (10 minutes after creation), `created_at`, `paid_at`.
-`one_payment_in_flight_per_payer` (unique on `payer_id` where `status = 'paying'`) keeps one
-payment per payer in flight, so their account's nonces never collide.
+A participant the operator named a merchant. A merchant is paid at the same account as any
+participant.
 
-**`redemption_request`.** A merchant turning ZYR into pesos. `merchant_id`, `amount_cop`, `status`
-(`signing`, `requested`, `pending`, `settled`, `refunded`, `failed`), `signature`, `deadline`,
-`nonce`, `request_tx` (the relayed `redeem`), `decision_tx` (settle or refund), `bank_ref`,
-`decided_by`, relay bookkeeping, `created_at`, `updated_at`. Its id, hashed, is the Treasury's
-reference for the redemption (`chain.redemption_ref`).
+| Column | Type | Null | Meaning |
+|---|---|---|---|
+| `resident_id` | uuid | no | Primary key. FK → `resident.id`. |
+| `name` | varchar(200) | no | The business name shown to payers. |
+| `nit` | varchar(32) | no | The tax id: the KYC reference, checked off line. |
+| `host_id` | uuid | yes | FK → `host.id`: the campus it sells on, if any. |
+| `active` | boolean | no | Default true. An inactive merchant cannot charge or redeem. |
+| `created_at` | timestamptz | no | |
+
+**Written by:** `name_merchant` in [`payment_routes.py`][payment-routes] (insert or update).
+
+#### `payment_request`
+
+A merchant's charge, paid by a participant's signed `Execute` that the backend relays.
+
+| Column | Type | Null | Meaning |
+|---|---|---|---|
+| `id` | uuid | no | Primary key. The QR is `zyrcle://p/<id>`. |
+| `merchant_id` | uuid | no | FK → `resident.id`: the merchant. |
+| `amount_cop` | bigint | no | The charge. |
+| `concept` | varchar(120) | no | What it is for; may be empty. |
+| `status` | varchar(16) | no | See [section 4.9](#49-other-status-columns). |
+| `payer_id` | uuid | yes | FK → `resident.id`: who paid, set when they sign. |
+| `signature`, `deadline`, `nonce` | varchar(200), bigint, bigint | yes | The payer's EIP-712 signature over the `Execute`, and its deadline and account nonce. |
+| `tx_hash` | varchar(66) | yes | The relayed transaction. |
+| `attempts` | integer | no | Default 0. Relay attempts. |
+| `next_attempt_at` | timestamptz | yes | Not due before this; a claimed row is set 2 minutes ahead. |
+| `last_error` | text | yes | |
+| `expires_at` | timestamptz | no | 10 minutes after creation. |
+| `created_at` | timestamptz | no | |
+| `paid_at` | timestamptz | yes | |
+
+- `payment_request_status_valid`, `payment_request_amount_positive` (`amount_cop > 0`).
+- `one_payment_in_flight_per_payer`: unique `(payer_id)` where `status = 'paying'`. One payment per
+  payer in flight, so their account's nonces never collide.
+- `payment_request_due_idx` on `(status, next_attempt_at)`: the relay worker's claim query.
+- `ix_payment_request_merchant_id`, `ix_payment_request_payer_id`.
+
+#### `redemption_request`
+
+A merchant turning ZYR into pesos. Its id, hashed, is the Treasury's reference for the redemption
+(`redemption_ref` in [`chain.py`][chain]).
+
+| Column | Type | Null | Meaning |
+|---|---|---|---|
+| `id` | uuid | no | Primary key. |
+| `merchant_id` | uuid | no | FK → `resident.id`: the merchant. |
+| `amount_cop` | bigint | no | The ZYR sent to the Treasury, and the pesos owed. |
+| `status` | varchar(16) | no | See [section 4.9](#49-other-status-columns). |
+| `signature`, `deadline`, `nonce` | varchar(200), bigint, bigint | yes | The merchant's signed `Execute` to the Treasury's `redeem`. |
+| `request_tx` | varchar(66) | yes | The relayed `redeem`. |
+| `decision_tx` | varchar(66) | yes | `settleRedemption` or `refundRedemption`. |
+| `bank_ref` | varchar(100) | yes | The transfer's reference, typed or taken from a matched bank movement. |
+| `decided_by` | varchar(254) | yes | The operator who settled or refunded it. |
+| `attempts` | integer | no | Default 0. Relay attempts. |
+| `next_attempt_at` | timestamptz | yes | Not due before this; a claimed row is set 2 minutes ahead. |
+| `last_error` | text | yes | |
+| `created_at`, `updated_at` | timestamptz | no | |
+
+- `redemption_request_status_valid`, `redemption_request_amount_positive` (`amount_cop > 0`).
+- `redemption_request_due_idx` on `(status, next_attempt_at)`: the relay worker's claim query.
+- `ix_redemption_request_merchant_id`.
+
+**Written by:** [`payments.py`][payments] (`redemption_intent`, `sign_redemption`, the
+`RelayWorker`, `decide_redemption`), called by the merchant and operator routes and by `match_line`
+in [`bank_routes.py`][bank-routes].
 
 ### 3.5 Participants and accounts
 
@@ -1030,6 +1281,8 @@ participant, collectors included. A participant is their account, not their phon
 | `owner_address` | varchar(42) | no | Unique. The phone key that signs in and controls the account. A recovery replaces it. |
 | `email` | varchar(254) | yes | Unique. The verified recovery email, lowercase. Set only after the participant typed the code sent to it. |
 | `email_verified_at` | timestamptz | yes | |
+| `privacy_version` | varchar(16) | yes | The data-processing policy the participant accepted (its date, for example `2026-11-22`), or null. Since migration `0011` ([ADR 0028][adr-0028]). |
+| `privacy_accepted_at` | timestamptz | yes | When they accepted it. |
 | `created_at` | timestamptz | no | |
 
 - `resident_owner_address_key` (unique): sign-in finds the resident by the signing key.
@@ -1039,9 +1292,11 @@ participant, collectors included. A participant is their account, not their phon
 
 **Written by:** `verify_siwe` in [`auth.py`][auth] (creates a resident on a key's first sign-in;
 gives older residents their account address); `verify_email` in [`email_codes.py`][email-codes]
-and `ensure_account` in [`recovery.py`][recovery]; `_complete` in [`recovery_worker.py`][recovery-worker] (sets the new
-`owner_address` and deletes the new phone's own resident).
-**Read by:** almost everything. `resident_dep` in [`api.py`][api] checks `owner_address` against
+and `ensure_account` in [`recovery.py`][recovery]; `consent` in [`api.py`][api]
+(`POST /v1/me/consent`, the privacy columns); `_complete` in
+[`recovery_worker.py`][recovery-worker] (sets the new `owner_address` and deletes the new phone's
+own resident).
+**Read by:** almost everything. `resident_dep` in [`deps.py`][deps] checks `owner_address` against
 the token on every request, so a recovery ends the old phone's session at once.
 
 #### `auth_nonce`
@@ -1124,8 +1379,8 @@ A **lease** is a time during which a claimed row is left alone by other workers.
 - `account_recovery_due_idx` on `(status, next_attempt_at)`: the worker's claim query.
 - `ix_account_recovery_resident_id`.
 
-**Written by:** [`recovery.py`][recovery]: `start_recovery`, `cancel_recovery` and
-`RecoveryWorker`.
+**Written by:** `start_recovery` and `cancel_recovery` in [`recovery.py`][recovery], and the
+`RecoveryWorker` in [`recovery_worker.py`][recovery-worker].
 **What a completed recovery changes,** in one transaction (`_complete`): it deletes the account's
 old push tokens; moves the new phone's push tokens, deposit sessions and bookings to the account;
 deletes the new phone's notifications; deletes the new phone's resident (its `email_code` rows
@@ -1162,7 +1417,7 @@ The outbox for push notifications. It is written in the transaction that caused 
 |---|---|---|---|
 | `id` | uuid | no | Primary key. |
 | `resident_id` | uuid | no | FK → `resident.id`: who to notify. |
-| `kind` | varchar(32) | no | `deposit_review`, `deposit_rejected`, `deposit_approved`, `payout_confirmed`, `settlement_paid`, `recovery_started`, `recovery_done` or `recovery_cancelled`. |
+| `kind` | varchar(32) | no | `deposit_review`, `deposit_rejected`, `deposit_approved`, `payout_confirmed`, `settlement_paid`, `recovery_started`, `recovery_done`, `recovery_cancelled`, `payment_received`, `redemption_settled` or `redemption_refunded`. |
 | `dedupe_key` | varchar(120) | no | Unique. `<kind>:<id of the cause>`, for example `payout_confirmed:<payout id>`. |
 | `title` | varchar(120) | no | Notification title. |
 | `body` | varchar(400) | no | Notification text. |
@@ -1183,8 +1438,9 @@ The outbox for push notifications. It is written in the transaction that caused 
 - `ix_notification_resident_id`.
 
 **Written by:** `enqueue` in [`notifications.py`][notifications], called from
-[`sessions.py`][sessions], [`payouts.py`][payouts], [`settlement.py`][settlement] and
-[`recovery.py`][recovery]; `NotificationWorker`; `_complete` in [`recovery_worker.py`][recovery-worker] (deletes
+[`sessions.py`][sessions], [`payouts.py`][payouts], [`settlement.py`][settlement],
+[`recovery.py`][recovery], [`recovery_worker.py`][recovery-worker] and [`payments.py`][payments];
+`NotificationWorker`; `_complete` in [`recovery_worker.py`][recovery-worker] (deletes
 the new phone's rows).
 
 #### `email_message`
@@ -1195,8 +1451,8 @@ through Resend's HTTP API ([ADR 0010][adr-0010]).
 | Column | Type | Null | Meaning |
 |---|---|---|---|
 | `id` | uuid | no | Primary key. Also the `Idempotency-Key` sent to Resend. |
-| `kind` | varchar(32) | no | `code_verify`, `code_recover`, `code_operator`, `recovery_started`, `recovery_cancelled` or `recovery_done`. |
-| `dedupe_key` | varchar(120) | no | Unique. For example `code:<email_code id>`, `code_operator:<operator_code id>` or `recovery_started:<recovery id>`. |
+| `kind` | varchar(32) | no | `code_verify`, `code_recover`, `code_operator`, `recovery_started`, `recovery_cancelled`, `recovery_done`, or `alert` (a health warning to each active admin, [ADR 0028][adr-0028]). |
+| `dedupe_key` | varchar(120) | no | Unique. For example `code:<email_code id>`, `code_operator:<operator_code id>`, `recovery_started:<recovery id>` or `alert:<warning kind>:<day>:<email>` (at most one per kind, day and admin). |
 | `to` | varchar(254) | no | Recipient. `to` is an SQL keyword: quote it in raw SQL. |
 | `subject` | varchar(200) | no | Subject. |
 | `text_body` | text | no | Plain-text body. |
@@ -1216,8 +1472,10 @@ through Resend's HTTP API ([ADR 0010][adr-0010]).
 - For the three `code_*` kinds, the worker replaces the subject with "Código de Zyrcle" and empties
   both bodies when the row ends `sent` or `failed` ([section 8](#8-data-that-must-never-be-stored)).
 
-**Written by:** `enqueue_email` in [`mail.py`][mail], called from [`recovery.py`][recovery] and
-[`operator_auth.py`][operator-auth]; `EmailWorker` in [`mail.py`][mail].
+**Written by:** `enqueue_email` in [`mail.py`][mail], called from
+[`email_codes.py`][email-codes], [`recovery.py`][recovery], [`recovery_worker.py`][recovery-worker],
+[`operator_auth.py`][operator-auth] and the `AlertWorker` in [`health.py`][health]; `EmailWorker`
+in [`mail.py`][mail].
 
 ### 3.7 Operators
 
@@ -1267,7 +1525,7 @@ enqueued only for an active operator's address.
 ### 3.8 `alembic_version`
 
 Alembic's own bookkeeping table. One row, `version_num varchar(32)`, holds the current revision
-(`0008`).
+(`0016`).
 
 ## 4. State machines
 
@@ -1483,13 +1741,25 @@ stateDiagram-v2
 - The contract error `RecoveryNotReady` does not fail the row. The worker tries again a minute
   later, because the chain's clock may be behind the server's.
 - Other errors (network) retry after 30 seconds without a status change.
-- All transitions are in [`recovery.py`][recovery].
+- The transitions are in [`recovery.py`][recovery] (start, cancel) and
+  [`recovery_worker.py`][recovery-worker] (every chain step).
 
 ### 4.9 Other status columns
 
 - `booking.status`: `booked → cancelled`. The participant can cancel before the hour ends, unless
   the spot is a walk-in or was already used ([`bookings.py`][bookings]).
 - `incident.status`: `open → resolved`, by an operator with a note.
+- `certificate.status`: `issued → anchored`, by the anchor worker once the root (and the IPFS CID,
+  when Pinata is on) is on chain. `failed` is allowed but not written ([`impact.py`][impact]).
+- `payment_request.status`: `open → paying` when the payer signs, then `paid` or `failed` by the
+  relay worker; `open → expired` when the charge is read after its 10 minutes
+  ([`payments.py`][payments]).
+- `redemption_request.status`: `signing` (intent made) `→ requested` (signed) `→ pending`
+  (relayed, waiting for the operator's transfer) `→ settled` or `refunded`; `requested → failed`
+  when the relay fails for good ([`payments.py`][payments]).
+- `ticket_scan.status`: `read` or `failed`, written once.
+- `bank_line.matched_kind`: null until an operator matches the movement, then `sale` or
+  `redemption`, once.
 
 ## 5. Outbox tables and workers
 
@@ -1524,6 +1794,17 @@ There are two claim styles:
 | `notification` | `enqueue` in [`notifications.py`][notifications]. | `pending` and due. Batch of 50 every `notification_interval_s` (2 s). Also locks the participants' enabled push tokens. Requests carry up to 100 messages. | Network, 429, 5xx, `MessageRateExceeded`: `min(15 × 2^attempts, 1800)` s, up to 6 attempts. About 15 minutes after sending, a second pass reads Expo's receipts. | `dedupe_key` makes enqueueing idempotent. Delivery is at least once: a crash after Expo accepted, before the commit, sends again. |
 | `email_message` | `enqueue_email` in [`mail.py`][mail]. | `pending` and due. Batch of 10 every `email_interval_s` (1 s). | Provider unavailable: the provider's retry time or `min(15 × 2^attempts, 1800)` s, up to 6 attempts. Code emails older than 10 minutes fail unsent. | `dedupe_key` makes enqueueing idempotent. Resend receives `Idempotency-Key = email_message.id`, so a resend after a crash or a timeout does not send a second email ([`mail.py`][mail]). |
 
+Three more tables are worked the claim-then-work way, each by its own worker:
+
+| Table | Worker | Claim | Retries |
+|---|---|---|---|
+| `certificate` | `AnchorWorker` in [`impact.py`][impact] | `issued` and due, batch of 5 every `settlement_interval_s` (3 s); `next_attempt_at` set 5 minutes ahead as a lease, `attempts + 1`, commit. Pins the public copy first, when Pinata is on, and keeps its CID before anchoring | Any error: 30 s, no limit |
+| `payment_request` | `RelayWorker` in [`payments.py`][payments] | `paying` and due, batch of 5 every `relay_interval_s` (2 s); lease of 2 minutes, `attempts + 1`, commit | Network and other errors: 30 s, no limit. A contract refusal (bad signature, expired, not enough ZYR): `failed` |
+| `redemption_request` | the same `RelayWorker` | `requested` and due, the same way | The same |
+
+The relay worker deploys the payer's account first if it has none, and checks the account's nonce
+before sending, so a payment relayed by an earlier attempt is not sent again.
+
 `account_recovery` follows the claim-then-work style without being a strict outbox. The worker
 selects live rows with `next_attempt_at <= now` (`SKIP LOCKED`), sets `next_attempt_at` to now +
 2 minutes as a lease, increments `attempts`, commits, then runs the chain step for the row's
@@ -1535,9 +1816,10 @@ out stalled rows) and `rotate_codes` (new QR codes for online devices).
 Workers start only when their dependencies are configured ([`main.py`][main], [`config.py`][config]):
 
 - payouts need the chain (`chain_enabled`);
-- settlements need the chain and the operator key (`sales_enabled`);
-- recoveries need the chain and the account factory (`accounts_enabled`);
-- email needs a Resend key or log-only mode (`email_enabled`);
+- settlements and certificate anchors need the chain and the operator key (`sales_enabled`);
+- recoveries and relayed payments need the chain and the account factory (`accounts_enabled`);
+- email, and the health alerts that go by email, need a Resend key or log-only mode
+  (`email_enabled`);
 - push needs `push_enabled`.
 
 Until a worker runs, its rows stay `pending`.
@@ -1556,13 +1838,17 @@ Until a worker runs, its rows stay `pending`.
 | One advance per deposit | `payout_session_id_key` |
 | A bag is sold at most once | `sale_line_bag_id_key` |
 | One settlement row per party per sale line | `one_settlement_per_party` |
+| One gram, one claim: a deposit's attribute is claimed by one certificate | `one_claim_per_deposit_attribute` |
+| One payment in flight per payer | Partial unique index `one_payment_in_flight_per_payer` |
+| A bank movement is stored once, and pays at most one sale or redemption | `bank_line_fingerprint_key`, `bank_line_matched_id_key` |
+| One price per center and material | Primary key `center_price (center_id, material)` |
 | A device message is stored once | Primary key `(device_id, seq)` |
-| Containers have a positive area and depth; prices are not negative | `container_area_mm2_check`, `container_depth_mm_check`, `material_price_cop_per_kg_check` (migration `0009`) |
+| Containers have a positive area and depth; prices are not negative | `container_area_mm2_check`, `container_depth_mm_check`, `material_price_cop_per_kg_check` (migration `0009`), `center_price_cop_per_kg_check` |
 | A device drives at most one container | `container_device_id_key` |
-| Unique identities | Unique `resident.address`, `resident.owner_address`, `resident.email`, `operator.email`, `bag.code` |
+| Unique identities | Unique `resident.address`, `resident.owner_address`, `resident.email`, `operator.email`, `bag.code`, `collection_center.name` |
 | Enqueueing a notification or an email is idempotent | Unique `dedupe_key` |
 | Status, state, kind, role, party and purpose values | `*_valid` CHECK constraints |
-| Positive amounts | `payout_amount_positive`, `sale_total_positive`, `sale_line_amount_positive`, `sale_line_buyer_g_positive`, `bag_grams_not_negative` |
+| Positive amounts | `payout_amount_positive`, `sale_total_positive`, `sale_line_amount_positive`, `sale_line_buyer_g_positive`, `bag_grams_not_negative`, `payment_request_amount_positive`, `redemption_request_amount_positive` |
 | Valid opening hours and capacity | `site_hours_valid`, `site_slot_capacity_positive` |
 | References exist | Foreign keys; `email_code.resident_id` cascades; `account_recovery.new_resident_id` is set null |
 
@@ -1581,13 +1867,17 @@ Until a worker runs, its rows stay `pending`.
 | One bag per material per collection; the bag is open, belongs to this collector, and its material is accepted | `add_fill` in [`collection.py`][collection] | |
 | `bag.grams` equals the sum of its fills' grams | `_close_fill` in [`collection.py`][collection] | |
 | Only sealed bags without open incidents are sold; a weight gap opens a `bag_balance` incident | `record_sale` | |
-| A sale is confirmed only when the bank amount equals `total_cop` | `confirm_sale` | |
+| A sale is confirmed only when the bank amount equals `total_cop` | `apply_bank_match` in [`sale_routes.py`][sale-routes] | Used by `confirm_sale` and by a bank match. |
+| A credit pays a sale and a debit a redemption, of the same amount | `match_line` in [`bank_routes.py`][bank-routes] | |
+| A ticket scan becomes at most one sale | `record_sale` | Locks the scan; `ticket_scan.sale_id` is indexed, not unique. |
+| An advance uses the site's center price, else the general price | `reference_price` in [`centers.py`][centers] | |
+| A sale names only an active center | `record_sale` | |
 | Nothing settles before confirmation, or while an incident, a review or an advance is pending | `SettlementWorker._claim`, `_plan` | |
-| Material codes are valid | [`api.py`][api] and [`collection_routes.py`][collection-routes] (`MATERIALS`) | No CHECK on `accepted_materials`, `declared_material`, `bag.material` or `material_price.material`. |
+| Material codes are valid | [`api.py`][api], [`setup_routes.py`][setup-routes], [`collection_routes.py`][collection-routes] and [`center_routes.py`][center-routes] (`MATERIALS`) | No CHECK on `accepted_materials`, `declared_material`, `bag.material`, `material_price.material` or `center_price.material`. |
 | Addresses and emails are lowercase | [`auth.py`][auth], [`recovery.py`][recovery], [`operator_auth.py`][operator-auth], route models | |
 | `updated_at` is current | Every writer | No trigger. |
 | `session_event` is append-only | Convention | No trigger. |
-| Code attempt limits and rate limits | [`recovery.py`][recovery], [`operator_auth.py`][operator-auth] | |
+| Code attempt limits and rate limits | [`email_codes.py`][email-codes], [`operator_auth.py`][operator-auth] | The limits per request are in memory ([`ratelimit.py`][ratelimit]), not in the database. |
 | Only operators, and only admins where required, act on operator routes | [`operator_auth.py`][operator-auth] | |
 
 ## 7. Migrations
@@ -1604,16 +1894,18 @@ Until a worker runs, its rows stay `pending`.
 | [`0006`][m0006] | 2026-11-22 | `bag`, `collector`, `collection` with `one_active_collection_per_container`, `collection_fill` with `one_open_fill_per_collection`, `incident`; `deposit_session.collection_id`. | [ADR 0012][adr-0012] |
 | [`0007`][m0007] | 2026-11-22 | `sale`, `sale_line`, `settlement` with `one_settlement_per_party`. | [ADR 0013][adr-0013] |
 | [`0008`][m0008] | 2026-11-22 | `operator`, `operator_code`. | [ADR 0014][adr-0014] |
-| [`0016`][m0016] | 2026-11-23 | `bank_statement`, `bank_line`. | [ADR 0039](adr/0039-bank-statement-matching.md) |
-| [`0015`][m0015] | 2026-11-23 | `ticket_scan`. | [ADR 0038](adr/0038-reading-scale-tickets-with-ai.md) |
-| [`0014`][m0014] | 2026-11-23 | `collection_center`, `center_price`; `site.center_id`, `sale.center_id`. | [ADR 0037](adr/0037-prices-per-collection-center.md) |
-| [`0013`][m0013] | 2026-11-23 | `certificate.ipfs_cid`: the CID of the certificate's public copy on IPFS. | [ADR 0027, amendment](adr/0027-impact-certificates.md#amendments) |
-| [`0012`][m0012] | 2026-11-23 | `merchant`, `payment_request` with `one_payment_in_flight_per_payer`, `redemption_request`. | [ADR 0029](adr/0029-closed-loop-payments.md) |
-| [`0011`][m0011] | 2026-11-23 | `resident.privacy_version`, `privacy_accepted_at`: the data-processing policy each participant accepted. | [ADR 0028](adr/0028-pilot-readiness.md) |
-| [`0010`][m0010] | 2026-11-22 | `certificate`, `impact_claim` with `one_claim_per_deposit_attribute`. | [ADR 0027](adr/0027-impact-certificates.md) |
 | [`0009`][m0009] | 2026-11-22 | The three CHECKs the models declared but no migration created (`container.area_mm2`, `container.depth_mm`, `material_price.cop_per_kg`); operator identity columns widened to 254. | section 9 below |
+| [`0010`][m0010] | 2026-11-22 | `certificate`, `impact_claim` with `one_claim_per_deposit_attribute`. | [ADR 0027][adr-0027] |
+| [`0011`][m0011] | 2026-11-23 | `resident.privacy_version`, `privacy_accepted_at`: the data-processing policy each participant accepted. | [ADR 0028][adr-0028] |
+| [`0012`][m0012] | 2026-11-23 | `merchant`, `payment_request` with `one_payment_in_flight_per_payer`, `redemption_request`. | [ADR 0029][adr-0029] |
+| [`0013`][m0013] | 2026-11-23 | `certificate.ipfs_cid`: the CID of the certificate's public copy on IPFS. | [ADR 0027, amendment](adr/0027-impact-certificates.md#amendments) |
+| [`0014`][m0014] | 2026-11-23 | `collection_center`, `center_price`; `site.center_id`, `sale.center_id`, each with its index and foreign key. | [ADR 0037][adr-0037] |
+| [`0015`][m0015] | 2026-11-23 | `ticket_scan`. | [ADR 0038][adr-0038] |
+| [`0016`][m0016] | 2026-11-23 | `bank_statement`, `bank_line`. | [ADR 0039][adr-0039] |
 
-The dates are the `Create Date` lines of the migration files. Every migration has a downgrade.
+In production, `0005` to `0009` went out with block 1 of v1 (2026-11-22), `0010` to `0013` with
+block 2 and `0014` to `0016` with block 3 (both 2026-11-23) ([history](history.md)). The dates in
+the table are the `Create Date` lines of the migration files. Every migration has a downgrade.
 Downgrades drop the tables and columns their upgrade added, so the data in them is lost.
 
 ### 7.2 Creating a migration
@@ -1636,10 +1928,10 @@ Downgrades drop the tables and columns their upgrade added, so the data in them 
 3. **Generate the migration.** Revision ids are sequential four-digit strings.
 
    ```bash
-   .venv/bin/alembic revision --autogenerate --rev-id 0009 -m "what changes"
+   .venv/bin/alembic revision --autogenerate --rev-id 0017 -m "what changes"
    ```
 
-   This writes `migrations/versions/0009_what_changes.py`.
+   This writes `migrations/versions/0017_what_changes.py`.
 
 4. **Review it by hand.** Autogenerate is a draft.
    - It does not detect CHECK constraints. Add `op.create_check_constraint(...)` and
@@ -1678,8 +1970,9 @@ Downgrades drop the tables and columns their upgrade added, so the data in them 
    CI runs `alembic upgrade head` and `alembic check` on an empty database. Remember that
    `alembic check` does not see CHECK constraints or server defaults.
 
-7. **Deploy.** In production, the `migrate` service of the [deploy compose file][deploy-compose]
-   runs `alembic upgrade head` with the new API image.
+7. **Deploy.** In production, `deploy.sh` backs the database up, then the `migrate` service of the
+   [deploy compose file][deploy-compose] runs `alembic upgrade head` with the new API image, and
+   the revision is written to the deploy history ([ADR 0032][adr-0032]).
 
 ## 8. Data that must never be stored
 
@@ -1697,10 +1990,13 @@ Downgrades drop the tables and columns their upgrade added, so the data in them 
    - The Treasury oracle, operator and guardian keys are files on the server
      ([ADR 0022][adr-0022]). Settings name them (`oracle_key_file`, `operator_key_file`,
      `guardian_key_file`) and [`main.py`][main] loads them into memory at startup.
+   - The chain's admin powers belong to a 2-of-3 Safe whose owners' keys are not on the server
+     ([ADR 0040][adr-0040]). The database holds nothing about it.
    - Participants' phone keys stay on the phone ([ADR 0006][adr-0006]).
    - Device signing keys stay on the device.
-4. **Secrets and tokens.** `jwt_secret`, `operator_token`, the Resend API key and the Expo access
-   token come from environment settings. JWTs are not stored. A participant's session ends when
+4. **Secrets and tokens.** `jwt_secret`, `operator_token`, the Resend API key, the Expo access
+   token, the Pinata JWT, the Anthropic API key and the Sentry DSN come from environment settings.
+   JWTs are not stored. A participant's session ends when
    `resident.owner_address` no longer matches the token's key; an operator's ends when
    `operator.active` is false.
 
@@ -1712,6 +2008,10 @@ Sensitive data that is stored on purpose, and needs care:
   server must compare them, and each lives at most 60 seconds. Public views must never return them.
   Only the demo routes in [`demo.py`][demo], mounted only in demo mode, show the live QR.
 - **Wallet addresses**, which link a participant to their on-chain balance and history.
+- **Ticket photos** (`ticket_scan.image`) and **bank movements** (`bank_line.description` and
+  `reference`): whatever the collection center printed and the bank exported, which can name
+  people and businesses. Only operator routes read them.
+- **Merchants' tax ids** (`merchant.nit`) and **centers' contacts** (`collection_center.contact`).
 
 ## 9. Discrepancies found while writing this, and what happened to them
 
@@ -1723,7 +2023,7 @@ Found on 2026-11-22 by comparing the code with its comments, docstrings and ADRs
 | 2 | `account_recovery.cancelled_by` comment omitted `replaced` | Fixed: comment updated |
 | 3 | `SaleLine` docstring did not show every transition | Fixed: docstring matches section 4.4 |
 | 4 | `CollectionFill` docstring did not mention the 10 g noise floor | Fixed: docstring updated |
-| 5 | `material_price.source = 'sales'` is never written | Documented as planned: prices from confirmed sales are not built yet |
+| 5 | `material_price.source = 'sales'` is never written | Still true for the general table. Prices from confirmed sales came per collection center in block 3: `center_price.source = 'sales'` when the operator takes the suggested median ([ADR 0037][adr-0037]) |
 | 6 | Operator identity columns were `varchar(64)`, operator emails up to 254 | Fixed: migration `0009` widens `reviewed_by`, `resolved_by`, `recorded_by`, `confirmed_by` to 254 |
 | 7 | Operator code emails were queued even with email off, so the plaintext code stayed `pending` | Fixed: no code email is written when email is off |
 | 8 | ADR 0012 said only credited deposits are linked to a collection; the code also links `review` and `rejected` ones | The code is right (their material is inside); ADR 0012 amended |
@@ -1736,6 +2036,7 @@ Found on 2026-11-22 by comparing the code with its comments, docstrings and ADRs
 [config]: ../apps/api/src/zyrcle_api/config.py
 [main]: ../apps/api/src/zyrcle_api/main.py
 [api]: ../apps/api/src/zyrcle_api/api.py
+[deps]: ../apps/api/src/zyrcle_api/deps.py
 [auth]: ../apps/api/src/zyrcle_api/auth.py
 [operator-auth]: ../apps/api/src/zyrcle_api/operator_auth.py
 [sessions]: ../apps/api/src/zyrcle_api/sessions.py
@@ -1758,11 +2059,22 @@ Found on 2026-11-22 by comparing the code with its comments, docstrings and ADRs
 [chain]: ../apps/api/src/zyrcle_api/chain.py
 [demo]: ../apps/api/src/zyrcle_api/demo.py
 [demo-seed]: ../apps/api/src/zyrcle_api/demo_seed.py
+[centers]: ../apps/api/src/zyrcle_api/centers.py
+[center-routes]: ../apps/api/src/zyrcle_api/center_routes.py
+[ticket-routes]: ../apps/api/src/zyrcle_api/ticket_routes.py
+[bank]: ../apps/api/src/zyrcle_api/bank.py
+[bank-routes]: ../apps/api/src/zyrcle_api/bank_routes.py
+[impact]: ../apps/api/src/zyrcle_api/impact.py
+[payments]: ../apps/api/src/zyrcle_api/payments.py
+[payment-routes]: ../apps/api/src/zyrcle_api/payment_routes.py
+[health]: ../apps/api/src/zyrcle_api/health.py
+[ratelimit]: ../apps/api/src/zyrcle_api/ratelimit.py
 [treasury]: ../chain/src/Treasury.sol
 [conftest]: ../apps/api/tests/conftest.py
 [api-readme]: ../apps/api/README.md
 [dev-compose]: ../apps/api/dev/compose.yml
 [deploy-compose]: ../deploy/compose.yml
+[backup]: ../deploy/backup.sh
 [ci]: ../.github/workflows/ci.yml
 [architecture]: architecture.md
 [device-protocol]: device-protocol.md
@@ -1794,5 +2106,13 @@ Found on 2026-11-22 by comparing the code with its comments, docstrings and ADRs
 [adr-0012]: adr/0012-collection-and-bags.md
 [adr-0013]: adr/0013-sale-and-settlement.md
 [adr-0014]: adr/0014-operator-accounts.md
-[adr-0020]: adr/0020-single-vps-docker-compose.md
 [adr-0022]: adr/0022-keys-secrets-and-production-changes.md
+[adr-0027]: adr/0027-impact-certificates.md
+[adr-0028]: adr/0028-pilot-readiness.md
+[adr-0029]: adr/0029-closed-loop-payments.md
+[adr-0032]: adr/0032-deploys-pinned-recorded-and-backed-up.md
+[adr-0034]: adr/0034-encrypted-off-site-backups.md
+[adr-0037]: adr/0037-prices-per-collection-center.md
+[adr-0038]: adr/0038-reading-scale-tickets-with-ai.md
+[adr-0039]: adr/0039-bank-statement-matching.md
+[adr-0040]: adr/0040-keys-guardian-and-multisig.md

@@ -6,7 +6,11 @@ firmware on real hardware must implement exactly the same messages. Reference co
 
 ## Transport
 
-MQTT over TLS in production (plain on a developer laptop), QoS 1.
+MQTT, QoS 1. Today the broker listens on port 1883 without TLS, reachable only on the VPS's
+internal Docker network, because the containers are simulated on the same machine
+([deploy/mosquitto/mosquitto.conf](../deploy/mosquitto/mosquitto.conf)). Every uplink is still signed
+by the device, so a reader of the network cannot forge readings. A physical container on a campus
+network will need TLS on the broker (port 8883) before it connects (infrastructure, section 10).
 
 | Direction | Topic | Content |
 |---|---|---|

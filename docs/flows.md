@@ -5,14 +5,22 @@ who recycles. Operator = a person running Zyrcle from the console. Container = t
 scale and sensors (simulated until hardware exists). Treasury = the contract that mints ZYR
 (1 ZYR = 1 COP) on ZyrcleChain.
 
+Every HTTP request in these flows, though not the live WebSocket, goes through the API's rate
+limits (ADR 0035): too many in a minute get a `429` with `Retry-After`, and the apps say so in
+Spanish.
+
 - [Sign in](#sign-in)
 - [Deposit](#deposit)
+- [Advance priced by the site's center](#advance-priced-by-the-sites-center)
 - [Booking a turn](#booking-a-turn)
 - [Collection](#collection)
 - [Sale and settlement](#sale-and-settlement)
+- [From a ticket photo to a sale](#from-a-ticket-photo-to-a-sale)
+- [Matching the bank statement](#matching-the-bank-statement)
 - [Impact certificate](#impact-certificate)
 - [Paying a campus merchant](#paying-a-campus-merchant)
 - [Lost-phone recovery](#lost-phone-recovery)
+- [Signing a Safe proposal](#signing-a-safe-proposal)
 - [Push notifications](#push-notifications)
 - [The money](#the-money)
 
@@ -81,7 +89,43 @@ sequenceDiagram
 ```
 
 Every device message is signed with the container's key and carries a sequence number; unsigned,
-replayed or out-of-order messages are dropped (`docs/device-protocol.md`).
+replayed or out-of-order messages are dropped (`docs/device-protocol.md`). The advance's amount
+depends on the price of the collection center the site sells to
+([next flow](#advance-priced-by-the-sites-center)).
+
+## Advance priced by the site's center
+
+ADR 0037. Only the advance depends on this price; the final payment follows the real sale.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Op as Operator
+    participant Console
+    participant API
+    participant DB as Postgres
+    Op->>Console: Precios, Centros de acopio, adds a center {name, NIT, address, contact}
+    Console->>API: POST /v1/operator/centers
+    Op->>Console: picks the center each site sells to
+    Console->>API: PUT /v1/operator/sites/{id}/center
+    Console->>API: GET /v1/operator/centers/{id}/suggested-prices
+    API->>DB: confirmed sales to that center in the last 90 days
+    API-->>Console: median COP per kg of each material, from the buyer's weights
+    Op->>Console: accepts the suggestion or types another price
+    Console->>API: PUT /v1/operator/centers/{id}/prices/{material} {cop_per_kg, source}
+    API->>DB: price, source sales or manual, who and when
+    Note over API,DB: later, a deposit at one of that center's sites is verified
+    API->>DB: the price of the site's center for the declared material
+    alt the center has a price for it
+        API->>API: advance = ratio x center price x kg, capped
+    else no center, or no price for that material
+        API->>API: advance = ratio x general table price x kg, capped
+    end
+    API->>DB: payout row in the same transaction (outbox), paid as in Deposit
+```
+
+A suggestion never changes a price by itself. A sale can also name the center that bought, which
+is what the next suggestions are computed from.
 
 ## Booking a turn
 
@@ -142,7 +186,10 @@ sequenceDiagram
 
 ## Sale and settlement
 
-ADR 0013. Nothing reaches the chain before the money reaches the bank.
+ADR 0013. Nothing reaches the chain before the money reaches the bank. The ticket can be typed or
+filled from a photo ([next flow](#from-a-ticket-photo-to-a-sale)), and the bank match can be typed
+or confirmed from an uploaded statement
+([matching the bank statement](#matching-the-bank-statement)).
 
 ```mermaid
 sequenceDiagram
@@ -152,14 +199,19 @@ sequenceDiagram
     participant API
     participant W as Settlement worker
     participant T as Treasury
-    Op->>Console: types the buyer's ticket: per bag, buyer's weight and pesos
-    Console->>API: POST /v1/operator/sales
+    Op->>Console: the buyer's ticket, typed or read from a photo: per bag, buyer's weight and pesos
+    Console->>API: POST /v1/operator/sales {buyer, center, ticket, lines}
     API->>API: bags sealed and free of incidents, bags become sold
-    opt buyer's weight differs from the bag's (100 g or 5 %)
+    opt buyer's weight differs from the bag's (the larger of 100 g and 5 %)
         API->>API: incident bag_balance (line waits)
     end
-    Op->>Console: sees the transfer in the bank, enters reference and amount
-    Console->>API: POST /v1/operator/sales/{id}/confirm
+    alt typed by hand
+        Op->>Console: sees the transfer in the bank, enters reference and amount
+        Console->>API: POST /v1/operator/sales/{id}/confirm
+    else from the bank statement
+        Op->>Console: confirms the credit the API proposed for this sale
+        Console->>API: POST /v1/operator/bank-lines/{id}/match
+    end
     API->>API: amount equals the ticket total? sale confirmed
     loop each bag (sale line), checking the chain before every step
         W->>W: wait if an incident names the bag, a deposit is in review, or an advance is being paid
@@ -174,6 +226,77 @@ sequenceDiagram
 
 Shares: 65 % participants (pro rata to verified grams), 15 % collector, 10 % host, 10 % operations
 (stays in pesos). A host without a payout address waits; its part is paid when it is set.
+`recordSale` is signed with the operator key; the residents', collector's and host's parts with the
+oracle key.
+
+## From a ticket photo to a sale
+
+ADR 0038. The model reads; the API checks and proposes; a person records the sale. Without an
+Anthropic key the API answers `503` and the operator types the ticket.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Op as Operator
+    participant Console
+    participant API
+    participant C as Anthropic API
+    participant DB as Postgres
+    Op->>Console: Ventas, takes a photo of the collection center's scale ticket
+    Console->>Console: shrink the long side to 1600 px at most, as JPEG
+    Console->>API: POST /v1/operator/ticket-scans {image, media type}
+    API->>C: the photo, a fixed JSON schema, model claude-opus-5-5
+    alt the ticket is readable
+        C-->>API: center, ticket number, date, lines {material, kg, COP per kg, amount}, total
+        API->>DB: ticket_scan read: photo, hash, model, request id, reading, who sent it
+        API->>API: check kg x price against each amount and the lines against the total
+        API->>API: propose the sealed bag of each line's material closest in weight, each bag once
+        API->>API: match the center by name
+        API-->>Console: reading, warnings, proposed bags, center
+        Console->>Console: fill the sale form
+    else unreadable, or the call fails
+        API->>DB: ticket_scan failed: photo and the reason
+        API-->>Console: the reason, and the operator types the ticket
+    end
+    Op->>Console: reviews and corrects every line
+    Console->>API: POST /v1/operator/sales {center, ticket, lines, ticket scan id}
+    API->>DB: sale recorded, the scan linked to it, bags sold
+    Note over Op,DB: the sale then waits for its bank match, as in Sale and settlement
+```
+
+## Matching the bank statement
+
+ADR 0039. The API proposes; nothing is confirmed until the operator clicks.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Op as Operator
+    participant Console
+    participant API
+    participant W as Settlement worker
+    participant T as Treasury
+    Op->>Console: Ventas, uploads the statement exported from the bank, CSV or Excel
+    Console->>API: POST /v1/operator/bank-statements {file name, content}
+    API->>API: find the columns by their headers, read Colombian numbers and dates
+    API->>API: a movement seen in an earlier statement is kept once, by its fingerprint
+    API->>API: propose matches, each movement and each target once, best score first
+    Note right of API: a credit for a sale waiting for its match, same amount, from a day before to ten days after the sale, more points for the ticket number or the buyer's name
+    Note right of API: a debit for a redemption waiting for its transfer, same amount, up to ten days after the request, more points for the merchant's name or tax id
+    API-->>Console: proposals with their score and reasons
+    alt a credit for a sale
+        Op->>Console: Confirmar
+        Console->>API: POST /v1/operator/bank-lines/{id}/match {sale}
+        API->>API: the same rule as confirming by hand, the movement's reference as bank reference
+        W->>T: the sale settles bag by bag, as in Sale and settlement
+    else a debit for a redemption
+        Op->>Console: Confirmar
+        Console->>API: POST /v1/operator/bank-lines/{id}/match {redemption}
+        API->>T: settleRedemption(ref, bank reference) with the operator key
+        API-->>Console: redemption settled, push "Te pagamos" to the merchant
+    end
+    API->>API: the movement records what it paid and who matched it
+```
 
 ## Impact certificate
 
@@ -241,8 +364,8 @@ sequenceDiagram
     A->>T: redeem(ref) with X ZYR: pending
     actor Op as Operator
     Op->>Op: transfers X pesos to the merchant's bank
-    Op->>API: settle {bank_ref}
-    API->>T: settleRedemption(ref): backing -X, X retired
+    Op->>API: settle {bank_ref}, typed or from a statement match
+    API->>T: settleRedemption(ref) with the operator key: backing -X, X retired
 ```
 
 ## Lost-phone recovery
@@ -275,13 +398,55 @@ sequenceDiagram
     end
 ```
 
+The guardian also relays signed payments. In production it is still the oracle key until runbook
+9.13 gives it its own (ADR 0040); since the handover, naming a new guardian is a Safe proposal.
+
+## Signing a Safe proposal
+
+ADR 0040. Since 2026-11-23 a Safe with three owners (Diego's Core wallet, his phone's MetaMask and
+a paper key) holds every admin power of ZyrcleChain, and two must sign each change. The handover
+itself was signed this way: the proof that the Safe acts, then the removal of the admin key from
+the precompiles, both kept in `infra/l1/safe/`.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor A as Proposer
+    participant CLI as zyrcle-api safe
+    actor O1 as Owner with a wallet
+    participant Page as Web page /multisig
+    actor O2 as Owner with the paper key
+    participant S as Safe on ZyrcleChain
+    A->>CLI: safe propose --what proof, revoke, guardian or call --out FILE
+    CLI->>S: read the chain id and the Safe's nonce
+    CLI-->>A: proposal file, EIP-712 data and the Safe's transaction hash
+    A->>O1: passes the file
+    O1->>Page: loads or pastes the proposal
+    Page->>Page: refuse it if a changed byte no longer gives its hash
+    Page->>S: owners, threshold and nonce from the public RPC
+    O1->>Page: Firmar con mi billetera
+    Page->>O1: eth_signTypedData_v4, adding the ZyrcleChain network if needed
+    Page->>Page: the signer must be an owner
+    Page-->>O1: signed proposal, downloaded or copied
+    O1->>O2: passes the file on
+    O2->>CLI: safe sign --proposal FILE --key-file -
+    CLI->>O2: asks for the key without showing it or writing it anywhere
+    CLI->>CLI: the signer must be an owner, now 2 of 3
+    A->>CLI: safe exec --proposal FILE --key-file of any funded key
+    CLI->>S: same hash and nonce as on chain? execTransaction with both signatures
+    S->>S: checks the signatures again, then runs the call
+    Note over A,S: the executed proposal is committed in infra/l1/safe/
+```
+
+Either owner may sign first, on the page or on the command line.
+
 ## Push notifications
 
 ADR 0008.
 
 ```mermaid
 flowchart LR
-    E[Event in a DB transaction: payout confirmed, review, settlement, recovery] --> O[(notification outbox)]
+    E[Event in a DB transaction: payout confirmed, review, settlement, recovery, payment received, redemption] --> O[(notification outbox)]
     O --> W[Notification worker]
     W -->|batch of 100| X[Expo push service]
     X --> F[Firebase / APNs] --> Ph[Phone]

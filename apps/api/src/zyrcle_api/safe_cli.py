@@ -8,8 +8,9 @@
   safe propose  --safe S --what revoke --admin A --multisend M --out FILE   step 4
   safe renounce --admin-key-file F --safe S                       step 5: the admin key gives up
   safe propose  --safe S --what guardian --guardian G --multisend M --out FILE   new guardian
-  safe propose  --safe S --what call --to T --data 0x… --description TEXT --out FILE
-                                                                  any later admin change
+  safe propose  --safe S --what call --to T --function "f(type,…)" --args A …
+                --description TEXT --out FILE                    any later admin change
+                (or --data 0x… instead of --function and --args)
   safe sign     --proposal FILE --key-file F|-                    sign with a key (- asks for it)
   safe exec     --proposal FILE --key-file F                      send it once two owners signed
 
@@ -45,7 +46,9 @@ def add_parser(sub) -> None:
     propose.add_argument("--what", choices=["proof", "revoke", "guardian", "call"], required=True)
     propose.add_argument("--guardian", help="the new guardian's address (guardian)")
     propose.add_argument("--to", help="the contract to call (call)")
-    propose.add_argument("--data", help="the calldata, 0x… (call)")
+    propose.add_argument("--data", help="the calldata, 0x… (call; or --function and --args)")
+    propose.add_argument("--function", help='e.g. "pause()" or "grantRole(bytes32,address)" (call)')
+    propose.add_argument("--args", nargs="*", default=[], help="the function's arguments, in order")
     propose.add_argument("--description", help="what it does, in plain words (call)")
     propose.add_argument("--admin", help="the admin key's address (revoke)")
     propose.add_argument("--multisend", help="the MultiSendCallOnly address (revoke)")
@@ -56,6 +59,39 @@ def add_parser(sub) -> None:
     execute = safe.add_parser("exec")
     execute.add_argument("--proposal", required=True)
     execute.add_argument("--key-file", required=True, help="pays the gas; any funded key")
+
+
+def calldata(function: str, values: list[str]) -> str:
+    """ABI calldata from a signature and text arguments, so no other tool is needed on the server.
+    A bytes32 argument that is not 0x-hex is hashed as text: OPERATOR_ROLE gives the role id."""
+    from eth_abi import encode
+    from eth_utils import function_signature_to_4byte_selector, keccak, to_checksum_address
+
+    inner = function[function.index("(") + 1 : function.rindex(")")]
+    types = [t.strip() for t in inner.split(",") if t.strip()]
+    if len(types) != len(values):
+        raise SystemExit(f"{function} takes {len(types)} arguments, got {len(values)}")
+
+    def value(kind: str, text: str):
+        if kind == "address":
+            return to_checksum_address(text)
+        if kind.startswith(("uint", "int")):
+            return int(text, 0)
+        if kind == "bool":
+            return text.lower() in ("true", "1", "yes")
+        if kind == "bytes32":
+            raw = text.removeprefix("0x")
+            is_hex = text.startswith("0x") and len(raw) == 64
+            return bytes.fromhex(raw) if is_hex else keccak(text=text)
+        if kind == "bytes":
+            return bytes.fromhex(text.removeprefix("0x"))
+        if kind == "string":
+            return text
+        raise SystemExit(f"type {kind} is not supported here; pass --data instead")
+
+    selector = function_signature_to_4byte_selector(function.replace(" ", ""))
+    encoded = encode(types, [value(t, v) for t, v in zip(types, values, strict=True)])
+    return "0x" + (selector + encoded).hex()
 
 
 def _key(path: str):
@@ -101,9 +137,10 @@ async def run(args: argparse.Namespace) -> None:
                 raise SystemExit("guardian needs --guardian and --multisend")
             p = await ops.guardian_proposal(args.safe, args.guardian, args.multisend)
         elif args.what == "call":
-            if not (args.to and args.data and args.description):
-                raise SystemExit("call needs --to, --data and --description")
-            p = await ops.propose(args.safe, args.to, args.data, args.description)
+            data = args.data or (calldata(args.function, args.args) if args.function else None)
+            if not (args.to and data and args.description):
+                raise SystemExit("call needs --to, --description and --data or --function")
+            p = await ops.propose(args.safe, args.to, data, args.description)
         else:
             if not args.admin or not args.multisend:
                 raise SystemExit("revoke needs --admin and --multisend")

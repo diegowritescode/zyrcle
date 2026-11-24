@@ -1,8 +1,11 @@
 # Blocks 3 and 4: from a working loop to a product every party relies on
 
-> Status: block 3 **deployed** (2026-11-23); the Safe of M17 is built and waits for its owners'
-> addresses to be deployed on chain. Block 4 planned. v1 blocks 1 and 2 are deployed ([roadmap-v1.md](roadmap-v1.md)).
-> Scope and order: [ADR 0030](adr/0030-blocks-3-and-4.md).
+> Status: block 3 (M8 to M17) **done and deployed** on 2026-11-23, with migrations `0014` to `0016`.
+> Since that day the 2-of-3 Safe `0x607c011C6921eA75C1e38223a5E5514eDbA7E43b` holds all eight admin
+> powers of ZyrcleChain and the L1 admin key holds none. Block 4 (M18 to M23) is planned, not
+> started. v1 blocks 1 and 2 are deployed ([roadmap-v1.md](roadmap-v1.md)). Scope and order:
+> [ADR 0030](adr/0030-blocks-3-and-4.md). What each milestone built is under **Built**; what
+> still waits for Diego is in [the last section of block 3](#what-block-3-still-waits-for).
 
 ## Why
 
@@ -50,14 +53,23 @@ M17 Keys: own guardian key, admin powers behind a multisig
   Playwright tests in `e2e/`. A CI job starts the whole system from the commit's code with Postgres,
   the broker, a local chain (anvil with the NativeMinter mock), the simulator and a Pinata
   stand-in (emails go to the API's log), then runs every walkthrough in Chromium against the web
-  app and the mobile app exported for the web. The Docker images keep their own build job. Unit tests for web and mobile components that hold logic. Test
-  coverage measured for the API (pytest-cov), the shared client and the web app (Vitest), shown in
-  each CI run, with a floor at today's level that only goes up.
+  app and the mobile app exported for the web. The Docker images keep their own build job. Unit
+  tests for web and mobile components that hold logic. Test coverage measured for the API
+  (pytest-cov), the shared client and the web app (Vitest), shown in each CI run, with a floor at
+  today's level that only goes up.
 - **Why this first:** it is a full copy of production, rebuilt for every commit, without paying for
   a second server. A permanent staging server needs more memory than the VPS has (ADR 0020); that
   stays a decision for later.
 - **Done when:** a pull request that breaks any screen of any party fails CI before it can be
   deployed.
+- **Built** ([ADR 0031](adr/0031-testing-and-the-pre-production-check.md), `a5e49fb`): Playwright
+  journeys in [`e2e/`](../e2e/README.md) for a day on campus and a lost phone (the Safe's journey
+  came with M17). `e2e/stack/up.sh` runs the whole system from the commit's source, not from the
+  Docker images, so nginx and its security headers are not exercised; stand-ins for Pinata and an
+  IPFS gateway (and, from M15, Anthropic). The release publishes images only for commits whose CI
+  passed. Unit tests for the web app's certificate check and the mobile app's push registration
+  and turn reminders. Coverage floors: API 75 % (76 % measured), shared client 50 % (53 %); the web
+  app's coverage is shown without a floor.
 
 ### M9. Stricter deploys
 - **What:** the release records each image's digest (its exact fingerprint) and `deploy.sh` runs
@@ -68,6 +80,11 @@ M17 Keys: own guardian key, admin powers behind a multisig
   Base images (Postgres, Mosquitto, Python, nginx) pinned by digest, with automatic update pull
   requests.
 - **Done when:** a deploy can be traced to exact images and rolled back from the history file.
+- **Built** ([ADR 0032](adr/0032-deploys-pinned-recorded-and-backed-up.md), `e55e4fe`): as planned.
+  Pulls are cut after 5 minutes and tried three times; `DEPLOY_ANY_CHECKOUT=1` allows another
+  checkout only to roll back the web app; `deploy/history.log` lives on the VPS, not in git.
+  Dependabot opens weekly pull requests for Docker and compose images and monthly ones for GitHub
+  Actions.
 
 ### M10. Error and uptime monitoring
 - **What:** Sentry in the API, the web app and the mobile app, each error with its context and no
@@ -76,7 +93,17 @@ M17 Keys: own guardian key, admin powers behind a multisig
   when one fails it opens an issue, which GitHub emails to Diego. Off until the Sentry DSNs are set.
 - **Needs from Diego:** a Sentry account (free plan) and its three DSNs, placed on the server and in
   EAS; optionally an UptimeRobot account for checks with phone alerts.
-- **Done when:** a forced error reaches Sentry with its context, and stopping the API opens an issue.
+- **Done when:** a forced error reaches Sentry with its context, and stopping the API opens an
+  issue.
+- **Built** ([ADR 0033](adr/0033-error-reports-and-uptime.md), `dc71749`): Sentry in the three
+  apps, with one scrubbing rule set in the API and the shared client (emails, long hex strings,
+  tokens; no bodies, cookies, headers or user). The uptime workflow runs every 10 minutes and checks
+  the API with its broker connection, the web app and the public RPC; a failure opens or updates an
+  issue labelled `uptime`. It does not check that blocks are produced: a quiet chain makes none
+  (below). Error reports stay off until the DSNs are placed.
+- **Also in block 3:** a false "chain stalled" alert on a quiet, healthy chain led to a health rule
+  that warns only when work has waited for the chain as long as its last block is old, plus the
+  node's own `/ext/health` ([ADR 0028](adr/0028-pilot-readiness.md), amendment, `d69b62c`).
 
 ### M11. Off-site encrypted backups
 - **What:** the daily database dump, plus a weekly bundle of the validator identity (staking key,
@@ -87,6 +114,11 @@ M17 Keys: own guardian key, admin powers behind a multisig
 - **Needs from Diego:** a bucket (Cloudflare R2 recommended: 10 GB free and no download fees) with a
   write-only key, and an `age` key pair he generates on his own machine.
 - **Done when:** a backup made on the VPS is restored from the bucket on another machine.
+- **Built** ([ADR 0034](adr/0034-encrypted-off-site-backups.md), `63b937d`): `deploy/offsite.sh`,
+  daily after the dump and weekly (or with `--keys`) for the key bundle, which also carries
+  `deploy/.env`. The script never deletes remote copies: the bucket's lifecycle rule and lock do.
+  `deploy/offsite-selftest.sh` proves encrypt, upload, download and restore in CI against an S3
+  stand-in. The real copy, and the restore drill, wait for the bucket and the key.
 
 ### M12. Rate limits on the whole API
 - **What:** limits per IP and per account, by route class: sign-in and codes strict, writes medium,
@@ -94,6 +126,10 @@ M17 Keys: own guardian key, admin powers behind a multisig
   Kept in the API process, which is enough for one instance; more instances would need a shared
   store, written down in the ADR.
 - **Done when:** a burst against any route is cut off without affecting other users.
+- **Built** ([ADR 0035](adr/0035-rate-limits.md), `66ebd37`): token buckets per minute: emailed
+  codes 20 and phone sign-in 120 per IP address, writes 120 and reads 600 per account (per IP
+  address without a valid token). Over the limit: `429` with code `rate_limited` and `Retry-After`.
+  `/health`, preflights and the WebSocket are exempt.
 
 ### M13. Cleanup and refactor
 - **What:** split the modules that mixed responsibilities, with M8's tests around every move:
@@ -103,6 +139,13 @@ M17 Keys: own guardian key, admin powers behind a multisig
   service, the collection service) stay whole ([ADR 0036](adr/0036-module-boundaries.md)). The
   deprecated `residence` routes and fields wait for M23, once the new Android build is in use.
 - **Done when:** every test still passes and the schema is unchanged (`alembic check`).
+- **Built** ([ADR 0036](adr/0036-module-boundaries.md), `36ea44d`): `models.py` became the package
+  `models/` on a shared `base.py`, re-exporting every name; `recovery.py` became `email_codes.py`,
+  `recovery.py` and `recovery_worker.py`; `api.py` became `api.py`, `deps.py` and
+  `setup_routes.py`. `sessions.py`, `collection.py` and `chain.py` were kept whole: each is one
+  class whose helpers call each other. The first target ("no module over about 400 lines") was
+  dropped for that reason. Same schema (32 tables then), same 106 backend tests and journeys before
+  and after.
 
 ### M14. Prices per collection center
 - **What:** collection centers become records (name, tax id, address, contact). Each has its
@@ -112,6 +155,10 @@ M17 Keys: own guardian key, admin powers behind a multisig
   edits it. Final payments already follow the real sale (ADR 0013); this changes only the advance.
 - **Done when:** two sites selling to centers with different prices get different advances, and
   each sale records its center.
+- **Built** ([ADR 0037](adr/0037-prices-per-collection-center.md), `32aebaf`, migration `0014`):
+  tables `collection_center` and `center_price`, `site.center_id` and `sale.center_id`; the
+  "Centros de acopio" card in the console's Precios tab. A suggestion never changes a price by
+  itself; the record says whether the operator took it (`sales`) or typed one (`manual`).
 
 ### M15. Reading the scale ticket with AI
 - **What:** the operator photographs the ticket in the console. The API sends it to Claude
@@ -126,6 +173,12 @@ M17 Keys: own guardian key, admin powers behind a multisig
   until then).
 - **Done when:** a ticket photo becomes a sale with every line filled, and every figure the model
   read can be traced.
+- **Built** ([ADR 0038](adr/0038-reading-scale-tickets-with-ai.md), `e7a8226`, migration `0015`):
+  `POST /v1/operator/ticket-scans` and the "Leer el tiquete con una foto" card in the Ventas tab,
+  which prefills the sale form. The browser shrinks the photo to at most 1600 pixels; the API keeps
+  it with its hash, the model, the request id and the reading in `ticket_scan`, which also records
+  the sale it became. Tested with a stand-in for Claude; off in production until the key is
+  placed.
 
 ### M16. Matching the bank statement
 - **What:** the operator uploads the statement exported from the bank (CSV or Excel; Bancolombia
@@ -136,6 +189,11 @@ M17 Keys: own guardian key, admin powers behind a multisig
   usable.
 - **Needs from Diego:** a real statement export, anonymized, to test the parser.
 - **Done when:** a statement with several deposits proposes the right sale for each.
+- **Built** ([ADR 0039](adr/0039-bank-statement-matching.md), `317b0ef`, migration `0016`):
+  `/v1/operator/bank-statements`, `/bank-proposals` and `/bank-lines/{id}/match`, and the
+  "Conciliar con el extracto del banco" card in the Ventas tab. Instead of a Bancolombia-specific
+  parser, columns are found by their headers, so any bank's CSV or Excel export works; a movement
+  seen in an earlier statement is kept once. Tested with synthetic CSV and Excel exports.
 
 ### M17. Keys: own guardian key, admin powers behind a multisig
 - **What:** today one L1 admin key, kept on the VPS, controls every precompile, the validator
@@ -151,8 +209,36 @@ M17 Keys: own guardian key, admin powers behind a multisig
 - **Needs from Diego:** three signer addresses (for example a browser wallet, a phone wallet and an
   offline backup) and approval of each transaction on Fuji.
 - **Done when:** no single key on the server can mint, change roles or touch the validators.
+- **Built** ([ADR 0040](adr/0040-keys-guardian-and-multisig.md), `e328ac4`, `48fd1d1`,
+  `fd05fa7`): `zyrcle-api keys new` and a `guardian.key` the API mounts, which points at the oracle
+  key until runbook 9.13 moves the factory's guardian to its own key. Safe v1.4.1 vendored unchanged
+  and deployed on ZyrcleChain; proposals made with `zyrcle-api safe propose` travel as JSON files
+  and are signed on the web app's `/multisig` page with a wallet, or on the command line with a key
+  file or a typed paper key. Eight powers, not seven: the validator manager's proxy admin counts
+  too. On 2026-11-23, with Diego's approval, the Safe `0x607c011C6921eA75C1e38223a5E5514eDbA7E43b`
+  was deployed with his Core wallet, his phone's MetaMask and a paper key, threshold two, and the
+  five-step handover ran: the Safe holds the eight powers and the L1 admin key none. The signed
+  proposals are in `infra/l1/safe/`. The admin key stays on the VPS only for its genesis ZYR, used
+  as gas, until that float has another holder. Naming a new guardian is now a Safe proposal
+  (`safe propose --what guardian`).
+
+### What block 3 still waits for
+
+Everything is built and deployed; these switch features on or close what code cannot:
+
+| Waits for Diego | Switches on |
+|---|---|
+| A Sentry account and its three DSNs, on the server, the repository variable and EAS | Error reports (M10) |
+| An R2 bucket with a write-only token, and an `age` key pair made on his machine | The off-site copies and the restore drill (M11) |
+| An Anthropic API key with a monthly spending limit, on the server; photos of real tickets | Reading tickets (M15) |
+| A real statement export, anonymized | Testing the statement parser on the campus's bank (M16) |
+| The guardian's own key, moved in by runbook 9.13 (now a Safe proposal) | The guardian stops sharing the oracle key (M17) |
+| A new Android build | Sentry and every block 3 change in the installed app (with M23) |
+| Legal review, Google Play, the chain for real money | The pilot with real people and pesos (v1 M7, ADR 0028) |
 
 ## Block 4: every party
+
+> Planned, not started. Nothing below is built.
 
 ### M18. Participant
 - **Each deposit, step by step:** deposited, verified, collected, sold, paid, with the date and the

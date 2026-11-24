@@ -53,7 +53,7 @@ code format. If a number in the code changes how money, weight or trust is handl
 | [0025](0025-documentation-as-code.md) | Documentation in the repository, changed with the code | accepted 2026-11-22 | Diego asked; Claude proposed the structure |
 | [0026](0026-v1-scope-and-delivery.md) | v1: one university campus, delivered in two reviewed blocks | accepted 2026-11-22 | Diego (university, two blocks); Claude (scope, milestones) |
 | [0027](0027-impact-certificates.md) | Impact certificates: sold material only, EPA WARM v16, one claim per gram, anchored root; amended 2026-11-22 with a permanent copy on IPFS (Pinata) | accepted 2026-11-23 | Claude proposed (v1 block 2, M5); Diego asked for host certificates, chose the IPFS copy and confirmed it |
-| [0028](0028-pilot-readiness.md) | Pilot readiness: backups, alerts, consent, production switches | accepted 2026-11-23 | Claude proposed (v1 block 2, M7); Diego confirmed it; several items still wait for him |
+| [0028](0028-pilot-readiness.md) | Pilot readiness: backups, alerts, consent, production switches; amended 2026-11-23: a quiet chain is not a stalled one | accepted 2026-11-23 | Claude proposed (v1 block 2, M7); Diego confirmed it; several items still wait for him |
 | [0029](0029-closed-loop-payments.md) | Paying campus merchants; redeeming ZYR for pesos; Treasury v3 | accepted 2026-11-23 | Claude proposed (v1 block 2, M6, after ADR 0004); Diego confirmed it |
 | [0030](0030-blocks-3-and-4.md) | Blocks 3 and 4: foundations and operations first, then every party | accepted 2026-11-23 | Diego asked for one large plan in two blocks and confirmed it; Claude proposed the split, order and designs |
 | [0031](0031-testing-and-the-pre-production-check.md) | Every party's journey tested in CI; coverage floors that only go up | accepted 2026-11-23 | Claude (block 3, M8); Diego confirmed it |
@@ -65,7 +65,7 @@ code format. If a number in the code changes how money, weight or trust is handl
 | [0037](0037-prices-per-collection-center.md) | A reference price per collection center; suggestions from its recent sales | accepted 2026-11-23 | Claude (block 3, M14), after Diego's point on prices per center; Diego confirmed it |
 | [0038](0038-reading-scale-tickets-with-ai.md) | Reading the scale ticket from a photo with Claude; a person confirms | accepted 2026-11-23 | Claude (block 3, M15); Diego confirmed it; needs his Anthropic key |
 | [0039](0039-bank-statement-matching.md) | Matching the bank statement to sales and redemptions, one click each | accepted 2026-11-23 | Claude (block 3, M16); Diego confirmed it |
-| [0040](0040-keys-guardian-and-multisig.md) | The guardian gets its own key; admin powers move to a 2-of-3 Safe | accepted 2026-11-23 | Claude (block 3, M17); guardian part built; multisig waits for Diego's signers |
+| [0040](0040-keys-guardian-and-multisig.md) | The guardian gets its own key; admin powers move to a 2-of-3 Safe | accepted 2026-11-23 | Claude (block 3, M17); Diego confirmed it, chose the signers and approved the handover; the Safe holds every admin power since 2026-11-23 |
 
 Records 0016 to 0024 describe decisions taken before this log existed. They were written on
 2026-11-22 from the code, the commit history and the conversations, and keep the date each decision

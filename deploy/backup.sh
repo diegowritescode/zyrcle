@@ -6,7 +6,7 @@
 #   deploy/backup.sh --check FILE  restore FILE into a throwaway Postgres and count the rows
 #
 # Meant for cron on the VPS, for example `15 3 * * * ~/apps/zyrcle/deploy/backup.sh`. Nothing
-# leaves the machine: copying the dumps somewhere else is a separate, pending decision.
+# leaves the machine from here: deploy/offsite.sh copies the dumps off the VPS, encrypted (ADR 0034).
 set -euo pipefail
 cd "$(dirname "$0")"
 dir="${BACKUP_DIR:-$HOME/backups/zyrcle}"

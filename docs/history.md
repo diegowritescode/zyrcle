@@ -11,7 +11,8 @@ timeline
     2025-05 : ZyrcleChain v1 created on Fuji, never used by the app
     2026-06 : Revival - dependencies modernised, contracts rebuilt from their ABI
     2026-11-21 : Monorepo and CI (phase 0) : ZyrcleChain v2 live on Fuji : Deposit cycle (phase 1) : Treasury (phase 2)
-    2026-11-22 : Live demo (phase 5) : Resident app with Expo (phase 3) : Turns, push, lost-phone recovery : v1 roadmap and block 1 (hosts, collection, sales, console)
+    2026-11-22 : Live demo (phase 5) : Resident app with Expo (phase 3) : Turns, push, lost-phone recovery : v1 roadmap and block 1 (hosts, collection, sales, console) : Block 2 built (certificates, pilot readiness, campus payments)
+    2026-11-23 : Block 2 deployed : Block 3 built and deployed (tests, deploys, monitoring, backups, rate limits, centers, tickets, bank statements) : Admin powers moved to a 2-of-3 Safe
 ```
 
 ## 2025: the hackathon
@@ -98,7 +99,7 @@ Fuji. The backend moved to FastAPI with Pydantic v2 on Python 3.13. It still ser
   The fixes found while documenting followed (migration `0009`). The two original repositories
   were archived.
 
-## 23 November 2026: block 2 of v1, built locally
+## 22 November 2026, evening: block 2 of v1, built locally
 
 - **M5, impact certificates** (`1dec632`, ADR 0027): monthly per host or site, sold material only,
   EPA WARM v16 factors, one claim per gram, the Merkle root anchored on ZyrcleChain and verified in
@@ -114,29 +115,46 @@ Fuji. The backend moved to FastAPI with Pydantic v2 on Python 3.13. It still ser
 
 ## 23 November 2026: block 2 deployed
 
-With Diego's approval, naming each step: the commits pushed to `main`; a database backup checked by
-restoring it; Treasury v3 with redemptions deployed on ZyrcleChain
+Just after midnight, with Diego's approval, naming each step: the commits pushed to `main`; a
+database backup checked by restoring it; Treasury v3 with redemptions deployed on ZyrcleChain
 (`0xd7052201140224018b123ecFF7b83B4251790Aeb`) and the simulated seed recorded again; migrations
-`0010` to `0013` and the images of `a3f395e` deployed; 20 ZYR of gas each for the oracle and operator
-keys; the two earlier Treasuries taken off the NativeMinter allow list; the daily backup installed in
-cron. Diego placed the Pinata JWT on the server himself.
+`0010` to `0013` and the images of `a3f395e` deployed; 20 ZYR of gas each for the oracle and
+operator keys; the two earlier Treasuries taken off the NativeMinter allow list; the daily backup
+installed in cron. Diego placed the Pinata JWT on the server himself.
 
 ## 23 November 2026: block 3 built and deployed
 
-Diego asked for everything missing, for every party and for the engineering, in two large blocks
-(ADR 0030). Block 3 was built the same day: every party's journey tested in a browser in CI (ADR
-0031), deploys pinned by digest and backed up before migrating (0032), error reports and an uptime
-check (0033), encrypted off-site backups (0034), rate limits (0035), modules split by responsibility
-(0036), prices per collection center (0037), scale tickets read from a photo with Claude (0038), the
-bank statement matched to sales and redemptions (0039), and the guardian's own key (0040). A false
-"chain stalled" alert the night before led to a health check that tells a quiet chain from a
-stalled one (ADR 0028, amendment). Diego confirmed every record, chose the multisig signers (his
-MetaMask, his phone and a paper key) and authorized the merge and the deploy: commit `ac09179`,
-migrations `0014` to `0016`, images pinned by digest and recorded in `deploy/history.log`.
-The multisig code of M17 followed the same day with his approval (`48fd1d1`): the Safe contracts, the
-`zyrcle-api safe` commands and the `/multisig` signing page. Diego then chose his three signers and
-approved the handover: the Safe `0x607c011C6921eA75C1e38223a5E5514eDbA7E43b` holds every admin power of ZyrcleChain since 2026-11-23,
-and the key that held them all has none.
+Diego asked for everything missing, for every party and for the engineering, in two large blocks.
+Claude proposed the split and the order, and Diego confirmed it the same day (ADR 0030,
+`e068f14`). The [roadmap](roadmap-blocks-3-4.md) has what each milestone built.
+
+- **A quiet chain is not a stalled one** (`d69b62c`, ADR 0028, amendment). On the night of the
+  block 2 deploy the alert "no block for 10 minutes" fired on a healthy chain: ZyrcleChain makes a
+  block only when there is a transaction. The warning now needs work that has waited for the chain
+  as long as the last block is old, and the health report asks the validator node itself
+  (`/ext/health`).
+- **Block 3, built in one session** (`a5e49fb` to `e328ac4`): every party's journey tested in a
+  browser in CI (M8, ADR 0031), deploys pinned by digest and backed up before migrating (M9,
+  0032), error reports and an uptime check (M10, 0033), encrypted off-site backups (M11, 0034),
+  rate limits (M12, 0035), modules split by responsibility (M13, 0036), prices per collection
+  center (M14, 0037), scale tickets read from a photo with Claude (M15, 0038), the bank statement
+  matched to sales and redemptions (M16, 0039), and the guardian's own key with the multisig
+  designed (M17, 0040).
+- **Block 3 deployed.** Diego confirmed every record, said who would sign the multisig (his
+  MetaMask, his phone and a paper key) and authorized the merge and the deploy (`ac09179`):
+  migrations `0014` to `0016`, images pinned by digest and recorded in `deploy/history.log`.
+- **The multisig code** followed the same day with his approval (`48fd1d1`): Safe v1.4.1, the
+  `zyrcle-api safe` commands and the web app's `/multisig` signing page.
+- **The handover** (`fd05fa7`, ADR 0040, amendment). With his approval the Safe
+  `0x607c011C6921eA75C1e38223a5E5514eDbA7E43b` was deployed on ZyrcleChain with his Core wallet,
+  his phone's MetaMask and a paper key, threshold two. He signed both proposals, with Core on the
+  multisig page and with the paper key on the command line. Since 2026-11-23 the Safe holds all
+  eight admin powers of ZyrcleChain, and the L1 admin key that held them all has none. The signed
+  proposals are kept in `infra/l1/safe/`.
+
+Still waiting for Diego: the Sentry account, the backup bucket and its `age` key, the Anthropic
+key, the guardian's own key (runbook 9.13), a new Android build, the legal review, Google Play and
+the chain for real money. Block 4 (M18 to M23) is planned, not started.
 
 ## Where the old things are
 
@@ -148,3 +166,4 @@ and the key that held them all has none.
 | ZyrcleChain v1 (2025) | Fuji P-Chain, inactive |
 | Treasury before the host share | `0xB843946A42F2791B8b932F8c0205C9D277E351B1` on ZyrcleChain v2, replaced on 2026-11-22 by `0xBc5035341C075CBd75508ff1a3a5EC0241e58201` (ADR 0013) |
 | Treasury before redemptions | `0xBc5035341C075CBd75508ff1a3a5EC0241e58201`, replaced on 2026-11-23 by `0xd7052201140224018b123ecFF7b83B4251790Aeb` (ADR 0029). Both old ones are off the NativeMinter allow list |
+| ZyrcleChain's admin powers before the Safe | Held by the single L1 admin key until 2026-11-23; since then by the 2-of-3 Safe `0x607c011C6921eA75C1e38223a5E5514eDbA7E43b`, with the signed handover proposals in `infra/l1/safe/` (ADR 0040) |

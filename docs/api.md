@@ -8,8 +8,14 @@ The code is the source of truth. This file was written from the router modules
 ([`api.py`](../apps/api/src/zyrcle_api/api.py), [`public.py`](../apps/api/src/zyrcle_api/public.py),
 [`booking_routes.py`](../apps/api/src/zyrcle_api/booking_routes.py),
 [`account_routes.py`](../apps/api/src/zyrcle_api/account_routes.py),
+[`setup_routes.py`](../apps/api/src/zyrcle_api/setup_routes.py),
 [`collection_routes.py`](../apps/api/src/zyrcle_api/collection_routes.py),
 [`sale_routes.py`](../apps/api/src/zyrcle_api/sale_routes.py),
+[`center_routes.py`](../apps/api/src/zyrcle_api/center_routes.py),
+[`ticket_routes.py`](../apps/api/src/zyrcle_api/ticket_routes.py),
+[`bank_routes.py`](../apps/api/src/zyrcle_api/bank_routes.py),
+[`impact_routes.py`](../apps/api/src/zyrcle_api/impact_routes.py),
+[`payment_routes.py`](../apps/api/src/zyrcle_api/payment_routes.py),
 [`operator_auth.py`](../apps/api/src/zyrcle_api/operator_auth.py),
 [`demo.py`](../apps/api/src/zyrcle_api/demo.py)), the services they call, and the tests in
 [`apps/api/tests`](../apps/api/tests). If you find a difference, the code wins: fix this file in the
@@ -120,8 +126,11 @@ by hand):
 | `not_found` | 404 | The thing does not exist, or it is not yours (a session, booking, collection, recovery or bag of someone else answers 404) |
 | `forbidden` | 403 | The container's access code is wrong or expired; not a collector; a bag that belongs to another collector; cancelling a turn that was already used; an admin-only route called by a non-admin |
 | `conflict` | 409 | The current state does not allow it: container offline, busy or being emptied; you already have an open session or collection; a state change the state machine refuses; a bag that is not sealed or has an open incident; an email that is already an operator; demoting yourself |
-| `invalid` | 422 | A bad QR or bag code; a material the container does not take; booking-time rules; a bag listed twice in a sale |
-| `unavailable` | 503 | The unlock command could not reach the container's broker |
+| `invalid` | 422, or 413 | A bad QR or bag code; a material the container does not take; booking-time rules; a bag listed twice in a sale; an uploaded photo or statement that is not base64 (422) or is over 5 MB (413); a bank movement of the wrong sign for what it should pay |
+| `unavailable` | 503 | The unlock command could not reach the container's broker; ticket reading is off (no Anthropic key); the demo simulator does not answer |
+| `rate_limited` | 429 | Too many requests from one caller this minute (rate limits below). The `Retry-After` header says how many seconds to wait |
+| `consent_required` | 403 | `POST /v1/sessions` while `ZYRCLE_REQUIRE_CONSENT` is on and the participant has not accepted the policy in force |
+| `unreadable` | 422 | `POST /v1/operator/bank-statements`: no date and amount columns were found. `detail` says why |
 | `closed` | 409 | The site is closed at that hour (deposit or booking). `detail` names the hours: `the container is open from 06:00 to 22:00` |
 | `slot_full` | 409 | Every spot of the hour is taken |
 | `already_booked` | 409 | You already booked that hour at that container |
@@ -136,11 +145,12 @@ by hand):
 | `recovery_in_progress` | 409 | This phone is already recovering a different account |
 | `recovery_unavailable` | 503 | Email, or account recovery, is not configured on this server |
 | `key_retired` | 403 | Sign-in only: this phone key's account was moved to another phone ([`api.py`](../apps/api/src/zyrcle_api/api.py), `verify`) |
-| `amount_mismatch` | 422 | Confirming a sale with a received amount different from the ticket total ([`sale_routes.py`](../apps/api/src/zyrcle_api/sale_routes.py)) |
+| `amount_mismatch` | 422 | Confirming a sale with a received amount different from the ticket total ([`sale_routes.py`](../apps/api/src/zyrcle_api/sale_routes.py)), by hand or by matching a bank movement; a bank debit that is not the redemption's amount |
 | `simulator` | the simulator's status (404, 409 or 422) | Demo routes only: the container simulator refused the request |
 
-`errors.py` also defines `bad_request` (400) and `rate_limited` (429). They are base classes; no
-route raises them directly today.
+`errors.py` also defines `bad_request` (400), the base class of every domain error, which no route
+raises directly. `rate_limited` is the base class of `too_soon` and `too_many_codes`, and the rate
+limit middleware answers with it.
 
 Errors that come back as a plain string, without a code:
 
@@ -164,13 +174,15 @@ Anything else is a bug and comes back as a 500 (see Open questions for the known
 the API with `average=20` and `burst=60`
 ([`deploy/compose.yml`](../deploy/compose.yml)). Period and source are not set, so Traefik's
 defaults apply (see Open questions). Over the limit, Traefik answers `429` with a plain-text body,
-not the JSON error shape. There is no limit when you run the API locally.
+not the JSON error shape. There is no edge limit when you run the API locally; the limits in the
+app still apply.
 
 **Per caller, in the app** ([ADR 0035](adr/0035-rate-limits.md),
 [`ratelimit.py`](../apps/api/src/zyrcle_api/ratelimit.py)). Every request takes a token from a bucket
-that refills steadily. Over the limit the API answers `429` with `{"code": "rate_limited"}` and a
-`Retry-After` header, CORS headers included; the apps say "Vas muy rápido: espera unos segundos e
-inténtalo de nuevo."
+that refills steadily. Over the limit the API answers `429` with
+`{"detail": {"code": "rate_limited", "detail": "too many requests; try again in N seconds"}}` and a
+`Retry-After` header of N, CORS headers included; the apps say "Vas muy rápido: espera unos
+segundos e inténtalo de nuevo."
 
 | Class | Routes | Counted by | Per minute |
 |---|---|---|---|
@@ -181,7 +193,9 @@ inténtalo de nuevo."
 
 `/health`, CORS preflights and the WebSocket are not limited. The IP address is the last entry of
 `X-Forwarded-For`, the one Traefik added, so a client cannot choose it. The settings are
-`ZYRCLE_RATE_LIMIT_*`.
+`ZYRCLE_RATE_LIMITS_ENABLED` (default on), `ZYRCLE_RATE_LIMIT_CODES_PER_MIN`, `_SIGNIN_PER_MIN`,
+`_WRITE_PER_MIN`, `_READ_PER_MIN` and `_PROXY_HOPS` (proxies in front of the API, default 1). The
+limits are kept in the API process: enough for one instance, not shared between several.
 
 **Per purpose, in the app.** These limits are enforced in code and apply everywhere:
 
@@ -409,11 +423,16 @@ query string: `/v1/sessions/{session_id}/live?token=<JWT>`. Section 4 covers the
 
 ## 3. Endpoint reference
 
-72 endpoints when demo mode is on: 71 HTTP operations and 1 WebSocket. Without demo mode, the 5
-`/v1/demo` routes are not mounted. Success codes are 200 unless the table says otherwise.
+102 endpoints when demo mode is on: 101 HTTP operations and 1 WebSocket. Without demo mode, the 5
+`/v1/demo` routes are not mounted, which leaves 97. Each section opens with a table of all its
+routes; the details follow. Success codes are 200 unless the table says otherwise.
 
 The "Session", "Collection", "Bag", "Booking", "Recovery" and "Sale" objects that several routes
 return are described once, after the routes that use them.
+
+The Safe that holds ZyrcleChain's admin powers ([ADR 0040](adr/0040-keys-guardian-and-multisig.md))
+has no API routes: proposals are made and executed with `zyrcle-api safe …` and signed on the web
+app's `/multisig` page, which talks only to the wallet and the public RPC.
 
 ### 3.1 Health
 
@@ -442,6 +461,8 @@ No token. These views never show an access code or anything that identifies a pa
 | `GET /v1/sites/{site_id}/dashboard?days=` | a site's totals, each container's state, daily series | [0011](adr/0011-hosts-and-sites.md) |
 | `GET /v1/residences` **deprecated** | alias of `/v1/sites` in its old shape | [0011](adr/0011-hosts-and-sites.md) |
 | `GET /v1/residences/{site_id}/dashboard?days=` **deprecated** | alias of the site dashboard | [0011](adr/0011-hosts-and-sites.md) |
+| `GET /v1/hosts/{host_id}/certificates` | a host's impact certificates | [0027](adr/0027-impact-certificates.md) |
+| `GET /v1/certificates/{certificate_id}` | one certificate with its leaves, to verify it | [0027](adr/0027-impact-certificates.md) |
 
 **`GET /v1/materials`** returns `["cardboard", "glass", "hdpe", "metal", "paper", "pet"]`.
 
@@ -539,6 +560,14 @@ All routes need a participant JWT, except the two sign-in routes.
 | `POST /v1/recovery/code` | 202 | email a code to recover an older account | [0010](adr/0010-smart-accounts-and-recovery.md) |
 | `POST /v1/recovery` | 201 | start moving that account to this phone | [0010](adr/0010-smart-accounts-and-recovery.md) |
 | `DELETE /v1/recovery/{recovery_id}` | 200 | cancel a recovery (either side) | [0010](adr/0010-smart-accounts-and-recovery.md) |
+| `POST /v1/me/consent` | 200 | accept the data-processing policy in force | [0028](adr/0028-pilot-readiness.md) |
+| `GET /v1/payments/{payment_id}` | 200 | a merchant's charge, after scanning its QR | [0029](adr/0029-closed-loop-payments.md) |
+| `POST /v1/payments/{payment_id}/intent` | 200 | the typed data to sign to pay it | [0029](adr/0029-closed-loop-payments.md) |
+| `POST /v1/payments/{payment_id}/pay` | 200 | pay it with that signature | [0029](adr/0029-closed-loop-payments.md) |
+| `GET /v1/merchant` | 200 | merchants only: name, charges, redemptions | [0029](adr/0029-closed-loop-payments.md) |
+| `POST /v1/merchant/charges` | 201 | merchants only: charge with a QR | [0029](adr/0029-closed-loop-payments.md) |
+| `POST /v1/merchant/redemptions` | 201 | merchants only: start turning ZYR into pesos | [0029](adr/0029-closed-loop-payments.md) |
+| `POST /v1/merchant/redemptions/{redemption_id}/sign` | 200 | merchants only: sign that redemption | [0029](adr/0029-closed-loop-payments.md) |
 
 #### Sign-in
 
@@ -771,6 +800,19 @@ The phone signs an EIP-712 `Execute` for its own smart account; the backend rela
 
 `GET /v1/me` also returns `merchant` (business name or null).
 
+#### Merchants (participants with the role)
+
+A participant JWT whose participant an operator named a merchant (`POST /v1/operator/merchants`).
+The first three answer `403 forbidden` to anyone else, an inactive merchant included; signing works
+only on your own redemption (404 otherwise), and a second signature returns it unchanged.
+
+| Method and path | Body | Returns |
+|---|---|---|
+| `GET /v1/merchant` | | `{name, charges: [Payment], redemptions: [Redemption]}`. 403 for non-merchants |
+| `POST /v1/merchant/charges` | `{amount_cop, concept?}`: 1 to 1,000,000 pesos, a concept up to 120 characters | 201, the charge with its QR `zyrcle://p/<id>`, valid 10 minutes |
+| `POST /v1/merchant/redemptions` | `{amount_cop}`: 1 to 100,000,000 | 201, `{id, typed_data}`: an `Execute` that sends that ZYR to the Treasury's `redeem(ref)` |
+| `POST /v1/merchant/redemptions/{id}/sign` | `{signature, deadline, nonce}` | The redemption, `requested`; the relay worker puts it on chain (`pending`). 403 if the signature is not from this phone's key |
+
 ### 3.4 Collector
 
 A collector is a participant with an active collector row, named by an operator
@@ -909,6 +951,26 @@ them are under `/v1/operator`.
 | `POST /v1/operator/sales/{sale_id}/confirm` | 200 | the money reached the bank | [0013](adr/0013-sale-and-settlement.md) |
 | `GET /v1/operator/sales` | 200 | the last 100 sales | [0013](adr/0013-sale-and-settlement.md) |
 | `GET /v1/operator/sales/{sale_id}` | 200 | a sale with its settlement report | [0013](adr/0013-sale-and-settlement.md) |
+| `POST /v1/operator/merchants` | 201 | name (or update) a merchant | [0029](adr/0029-closed-loop-payments.md) |
+| `GET /v1/operator/merchants` | 200 | every merchant | [0029](adr/0029-closed-loop-payments.md) |
+| `GET /v1/operator/redemptions` | 200 | redemptions, by status | [0029](adr/0029-closed-loop-payments.md) |
+| `POST /v1/operator/redemptions/{redemption_id}/settle` | 200 | the pesos were transferred | [0029](adr/0029-closed-loop-payments.md) |
+| `POST /v1/operator/redemptions/{redemption_id}/refund` | 200 | give the ZYR back instead | [0029](adr/0029-closed-loop-payments.md) |
+| `GET /v1/operator/health` | 200 | the system's health and its warnings | [0028](adr/0028-pilot-readiness.md) |
+| `GET /v1/operator/centers` | 200 | collection centers with prices and sites | [0037](adr/0037-prices-per-collection-center.md) |
+| `POST /v1/operator/centers` | 201 | add a collection center | [0037](adr/0037-prices-per-collection-center.md) |
+| `PUT /v1/operator/centers/{center_id}/prices/{material}` | 200 | set a center's price for a material | [0037](adr/0037-prices-per-collection-center.md) |
+| `GET /v1/operator/centers/{center_id}/suggested-prices` | 200 | the median of its recent confirmed sales | [0037](adr/0037-prices-per-collection-center.md) |
+| `PUT /v1/operator/sites/{site_id}/center` | 200 | the center a site sells to | [0037](adr/0037-prices-per-collection-center.md) |
+| `POST /v1/operator/ticket-scans` | 201 | read a scale ticket's photo with Claude | [0038](adr/0038-reading-scale-tickets-with-ai.md) |
+| `GET /v1/operator/ticket-scans/{scan_id}` | 200 | one ticket scan | [0038](adr/0038-reading-scale-tickets-with-ai.md) |
+| `GET /v1/operator/ticket-scans/{scan_id}/image` | 200 | its photo | [0038](adr/0038-reading-scale-tickets-with-ai.md) |
+| `POST /v1/operator/bank-statements` | 201 | upload a bank statement | [0039](adr/0039-bank-statement-matching.md) |
+| `GET /v1/operator/bank-proposals` | 200 | what each unmatched movement may pay | [0039](adr/0039-bank-statement-matching.md) |
+| `POST /v1/operator/bank-lines/{line_id}/match` | 200 | confirm that a movement pays a sale or a redemption | [0039](adr/0039-bank-statement-matching.md) |
+| `POST /v1/operator/certificates/preview` | 200 | what a certificate would hold | [0027](adr/0027-impact-certificates.md) |
+| `POST /v1/operator/certificates` | 201 | issue a certificate | [0027](adr/0027-impact-certificates.md) |
+| `GET /v1/operator/certificates` | 200 | every certificate | [0027](adr/0027-impact-certificates.md) |
 
 #### Sign-in and self
 
@@ -954,7 +1016,8 @@ for the shared token.
 - Returns `201` and `{id, host_id, name, opens_hour, closes_hour, slot_capacity}`.
 - Errors: `404 not_found` (unknown host), FastAPI 422.
 
-**`GET /v1/operator/sites`** returns that object plus `host_name`, for every site.
+**`GET /v1/operator/sites`** returns that object plus `host_name` and `center_id` (the collection
+center it sells to, or null), for every site, by host and site name.
 
 **`PUT /v1/operator/sites/{site_id}/schedule`**
 
@@ -998,7 +1061,10 @@ for the shared token.
 - The advance for a credited deposit is
   `floor(deposited_g x cop_per_kg x ZYRCLE_ADVANCE_RATIO_BPS / 10,000,000)`, capped at
   `ZYRCLE_MAX_ADVANCE_COP` (defaults 5,000 bps = 50 % and 5,000 COP;
-  [`pricing.py`](../apps/api/src/zyrcle_api/pricing.py)). No price, no advance.
+  [`pricing.py`](../apps/api/src/zyrcle_api/pricing.py)). `cop_per_kg` is the price of the
+  collection center the container's site sells to, when it has one for that material, else this
+  general table ([`centers.py`](../apps/api/src/zyrcle_api/centers.py), `reference_price`). No
+  price, no advance.
 
 **`GET /v1/operator/prices`** returns `[{material, cop_per_kg, source}]` for every material, with
 nulls where no price is set.
@@ -1080,15 +1146,18 @@ The worker runs only when the chain and `ZYRCLE_OPERATOR_KEY_FILE` are configure
 
 - Body: `buyer` (1 to 200), `ticket_ref` (1 to 100), `sold_on` (`YYYY-MM-DD`), `lines` (1 to 100 of
   `{bag, buyer_g, amount_cop}`, where `bag` is a QR or code, `buyer_g` is 1 to 1,000,000 and
-  `amount_cop` is 1 to 100,000,000).
+  `amount_cop` is 1 to 100,000,000), and optionally `center_id` (the collection center that
+  bought, [ADR 0037](adr/0037-prices-per-collection-center.md)) and `ticket_scan_id` (the photo
+  it was read from, [ADR 0038](adr/0038-reading-scale-tickets-with-ai.md)).
 - Every bag must be `sealed` and free of open incidents. Bags become `sold`.
 - A line whose `buyer_g` differs from the bag's grams beyond tolerance is still recorded, and a
   `bag_balance` incident holds it until resolved.
 - `total_cop` is the sum of the lines. `evidence_hash` is `0x` plus the SHA-256 of the ticket's
   canonical JSON (sorted keys, no spaces, bag codes normalized).
 - Returns `201` and a Sale with `status: recorded`.
-- Errors: `422 invalid` (bad bag code, `a bag appears twice`); `404 not_found` (`unknown bag ...`);
-  `409 conflict` (`bag ... is <status>, not sealed`, `bag ... has an open incident to resolve`).
+- Errors: `422 invalid` (bad bag code, `a bag appears twice`); `404 not_found` (`unknown bag ...`,
+  `unknown or inactive collection center`); `409 conflict` (`bag ... is <status>, not sealed`,
+  `bag ... has an open incident to resolve`, `unknown ticket scan, or already a sale`).
 
 **`POST /v1/operator/sales/{sale_id}/confirm`**
 
@@ -1103,7 +1172,7 @@ The worker runs only when the chain and `ZYRCLE_OPERATOR_KEY_FILE` are configure
 `[{party, ref, address, grams, share_cop, paid_cop, tx_hash}]`, where `party` is `deposit`,
 `collector` or `host`. Errors: `404 not_found`.
 
-**Sale object** (`sale_view`): `id`, `buyer`, `ticket_ref`, `sold_on`, `total_cop`,
+**Sale object** (`sale_view`): `id`, `buyer`, `center_id`, `ticket_ref`, `sold_on`, `total_cop`,
 `evidence_hash`, `status` (`recorded` or `confirmed`), `recorded_by`, `bank_ref`, `confirmed_by`,
 `confirmed_at`, `created_at`, `lines`. Each line: `id`, `bag_code`, `material`, `bag_g`, `buyer_g`,
 `amount_cop`, `status` (`pending`, `waiting`, `settling`, `settled` or `failed`), `reason`,
@@ -1111,32 +1180,25 @@ The worker runs only when the chain and `ZYRCLE_OPERATOR_KEY_FILE` are configure
 `settled_at`.
 
 
-#### Merchants (participants with the role)
-
-| Method and path | Body | Returns |
-|---|---|---|
-| `GET /v1/merchant` | | `{name, charges: [Payment], redemptions: [Redemption]}`. 403 for non-merchants |
-| `POST /v1/merchant/charges` | `{amount_cop, concept?}` | 201, the charge with its QR `zyrcle://p/<id>`, valid 10 minutes |
-| `POST /v1/merchant/redemptions` | `{amount_cop}` | 201, `{id, typed_data}`: an `Execute` that sends that ZYR to the Treasury's `redeem(ref)` |
-| `POST /v1/merchant/redemptions/{id}/sign` | `{signature, deadline, nonce}` | The redemption, `requested`; the relay worker puts it on chain (`pending`) |
-
 #### Merchants and redemptions (operator)
 
 | Method and path | Body | Returns |
 |---|---|---|
-| `POST /v1/operator/merchants` | `{address, name, nit, host_id?, active?}` | 201, the merchant. The NIT is the KYC reference, checked off line |
-| `GET /v1/operator/merchants` | | Every merchant |
-| `GET /v1/operator/redemptions` | `?status=` | Redemptions with merchant name and NIT |
-| `POST /v1/operator/redemptions/{id}/settle` | `{bank_ref}` | The pesos were transferred: `settleRedemption` on chain lowers `backing` and retires the ZYR. 409 unless `pending` |
-| `POST /v1/operator/redemptions/{id}/refund` | | `refundRedemption` returns the ZYR to the merchant's account |
+| `POST /v1/operator/merchants` | `{address, name, nit, host_id?, active?}`: the participant's account address or phone key | 201, `{resident_id, address, name, nit, host_id, active}`, also when it updates an existing merchant. The NIT is the KYC reference, checked off line. 404 if nobody signed in with that address, or for an unknown host |
+| `GET /v1/operator/merchants` | | Every merchant, by name, in the same shape |
+| `GET /v1/operator/redemptions` | `?status=` (`requested`, `pending`, `settled`, `refunded` or `failed`) | The last 100 redemptions, newest first, with merchant name and NIT. Redemptions still `signing` are left out |
+| `POST /v1/operator/redemptions/{id}/settle` | `{bank_ref}` | The pesos were transferred: `settleRedemption` on chain lowers `backing` and retires the ZYR. 409 unless `pending`; 503 without the Treasury operator key |
+| `POST /v1/operator/redemptions/{id}/refund` | | `refundRedemption` returns the ZYR to the merchant's account. 503 without the Treasury operator key |
 
 #### Health
 
 | Method and path | Returns |
 |---|---|
-| `GET /v1/operator/health` | `{ok, warnings: [{kind, text}], outboxes: [{name, pending, failed, oldest_pending_min, stuck}], devices: {online, total}, mqtt, chain: {block, block_age_s, available_cop, keys: {role: {address, zyr}}}}` ([ADR 0028](adr/0028-pilot-readiness.md)). Warnings are in Spanish |
+| `GET /v1/operator/health` | `{checked_at, ok, warnings: [{kind, text}], outboxes: [{name, pending, failed, oldest_pending_min, stuck}], devices: {online, total}, mqtt, chain: {block, block_age_s, waiting_s, available_cop, keys: {role: {address, zyr}}, node_healthy, error}}` ([ADR 0028](adr/0028-pilot-readiness.md)). `chain` is null without a chain; `waiting_s` is how long the oldest work for the chain has waited (null when none); `node_healthy` appears when `ZYRCLE_CHAIN_HEALTH_URL` is set; `error` when the chain could not be read. Warnings are in Spanish |
 
-Interactive docs (`/docs`, `/redoc`, `/openapi.json`) are off in production (`ZYRCLE_DOCS_ENABLED=false`).
+The chain warning (`chain_stale`) needs both an old last block and work that has waited as long:
+ZyrcleChain makes blocks only when there are transactions, so a quiet chain is not a stalled one
+(ADR 0028, amendment). `node_unhealthy` comes from the validator node's own `/ext/health`.
 
 #### Collection centers (operator)
 
@@ -1146,14 +1208,15 @@ of the center it sells to, else the general table (`/v1/operator/prices`).
 
 | Method and path | Body | Returns |
 |---|---|---|
-| `GET /v1/operator/centers` | | Every center: `{id, name, tax_id, address, contact, active, prices: {material: {cop_per_kg, source, updated_by, updated_at}}, sites: [{id, name}]}` |
-| `POST /v1/operator/centers` | `{name, tax_id?, address?, contact?}` | 201, the center. 409 `conflict` if the name exists |
-| `PUT /v1/operator/centers/{id}/prices/{material}` | `{cop_per_kg, source?: "manual" \| "sales"}` | The center. `sales` means the operator took the suggested median. 404, 422 for an unknown material |
-| `GET /v1/operator/centers/{id}/suggested-prices` | | `{material: {cop_per_kg, lines}}`: the median COP per kg in the center's confirmed sales of the last 90 days, from the buyer's weights |
-| `PUT /v1/operator/sites/{site_id}/center` | `{center_id \| null}` | `{site_id, center_id}` |
+| `GET /v1/operator/centers` | | Every center, by name: `{id, name, tax_id, address, contact, active, prices: {material: {cop_per_kg, source, updated_by, updated_at}}, sites: [{id, name}]}` |
+| `POST /v1/operator/centers` | `{name, tax_id?, address?, contact?}`: up to 200, 32, 300 and 200 characters | 201, the center. 409 `conflict` if the name exists |
+| `PUT /v1/operator/centers/{id}/prices/{material}` | `{cop_per_kg, source?: "manual" \| "sales"}`: 0 to 1,000,000, default `manual` | The center. `sales` means the operator took the suggested median; the price records who set it. 404 for an unknown center, 422 for an unknown material |
+| `GET /v1/operator/centers/{id}/suggested-prices` | | `{material: {cop_per_kg, lines}}`: the median COP per kg in the center's confirmed sales of the last 90 days, from the buyer's weights. 404 for an unknown center |
+| `PUT /v1/operator/sites/{site_id}/center` | `{center_id \| null}` | `{site_id, center_id}`. `null` takes the site off any center. 404 for an unknown site or center |
 
 `POST /v1/operator/sales` takes an optional `center_id` (404 if unknown or inactive), and sales and
-`GET /v1/operator/sites` show it.
+`GET /v1/operator/sites` show it. The general table stays the fallback, and `PUT
+/v1/operator/prices/{material}` still sets it.
 
 #### Reading scale tickets (operator)
 
@@ -1163,9 +1226,9 @@ of the center it sells to, else the general table (`/v1/operator/prices`).
 
 | Method and path | Body | Returns |
 |---|---|---|
-| `POST /v1/operator/ticket-scans` | `{image_base64, media_type: "image/jpeg" \| "image/png" \| "image/webp"}`, at most 5 MB | 201: `{id, status: "read" \| "failed", reading: {readable, center_name, ticket_ref, date, lines: [{material, label, kg, cop_per_kg, amount_cop}], total_cop, notes}, checks: [{kind, detail, line?}], proposed_bags: [code \| null], center_id, error, model, created_by, sale_id}`. A failed reading keeps the photo and says why |
-| `GET /v1/operator/ticket-scans/{id}` | | The same view |
-| `GET /v1/operator/ticket-scans/{id}/image` | | The photo |
+| `POST /v1/operator/ticket-scans` | `{image_base64, media_type: "image/jpeg" \| "image/png" \| "image/webp"}`, at most 5 MB once decoded | 201: `{id, status: "read" \| "failed", reading: {readable, center_name, ticket_ref, date, lines: [{material, label, kg, cop_per_kg, amount_cop}], total_cop, notes}, checks: [{kind, detail, line?}], proposed_bags: [code \| null], center_id, error, model, created_by, created_at, sale_id}`. `proposed_bags` are sealed bags, one per line; `center_id` is the center whose name matches. A failed reading keeps the photo and says why. 422 `invalid` if not base64, 413 if over 5 MB, 503 `unavailable` without a key |
+| `GET /v1/operator/ticket-scans/{id}` | | The same view. 404 if unknown |
+| `GET /v1/operator/ticket-scans/{id}/image` | | The photo, with its media type. 404 if unknown |
 
 `POST /v1/operator/sales` takes an optional `ticket_scan_id`; the scan then names the sale it became
 (409 if it already did).
@@ -1177,11 +1240,17 @@ of the center it sells to, else the general table (`/v1/operator/prices`).
 
 | Method and path | Body | Returns |
 |---|---|---|
-| `POST /v1/operator/bank-statements` | `{filename, content_base64}`: the CSV or `.xlsx` export, at most 5 MB | 201: `{statement_id, movements, added, already_known, proposals}`. 422 `unreadable` when no date and amount columns are found. A movement already uploaded is kept once |
-| `GET /v1/operator/bank-proposals` | | `[{line: {id, posted_on, description, reference, amount_cop}, kind: "sale" \| "redemption", target_id, target, score, why}]`, best first, each movement and each target once |
-| `POST /v1/operator/bank-lines/{id}/match` | `{kind, target_id}` | Confirms the sale (same rules as `/confirm`, with the movement's reference as `bank_ref`) or settles the redemption (same as `/settle`), then marks the movement. 409 if it is matched already |
+| `POST /v1/operator/bank-statements` | `{filename, content_base64}`: the CSV or `.xlsx` export, at most 5 MB once decoded | 201: `{statement_id, movements, added, already_known, proposals}` (`proposals` as below). A movement already uploaded is kept once. 422 `unreadable` when no date and amount columns are found; 422 `invalid` if not base64; 413 if over 5 MB |
+| `GET /v1/operator/bank-proposals` | | `[{line, kind: "sale" \| "redemption", target_id, target, score, why}]`, best first, each movement and each target once. `line` is a movement (below); `target` is `{ticket_ref, buyer, amount_cop}` for a sale waiting for its match, `{merchant, nit, amount_cop}` for a `pending` redemption |
+| `POST /v1/operator/bank-lines/{id}/match` | `{kind: "sale" \| "redemption", target_id}` | Confirms the sale (same rules as `/confirm`, with the movement's reference as `bank_ref`) or settles the redemption (same as `/settle`), then marks the movement. Returns the movement. A sale needs a credit and a redemption a debit (422 `invalid`); the amount must match (422 `amount_mismatch`). 404 for an unknown movement or sale; 409 if the movement is matched already |
+
+A movement: `{id, posted_on, description, reference, amount_cop, matched_kind, matched_id,
+matched_by}`. Credits are positive and debits negative.
 
 #### Impact certificates (operator)
+
+[ADR 0027](adr/0027-impact-certificates.md),
+[`impact_routes.py`](../apps/api/src/zyrcle_api/impact_routes.py).
 
 | Method and path | Body | Returns |
 |---|---|---|
@@ -1308,8 +1377,10 @@ which calls are safe to repeat.
 | `DELETE /v1/recovery/{id}` | returns the recovery while it is `cancelling` |
 | `POST /v1/operator/sales/{id}/confirm` | returns the confirmed sale; the body is ignored |
 | `POST /v1/operator/incidents/{id}/resolve` | returns the resolved incident; the first note stays |
-| `PUT /v1/me/push-token`, `PUT /v1/operator/prices/{m}`, `PUT /v1/operator/sites/{id}/schedule`, `PATCH` routes | overwrite with the same values |
-| `POST /v1/operator/collectors` | creates or updates the same collector |
+| `PUT /v1/me/push-token`, `PUT /v1/operator/prices/{m}`, `PUT /v1/operator/sites/{id}/schedule`, `PUT /v1/operator/centers/{id}/prices/{m}`, `PUT /v1/operator/sites/{id}/center`, `PATCH` routes | overwrite with the same values |
+| `POST /v1/operator/collectors`, `POST /v1/operator/merchants` | creates or updates the same collector or merchant |
+| `POST /v1/merchant/redemptions/{id}/sign` | returns the redemption unchanged once it is signed |
+| `POST /v1/operator/bank-statements` | records another upload, but each movement is kept once (`already_known`) |
 
 **Not safe to repeat: a second call fails or creates something new.**
 
@@ -1323,6 +1394,10 @@ which calls are safe to repeat.
 | `POST /v1/recovery` | `422 code_invalid`: the first call used the code. With a new code for the same account, it returns the live recovery |
 | `POST /v1/operator/sales` | `409 conflict`: the bags are already `sold` |
 | `POST /v1/operator/bags`, `/hosts`, `/sites` | creates another batch, host or site; nothing checks for duplicates |
+| `POST /v1/operator/centers` | `409 conflict`: a center with that name exists |
+| `POST /v1/operator/ticket-scans` | reads the photo again and stores another scan (and calls the model again) |
+| `POST /v1/operator/bank-lines/{id}/match` | `409 conflict`: the movement is matched |
+| `POST /v1/operator/certificates` | `409 conflict`: the month's grams are already claimed |
 
 **Concurrency rules callers will meet.**
 
@@ -1355,7 +1430,8 @@ which calls are safe to repeat.
 ### Interactive OpenAPI docs
 
 [`main.py`](../apps/api/src/zyrcle_api/main.py) creates `FastAPI(title="Zyrcle API",
-version="0.1.0", ...)` and does not change FastAPI's docs settings, so the defaults are on:
+version="0.1.0", ...)` with FastAPI's default docs pages, unless `ZYRCLE_DOCS_ENABLED=false`, which
+production sets ([ADR 0028](adr/0028-pilot-readiness.md)):
 
 | Path | What |
 |---|---|
@@ -1391,10 +1467,15 @@ print(json.dumps(create_app(s).openapi(), indent=2))'
 ### Adding an endpoint
 
 1. **Pick the router module by audience and area.** Public reads go in `public.py`; deposits and
-   the original participant routes in `api.py`, the operator's setup routes in `setup_routes.py`; bookings in `booking_routes.py`; recovery in
-   `account_routes.py`; collection in `collection_routes.py`; sales in `sale_routes.py`; operator
-   accounts in `operator_auth.py`; demo-only routes in `demo.py`. A new area gets a new module with
-   `APIRouter(prefix="/v1/...", tags=[...])`, included in `create_app` in `main.py`.
+   the original participant routes in `api.py`; the operator's setup routes in `setup_routes.py`;
+   bookings in `booking_routes.py`; recovery in `account_routes.py`; collection in
+   `collection_routes.py`; sales in `sale_routes.py`; collection centers in `center_routes.py`;
+   ticket scans in `ticket_routes.py`; bank statements in `bank_routes.py`; certificates in
+   `impact_routes.py`; payments and merchants in `payment_routes.py`; operator accounts in
+   `operator_auth.py`; demo-only routes in `demo.py`. A new area gets a new module with
+   `APIRouter(prefix="/v1/...", tags=[...])`, included in `create_app` in `main.py`. A new route is
+   rate limited by its class on its own; a new route that sends emailed codes must be added to
+   `CODE_ROUTES` in `ratelimit.py`.
 2. **Declare who may call it** with the existing dependencies: `Resident` (from `deps.py`) for a
    participant, `Operator` for any operator (it gives the email to record), `AdminWho` (from
    `operator_auth.py`) for admins, nothing for public. Do not read the header yourself.
@@ -1447,4 +1528,4 @@ Found on 2026-11-22 by comparing the routes with the two TypeScript clients and 
 | 13 | The demo router runs in production and `GET /v1/demo/containers` lists every container's live QR | Decided (ADR 0028): a pilot deployment with real containers runs without the demo router |
 | 14 | Plain-string errors without a `code` (section 1) | Open: move them to `{"code", "detail"}` when touched |
 | 15 | The edge rate limit's period and source are Traefik's defaults, not checked on the running proxy | Open, M7 |
-| 16 | When the `residence` aliases go (ADR 0011) | Planned: remove them once the APK built after block 1 is the one in use; tracked in ADR 0011 |
+| 16 | When the `residence` aliases go (ADR 0011) | Planned for block 4 (M23, [roadmap-blocks-3-4.md](roadmap-blocks-3-4.md)): remove them once the APK built after blocks 3 and 4 is the one in use; tracked in ADR 0011 |

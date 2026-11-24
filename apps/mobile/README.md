@@ -77,16 +77,32 @@ talks to the public testnet API by default. Open a container's screen on the com
 https://zyrcle.deviego.xyz/container/ctr-0001, and scan it from "Reciclar ahora".
 
 Point it at a local stack with `EXPO_PUBLIC_API_URL`, `EXPO_PUBLIC_RPC_URL` and
-`EXPO_PUBLIC_SIWE_DOMAIN` (see [apps/web/README.md](../web/README.md) for running the stack).
+`EXPO_PUBLIC_SIWE_DOMAIN` (see [apps/web/README.md](../web/README.md) for running the stack). The
+other build-time settings, with their defaults in [`src/lib/config.ts`](src/lib/config.ts), are
+`EXPO_PUBLIC_CHAIN_ID`, `EXPO_PUBLIC_ACCOUNT_FACTORY`, `EXPO_PUBLIC_WEB_URL` and
+`EXPO_PUBLIC_SENTRY_DSN`.
+
+## Error reports
+
+Sentry (`@sentry/react-native`, [ADR 0033](../../docs/adr/0033-error-reports-and-uptime.md)),
+started by `startErrorReports` in [`src/lib/errorReports.ts`](src/lib/errorReports.ts) before the
+app renders, so a crash on start is reported too. It is off unless `EXPO_PUBLIC_SENTRY_DSN` is set,
+as an EAS environment variable. The value is read at build time, so reports start with the first
+build made after it is set. No personal data is sent (`sendDefaultPii: false`), and `scrubReport`
+from `@zyrcle/client` cleans every event and breadcrumb.
 
 ## Checks
 
 ```bash
-npm run typecheck && npx expo lint && npx expo export --platform ios --platform android
+npm run typecheck && npx expo lint && npm test && npx expo export --platform ios --platform android
 ```
 
-The full flow (camera scan, deposit, payment, history) was exercised with Playwright on the app's
-web build at phone size, against a local stack with a fake camera showing a live container QR.
-Native builds go through EAS (`eas build`, profiles in `eas.json`); there are no `ios/` or
-`android/` folders in the repo. Booking a turn, the home card and being sent to Turnos when a
-container is closed were exercised the same way.
+`npm test` runs Vitest ([`src/lib/notifications.test.ts`](src/lib/notifications.test.ts), ADR 0031)
+with the native modules replaced by stand-ins: the push token is registered once, again only when
+Android hands over a different token, and after a failed attempt (the loop of the first APK); turn
+reminders are scheduled before each turn and cancelled when the booking is gone.
+
+The screens run in a real browser in [`e2e/`](../../e2e/README.md) on the app's web export, on
+every push and pull request: a collection from the phone, a payment to a merchant, and a lost
+phone's recovery. Native builds go through EAS (`eas build`, profiles in `eas.json`); there are no
+`ios/` or `android/` folders in the repo.

@@ -8,12 +8,30 @@ https://zyrcle.deviego.xyz.
 |---|---|---|
 | `/` | Landing | Live totals from `GET /v1/stats` instead of the hackathon's made-up figures |
 | `/recycling` | The resident's deposit: scan the container's QR (camera or typed code), choose the material, live weight, "Terminé", verdict and payment; plus the resident's history | SIWE sign-in, `POST /v1/sessions`, WebSocket `/v1/sessions/{id}/live`, `GET /v1/me` |
-| `/sites` | A host's dashboard across its sites, or one site's: totals, kilos per day and material, pesos paid per day, each site's numbers or each container's fill level and weight. `/residence` redirects here | `GET /v1/hosts/{id}/dashboard`, `GET /v1/sites/{id}/dashboard` |
-| `/console` | Operations console ([ADR 0014](../../docs/adr/0014-operator-accounts.md)): sign-in by email code, review queue, incidents, collectors and printable bag labels, sales with the bank match and settlement report, hosts and sites, prices, operators | `/v1/operator/*` |
-| `/certificates/:id` | A host's impact certificate ([ADR 0027](../../docs/adr/0027-impact-certificates.md)): totals per material, CO2e avoided, print view, CSV of the deposits, and "Verificar", which recomputes the root in the browser and compares it with the anchor transaction on ZyrcleChain | `GET /v1/certificates/{id}`, the public RPC |
+| `/sites` | A host's dashboard across its sites, or one site's: totals, kilos per day and material, pesos paid per day, each site's numbers or each container's fill level and weight; on a host's view, its impact certificates. `/residence` redirects here | `GET /v1/hosts/{id}/dashboard`, `GET /v1/sites/{id}/dashboard`, `GET /v1/hosts/{id}/certificates` |
+| `/console` | Operations console ([ADR 0014](../../docs/adr/0014-operator-accounts.md)): sign-in by email code, then the tabs below | `/v1/operator/*` |
+| `/certificates/:id` | A host's impact certificate ([ADR 0027](../../docs/adr/0027-impact-certificates.md)): totals per material, CO2e avoided, print view, CSV of the deposits, and "Verificar", which recomputes the root in the browser and compares it with the anchor transaction on ZyrcleChain and with the copy on IPFS | `GET /v1/certificates/{id}`, the public RPC, the IPFS gateway |
+| `/multisig` | "Firmar en el Safe" ([ADR 0040](../../docs/adr/0040-keys-guardian-and-multisig.md)): an owner of the Safe that holds ZyrcleChain's admin powers loads a proposal made with `zyrcle-api safe propose`, checks it, signs it with the browser wallet (`eth_signTypedData_v4`, adding ZyrcleChain if needed) and downloads or copies it for the next signer | the public RPC only |
 | `/privacidad`, `/terminos` | The data-processing policy and terms of use, drafts for legal review ([ADR 0028](../../docs/adr/0028-pilot-readiness.md)) | none |
 | `/container/:id` | A container's screen, simulated: the QR whose code rotates every 30 s | `GET /v1/demo/containers` |
-| `/collectors`, `/validator`, `/marketplace`, `/my-certificates` | What comes next (phase 4 and later) | none |
+| `/collectors`, `/marketplace` | What comes next (block 4 and later) | none |
+| `/validator`, `/my-certificates` | Old hackathon links: they redirect to `/console` and `/sites` (hosts' certificates are listed on their dashboard) | none |
+
+The console's tabs ([`src/pages/Console.tsx`](src/pages/Console.tsx), one component each in
+[`src/components/console/`](src/components/console)):
+
+| Tab | What the operator does there |
+|---|---|
+| Resumen | Pending work, the system's health ([ADR 0028](../../docs/adr/0028-pilot-readiness.md)), the Treasury, the containers |
+| Revisión | Approve or reject deposits in review |
+| Incidentes | Resolve mass-balance incidents with a note |
+| Recolección | Name collectors, print bag labels, follow collections |
+| Ventas | Read the scale ticket from a photo ([ADR 0038](../../docs/adr/0038-reading-scale-tickets-with-ai.md)), record the sale (prefilled from the photo), match it with the bank statement (CSV or Excel, [ADR 0039](../../docs/adr/0039-bank-statement-matching.md)) or by hand, and read each sale's settlement report |
+| Certificados | Preview and issue a host's or site's monthly certificate |
+| Comercios | Name merchants; settle or refund their redemptions of ZYR for pesos |
+| Sedes | Create hosts and set their payout address; create sites and set their hours |
+| Precios | Centros de acopio ([ADR 0037](../../docs/adr/0037-prices-per-collection-center.md)): each center, its price per material with the suggested median of its sales, and the sites that sell to it; then the general reference prices |
+| Operadores | Admins only: add, rename, promote, demote or deactivate operators |
 
 ## Wallet
 
@@ -42,7 +60,7 @@ cd apps/api && docker compose -f dev/compose.yml up -d && .venv/bin/alembic upgr
 
 # 2. A local chain with the Treasury deployed and seeded
 anvil --chain-id 20261121 &
-.venv/bin/python dev/local_chain.py >> .env       # ZYRCLE_CHAIN_RPC_URL, TREASURY, ORACLE key
+.venv/bin/python dev/local_chain.py >> .env       # chain URL, Treasury, factory, key files
 
 # 3. Simulated containers and the API (add to .env: ZYRCLE_SIWE_DOMAIN=localhost,
 #    ZYRCLE_CORS_ORIGINS=http://localhost:8080, ZYRCLE_DEMO_SIMULATOR_URL=http://127.0.0.1:8090)
@@ -56,17 +74,41 @@ cd ../web && npm ci && cp .env.example .env    # fill VITE_TREASURY_ADDRESS from
 npm run dev                                       # http://localhost:8080
 ```
 
+Build-time settings (`VITE_*`, defaults in [`src/lib/config.ts`](src/lib/config.ts)):
+`VITE_API_URL`, `VITE_SIWE_DOMAIN`, `VITE_CHAIN_ID`, `VITE_RPC_URL`, `VITE_TREASURY_ADDRESS`,
+`VITE_IPFS_GATEWAY` (its origin must also be in the CSP), and `VITE_SENTRY_DSN` with
+`VITE_RELEASE` for error reports.
+
+## Error reports
+
+Sentry ([ADR 0033](../../docs/adr/0033-error-reports-and-uptime.md)), loaded only when
+`VITE_SENTRY_DSN` is set, so a build without one carries none of its code
+([`src/lib/errorReports.ts`](src/lib/errorReports.ts)). No user data, cookies, headers or bodies
+leave the browser, and `scrubReport` from `@zyrcle/client` cleans the rest. The release workflow
+passes the repository variable `SENTRY_DSN_WEB`; unset, reports are off.
+
 ## Checks
 
 ```bash
-npm run typecheck && npx eslint . && npm test && npm run build
+npm run typecheck      # tsc -p tsconfig.app.json --noEmit
+npx eslint .
+npm test               # vitest run
+npm run coverage       # vitest run --coverage (lib/ and console/; shown in CI, no floor)
+npm run build
 ```
 
-Unit tests cover the SIWE message (the same literal is parsed by the API's tests), QR parsing,
-formatting and token expiry. The full flow (sign in, scan through a fake camera, deposit, payment
-on chain, dashboard) was exercised with Playwright against the production nginx image and its CSP.
+Unit tests ([ADR 0031](../../docs/adr/0031-testing-and-the-pre-production-check.md)) cover the logic
+behind the pages: the certificate check in the browser (tampered leaves, another root, a different
+IPFS copy, a gateway that is down), Safe proposals (the same hash and signature as the backend, a
+changed proposal refused) and the console's formatting. The SIWE message, QR parsing and token
+expiry are tested in [`packages/client`](../../packages/client). The pages themselves run in a real
+browser in [`e2e/`](../../e2e/README.md), on every push and pull request; those journeys do not go
+through the nginx image, so a change to its configuration or security headers still needs a look at
+the live site.
 
 ## Deploy
 
 `Dockerfile` builds the static site into unprivileged nginx with the security headers. Images are
-published by the release workflow and deployed with [`deploy/deploy.sh`](../../deploy).
+published by the release workflow, only for commits whose CI passed, and deployed by digest with
+[`deploy/deploy.sh`](../../deploy)
+([ADR 0032](../../docs/adr/0032-deploys-pinned-recorded-and-backed-up.md)).

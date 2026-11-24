@@ -1,7 +1,9 @@
 # Zyrcle v1: one campus, the full loop
 
-> Status: **deployed** (blocks 1 and 2, 2026-11-23). Planned 2026-11-22. What comes next:
-> [roadmap-blocks-3-4.md](roadmap-blocks-3-4.md).
+> Status: **deployed**. Block 1 (M1 to M4) on 2026-11-22, block 2 (M5 to M7) on 2026-11-23.
+> Planned 2026-11-22. M7's checklist still waits for Diego: the off-site backup bucket, legal
+> review, Google Play and the chain for real money. The hardware track (H) has not started. What
+> came next, block 3, is deployed too: [roadmap-blocks-3-4.md](roadmap-blocks-3-4.md).
 
 ## What v1 means
 
@@ -55,7 +57,8 @@ H  Weighing station: hardware track, in parallel
   hours, turns and containers. The public dashboard shows a host's totals and each site's.
 - **Done when:** the demo shows a university host with two campuses, each with its own containers,
   turns and dashboard, and existing data is migrated without loss.
-- **Decision:** ADR 0011, hosts and sites.
+- **Decision:** [ADR 0011](adr/0011-hosts-and-sites.md), hosts and sites. Built in block 1,
+  deployed on 2026-11-22. The deprecated `residence` aliases go in block 4 (M23).
 
 ### M2. Collection (phase 4a)
 - **Why:** the material has to leave the container with its weight and origin intact.
@@ -69,7 +72,8 @@ H  Weighing station: hardware track, in parallel
 - **Done when:** in the demo, a collector empties two containers into bags. Each bag knows which
   deposits, and so which grams from which participants, it holds. A tampered emptying opens an
   incident.
-- **Decision:** ADR 0012, collection and bags.
+- **Decision:** [ADR 0012](adr/0012-collection-and-bags.md), collection and bags. Built in block 1,
+  deployed on 2026-11-22.
 
 ### M3. Sale, reconciliation and settlement (phase 4b)
 - **Why:** this is the promise. Participants are paid from what the buyer paid, not from seed
@@ -87,7 +91,9 @@ H  Weighing station: hardware track, in parallel
 - **Done when:** the demo runs deposit → emptying → bag → sale → bank match → settlement end to
   end. Every participant, the collector and the host receive ZYR backed by that sale. The supply
   invariant still holds in the invariant tests.
-- **Decision:** ADR 0013, sale, reconciliation and the host share.
+- **Decision:** [ADR 0013](adr/0013-sale-and-settlement.md), sale, reconciliation and the host
+  share. Built in block 1, deployed on 2026-11-22 with the Treasury that has the host share.
+  Reading the ticket photo with a model and matching the bank statement came in block 3 (M15, M16).
 
 ### M4. Operations console
 - **Why:** everything an operator does today goes through the API with a shared token.
@@ -96,7 +102,8 @@ H  Weighing station: hardware track, in parallel
   incidents, sales and bank matching, settlements, and the Treasury. Built in `apps/web`, in the
   hackathon design.
 - **Done when:** a pilot can run for a month without anyone using the API by hand.
-- **Decision:** ADR 0014, operator accounts and the console.
+- **Decision:** [ADR 0014](adr/0014-operator-accounts.md), operator accounts and the console.
+  Built in block 1, deployed on 2026-11-22; every later milestone added its screens.
 
 ### M5. Impact certificates
 - **Why:** a host's reason to say yes, available from the first month.
@@ -110,7 +117,8 @@ H  Weighing station: hardware track, in parallel
   - Exports a sustainability office can use.
 - **Done when:** a host downloads a certificate, opens its verification link and sees it check out
   against the chain. A second certificate over the same grams is refused.
-- **Decision:** [ADR 0027](adr/0027-impact-certificates.md), impact certificates. Built in block 2, deployed on 2026-11-23 with the IPFS copy (amendment).
+- **Decision:** [ADR 0027](adr/0027-impact-certificates.md), impact certificates. Built in block 2,
+  deployed on 2026-11-23 with the IPFS copy (amendment).
 - **Not in v1:** tradable carbon or plastic credits. They need an approved methodology, an
   accredited third-party audit, registration (RENARE in Colombia) and a scale no single campus
   reaches. The path is one Zyrcle program aggregating every site, with revenue shared with the
@@ -125,7 +133,8 @@ H  Weighing station: hardware track, in parallel
   - Only businesses go through KYC.
 - **Done when:** in the demo, a participant buys something at a simulated campus merchant, and the
   merchant's redemption appears in the Treasury and the reconciliation.
-- **Decision:** [ADR 0029](adr/0029-closed-loop-payments.md). Built in block 2; deployed on 2026-11-23 with Treasury v3.
+- **Decision:** [ADR 0029](adr/0029-closed-loop-payments.md). Built in block 2; deployed on
+  2026-11-23 with Treasury v3.
 
 ### M7. Pilot readiness
 - **Why:** none of the above should touch a real person's data or money without this.
@@ -140,7 +149,13 @@ H  Weighing station: hardware track, in parallel
   - Static analysis of the contracts, and a review of how the oracle and guardian keys are held.
   - A decision on the chain for real value: Fuji, or an L1 on mainnet and what it costs per month.
 - **Done when:** the checklist is complete and the host has approved the pilot.
-- **Decision:** [ADR 0028](adr/0028-pilot-readiness.md). Built in block 2: backups with a restore check, health and alerts, consent, production switches, Slither review. Daily backup cron installed on 2026-11-23. Waiting for Diego: off-site copy, lawyer, Play account, chain decision.
+- **Decision:** [ADR 0028](adr/0028-pilot-readiness.md). Built in block 2: backups with a restore
+  check, health and alerts, consent, production switches, Slither review. Daily backup cron
+  installed on 2026-11-23. Block 3 added to the checklist: error reports and an uptime check
+  (M10), encrypted off-site copies (M11, built; they wait for the bucket and the key), a health
+  check that tells a quiet chain from a stalled one (amendment), the guardian's own key and every
+  admin power behind a 2-of-3 Safe (M17). Waiting for Diego: the bucket, the lawyer, the Play
+  account, the chain decision.
 
 ### H. Weighing station (hardware track, in parallel)
 - **Why:** an autonomous container with a camera and NIR is the long-term design, but the pilot
@@ -158,7 +173,7 @@ H  Weighing station: hardware track, in parallel
 |---|---|
 | Staffed station or autonomous container for the pilot | staffed station |
 | Host share of each sale | set in ADR 0013 |
-| Emission factor source for certificates | set in the certificates ADR, cited |
+| Emission factor source for certificates | set in ADR 0027: EPA WARM v16, cited |
 | Who audits the legal framing of ZYR | needed before M7 closes |
 | Chain for real value | decided in M7 |
 

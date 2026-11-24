@@ -205,3 +205,16 @@ async def test_the_command_line_runs_the_first_steps_and_a_paper_key_signs(
     admin = load_account(ANVIL_KEYS["admin"]).address
     status = cli(chain_env, "status", "--safe", safe, "--admin", admin)
     assert "AccountFactory" in status and "Safe: sí" in status
+
+
+def test_calldata_from_a_signature_needs_no_other_tool():
+    from eth_utils import keccak
+
+    from zyrcle_api.safe_cli import calldata
+
+    assert calldata("pause()", []) == "0x8456cb59"
+    role = calldata("grantRole(bytes32,address)", ["OPERATOR_ROLE", "0x" + "12" * 20])
+    assert role[:10] == "0x2f2ff15d"
+    assert bytes.fromhex(role[10:74]) == keccak(text="OPERATOR_ROLE")
+    assert role.endswith("12" * 20)
+    assert calldata("setNone(address)", ["0x" + "ab" * 20])[:10] == "0x8c6bfb3b"

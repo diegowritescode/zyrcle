@@ -77,4 +77,10 @@ every signed payment, also shared the oracle key (ADR 0028 asked to separate it)
   `infra/l1/safe/`. The admin key keeps the genesis ZYR float for gas; it is moved off the VPS once
   that float has another holder. Changing the guardian is now a Safe proposal
   (`safe propose --what guardian`).
+- **2026-11-23, Claude (a correction found while documenting):** "What stays out" says the P-Chain
+  key stays offline. It does not yet: `zyrcle-pchain.pk` lives on the VPS with the other key files
+  (`~/.avalanche-cli/key/`), because topping up the validator's balance needs it (runbook 9.8, due
+  about 2027-03-09). It holds no EVM power. Moving it offline between top-ups is a step for Diego to
+  decide; until then it is covered by the encrypted off-site copy of the key files (ADR 0034) once
+  that copy is switched on.
 
