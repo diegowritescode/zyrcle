@@ -151,6 +151,11 @@ Claude proposed the split and the order, and Diego confirmed it the same day (AD
   multisig page and with the paper key on the command line. Since 2026-11-23 the Safe holds all
   eight admin powers of ZyrcleChain, and the L1 admin key that held them all has none. The signed
   proposals are kept in `infra/l1/safe/`.
+- **A lost lid-open update** (`c2e0d67`, 2026-11-24). The browser journey in CI caught the deposit
+  page stuck on "Abriendo la tapa…". The session's live socket read the state and only then
+  subscribed to updates, so a lid that opened in between was announced to nobody, and the page,
+  which only polls while the socket is down, waited forever. The socket now subscribes first. A
+  test races a change against every read; with Diego's approval it was deployed the same night.
 
 Still waiting for Diego: the Sentry account, the backup bucket and its `age` key, the Anthropic
 key, the guardian's own key (runbook 9.13), a new Android build, the legal review, Google Play and
