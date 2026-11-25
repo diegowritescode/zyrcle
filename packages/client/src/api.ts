@@ -185,11 +185,54 @@ export interface PayoutInfo {
   tx_hash: string | null;
 }
 
+/** One step of a deposit on its way from the lid to the settlement (docs/adr/0041). */
+export interface DepositStep {
+  key: "deposited" | "verified" | "advance" | "collected" | "sold" | "paid";
+  status: "done" | "pending" | "failed" | "skipped";
+  at: string | null;
+  /** The advance; for `paid`, what came on top of the advance. */
+  amount_cop: number | null;
+  /** For `paid`: the deposit's whole share of the sale. */
+  share_cop: number | null;
+  tx_hash: string | null;
+  /** The buyer for `sold`, the review note for a rejection, or a code: approved_after_review,
+   * deferred, covered_by_advance. */
+  note: string | null;
+}
+
 export interface HistoryEntry extends Session {
   container_name: string;
   payout: PayoutInfo | null;
   /** Paid on top of the advance when the deposit's bag was sold (docs/adr/0013). */
   settled_cop?: number | null;
+  /** Empty for deposits that never got measured; absent from servers before ADR 0041. */
+  steps?: DepositStep[];
+}
+
+/** Grams and CO2e avoided (only by what was sold, ADR 0027's factors). */
+export interface ImpactFigures {
+  verified_g: number;
+  sold_g: number;
+  co2e_g: number;
+}
+
+export interface PersonalImpact {
+  factors_version: string;
+  deposits: number;
+  totals: ImpactFigures;
+  materials: (ImpactFigures & { material: string })[];
+  /** The last 12 months, oldest first, "YYYY-MM". */
+  months: (ImpactFigures & { month: string })[];
+}
+
+/** A campus merchant that takes ZYR (GET /v1/merchants, docs/adr/0041). */
+export interface MerchantListing {
+  name: string;
+  host: { id: string; name: string };
+  site: { id: string; name: string } | null;
+  place: string | null;
+  hours: string | null;
+  offer: string | null;
 }
 
 export interface Me {
@@ -257,10 +300,40 @@ export interface Collection {
   closed_at: string | null;
 }
 
+/** A container as a collector plans the round: fullest first (docs/adr/0042). */
+export interface CollectorContainer {
+  id: string;
+  name: string;
+  site: { id: string; name: string };
+  accepted_materials: string[];
+  /** 0 to 100 from the distance sensor; null without a reading. */
+  fill_pct: number | null;
+  last_emptied_at: string | null;
+  deposits_since: number;
+}
+
 export interface CollectorHome {
   name: string;
   current: Collection | null;
   bags: Bag[];
+  /** Absent from servers before ADR 0042. */
+  containers?: CollectorContainer[];
+}
+
+export interface CollectorEarnings {
+  collections: {
+    id: string;
+    container_name: string;
+    closed_at: string | null;
+    grams: number;
+    earned_cop: number;
+    /** Grams in bags not sold and settled yet. */
+    pending_g: number;
+    month: string | null;
+  }[];
+  /** The last 6 months, oldest first, "YYYY-MM". */
+  months: { month: string; collections: number; grams: number; earned_cop: number }[];
+  total_cop: number;
 }
 
 export interface SignIn {
@@ -420,6 +493,8 @@ export function createApi(baseUrl: string) {
     finish: (token: string, id: string) => call<Session>(`/v1/sessions/${id}/finish`, post(), token),
     session: (token: string, id: string) => call<Session>(`/v1/sessions/${id}`, {}, token),
     me: (token: string) => call<Me>("/v1/me", {}, token),
+    impact: (token: string) => call<PersonalImpact>("/v1/me/impact", {}, token),
+    merchants: () => call<MerchantListing[]>("/v1/merchants"),
     acceptPrivacy: (token: string, version: string) =>
       call<{ privacy_version: string }>("/v1/me/consent", post({ version }), token),
     registerPushToken: (token: string, pushToken: string, platform: "ios" | "android") =>
@@ -447,6 +522,7 @@ export function createApi(baseUrl: string) {
       call<Booking>(`/v1/bookings/${id}`, { method: "DELETE" }, token),
 
     collector: (token: string) => call<CollectorHome>("/v1/collector", {}, token),
+    earnings: (token: string) => call<CollectorEarnings>("/v1/collector/earnings", {}, token),
     startCollection: (token: string, qr: string) => call<Collection>("/v1/collections", post({ qr }), token),
     collection: (token: string, id: string) => call<Collection>(`/v1/collections/${id}`, {}, token),
     /** Start filling the bag with this QR or code; null takes out residue. */

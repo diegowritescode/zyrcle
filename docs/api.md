@@ -463,6 +463,7 @@ No token. These views never show an access code or anything that identifies a pa
 | `GET /v1/residences/{site_id}/dashboard?days=` **deprecated** | alias of the site dashboard | [0011](adr/0011-hosts-and-sites.md) |
 | `GET /v1/hosts/{host_id}/certificates` | a host's impact certificates | [0027](adr/0027-impact-certificates.md) |
 | `GET /v1/certificates/{certificate_id}` | one certificate with its leaves, to verify it | [0027](adr/0027-impact-certificates.md) |
+| `GET /v1/merchants` | the campus merchants that take ZYR: where they are and what they sell | [0041](adr/0041-participant-timeline-impact-and-where-to-spend.md) |
 
 **`GET /v1/materials`** returns `["cardboard", "glass", "hdpe", "metal", "paper", "pet"]`.
 
@@ -500,13 +501,19 @@ Errors: `404 not_found`.
 - Query: `days`, integer 1 to 90, default 14.
 - Returns `{site, host, residence (deprecated, same as site), timezone, totals, containers, activity, payouts}`.
 - Each container carries the public container fields plus `fill_pct` (0 to 100, from the latest
-  closed lid, or `null`), `weight_kg` (the scale's last final reading), `deposits_verified`,
+  closed lid, a deposit's or a collection's, or `null`; [ADR 0042](adr/0042-collector-fill-alerts-and-earnings.md)),
+  `weight_kg` (the scale's reading after that lid closed), `deposits_verified`,
   `kg_verified`, `paid_cop` and `last_deposit_at`.
 - Errors: `404 not_found`, FastAPI 422 for `days` out of range.
 
 The daily series cover the last `days` local days, today included, in `ZYRCLE_TIMEZONE`:
 `activity: [{day, kg: {<material>: <kg>}}]` (credited deposits by declared material) and
 `payouts: [{day, cop}]` (confirmed advances).
+
+**`GET /v1/merchants`** returns the active merchants that belong to a host, ordered by host, site
+and name: `{name, host: {id, name}, site: {id, name} or null, place, hours, offer}`. `place`, `hours`
+and `offer` are free text the operator wrote, or null. It never shows the tax id or the account
+address ([ADR 0041](adr/0041-participant-timeline-impact-and-where-to-spend.md)).
 
 #### Deprecated aliases
 
@@ -548,7 +555,8 @@ All routes need a participant JWT, except the two sign-in routes.
 | `GET /v1/sessions/{session_id}` | 200 | one of your sessions | [0005](adr/0005-device-link-mqtt.md) |
 | `POST /v1/sessions/{session_id}/finish` | 200 | "done": close the lid | [0005](adr/0005-device-link-mqtt.md) |
 | `WS /v1/sessions/{session_id}/live` | | live readings and states (section 4) | [0005](adr/0005-device-link-mqtt.md) |
-| `GET /v1/me` | 200 | your account, balance, payouts, history | [0003](adr/0003-advance-and-settlement.md), [0010](adr/0010-smart-accounts-and-recovery.md), [0013](adr/0013-sale-and-settlement.md) |
+| `GET /v1/me` | 200 | your account, balance, payouts, history with each deposit's steps | [0003](adr/0003-advance-and-settlement.md), [0010](adr/0010-smart-accounts-and-recovery.md), [0013](adr/0013-sale-and-settlement.md), [0041](adr/0041-participant-timeline-impact-and-where-to-spend.md) |
+| `GET /v1/me/impact` | 200 | your verified and sold kilograms and the CO2e avoided, per material and month | [0027](adr/0027-impact-certificates.md), [0041](adr/0041-participant-timeline-impact-and-where-to-spend.md) |
 | `PUT /v1/me/push-token` | 204 | where to send your push notifications | [0008](adr/0008-push-notifications.md) |
 | `GET /v1/containers/{container_id}/slots?day=` | 200 | one day of a container's hours | [0009](adr/0009-time-slots.md) |
 | `GET /v1/bookings` | 200 | your upcoming bookings | [0009](adr/0009-time-slots.md) |
@@ -667,7 +675,16 @@ until the unlock timeout (15 s) expires it, and until then a new attempt gets
 | `collector` | your collector name if an operator named you an active collector, else null ([ADR 0012](adr/0012-collection-and-bags.md)) |
 | `balance_cop` | your on-chain ZYR balance shown as pesos (a decimal), or null if the chain is not configured or does not answer |
 | `payouts` | your last 50 payouts: `{session_id, kind, amount_cop, status, tx_hash, created_at}`. `kind` is `advance`; `status` is `pending`, `submitting`, `confirmed`, `deferred` or `failed` |
-| `sessions` | your last 20 deposits: a Session plus `container_name`, `payout` (`{amount_cop, status, tx_hash}` or null) and `settled_cop` (what the sale of its bag paid on top of the advance, or null) ([ADR 0013](adr/0013-sale-and-settlement.md)) |
+| `sessions` | your last 20 deposits: a Session plus `container_name`, `payout` (`{amount_cop, status, tx_hash}` or null), `settled_cop` (what the sales of its bags paid on top of the advance, summed over every line, or null; [ADR 0013](adr/0013-sale-and-settlement.md)) and `steps` |
+| `sessions[].steps` | empty for deposits never measured; otherwise six steps in order, `deposited`, `verified`, `advance`, `collected`, `sold`, `paid`, each `{key, status, at, amount_cop, share_cop, tx_hash, note}`. `status` is `done`, `pending`, `failed` or `skipped`. `amount_cop` is the advance, or for `paid` what came on top of it; `share_cop` is the deposit's whole share; `note` is the buyer (`sold`), the review note (rejected `verified`), or `approved_after_review`, `deferred`, `covered_by_advance` ([ADR 0041](adr/0041-participant-timeline-impact-and-where-to-spend.md)) |
+
+**`GET /v1/me/impact`** returns `{factors_version, deposits, totals, materials, months}`. `totals` is
+`{verified_g, sold_g, co2e_g}` over all time; `materials` adds `material` to the same figures;
+`months` holds the last 12 months, oldest first, each with `month` (`YYYY-MM`, deployment time zone).
+Verified grams count by the month of the deposit; sold grams and CO2e by the month the first sale
+line holding the deposit settled. CO2e uses the certificates' factors and is computed only on sold
+grams ([ADR 0027](adr/0027-impact-certificates.md), [ADR 0041](adr/0041-participant-timeline-impact-and-where-to-spend.md)).
+It is a view, not a claim: nothing is written to `impact_claim`.
 
 **`PUT /v1/me/push-token`**
 
@@ -823,7 +840,8 @@ takes that material out, and taps "done"; the bag gets the difference between tw
 
 | Method and path | Success | What it does | ADR |
 |---|---|---|---|
-| `GET /v1/collector` | 200 | your name, collection in progress and bags | [0012](adr/0012-collection-and-bags.md) |
+| `GET /v1/collector` | 200 | your name, collection in progress, bags and containers fullest first | [0012](adr/0012-collection-and-bags.md), [0042](adr/0042-collector-fill-alerts-and-earnings.md) |
+| `GET /v1/collector/earnings` | 200 | what each of your collections paid, per month | [0042](adr/0042-collector-fill-alerts-and-earnings.md) |
 | `POST /v1/collections` | 201 | open a container to empty it | [0012](adr/0012-collection-and-bags.md) |
 | `GET /v1/collections/{collection_id}` | 200 | one of your collections | [0012](adr/0012-collection-and-bags.md) |
 | `POST /v1/collections/{collection_id}/fills` | 201 | start filling a bag, or taking out residue | [0012](adr/0012-collection-and-bags.md), [0013](adr/0013-sale-and-settlement.md) |
@@ -837,8 +855,21 @@ finish it.
 
 **`GET /v1/collector`**
 
-- Returns `{name, current, bags}`: `current` is your collection still in progress (a Collection) or
-  null; `bags` are your `open` and `sealed` bags.
+- Returns `{name, current, bags, containers}`: `current` is your collection still in progress (a
+  Collection) or null; `bags` are your `open` and `sealed` bags; `containers` are your host's
+  containers (every host's if you have none), each `{id, name, site: {id, name}, accepted_materials,
+  fill_pct, last_emptied_at, deposits_since}`, fullest first (unknown last), then the longest since
+  emptied ([ADR 0042](adr/0042-collector-fill-alerts-and-earnings.md)).
+- Errors: `403 forbidden` (`not a collector`).
+
+**`GET /v1/collector/earnings`**
+
+- Returns `{collections, months, total_cop}`. `collections` are your closed collections of the last
+  6 months, newest first: `{id, container_name, closed_at, grams, earned_cop, pending_g, month}`.
+  `grams` went into bags; `earned_cop` is your settlement share of those bags, split among the
+  collections that filled each bag by grams, so the collections add up to what the settlement report
+  paid you; `pending_g` is still waiting for a sale. `months` has the last 6 months, oldest first:
+  `{month, collections, grams, earned_cop}` ([ADR 0042](adr/0042-collector-fill-alerts-and-earnings.md)).
 - Errors: `403 forbidden` (`not a collector`).
 
 **`POST /v1/collections`**
@@ -1080,11 +1111,12 @@ nulls where no price is set.
 **`POST /v1/operator/collectors`**
 
 - Body: `address` (the participant's account address or phone key), `name` (1 to 200), `active`
-  (default true).
-- It creates the collector, or updates the name and `active` flag of an existing one; send
+  (default true), `host_id` (the host whose containers they empty; null or absent: every host's;
+  [ADR 0042](adr/0042-collector-fill-alerts-and-earnings.md)).
+- It creates the collector, or updates the name, `active` flag and host of an existing one; send
   `active: false` to take the role away. The participant must have signed in at least once.
-- Returns `201` and `{resident_id, address, name, active}`, also on an update.
-- Errors: `404 not_found` (`no participant has signed in with that`).
+- Returns `201` and `{resident_id, address, name, active, host_id}`, also on an update.
+- Errors: `404 not_found` (`no participant has signed in with that`, `unknown host`).
 
 **`GET /v1/operator/collectors`** returns that object for every collector, by name.
 
@@ -1184,7 +1216,7 @@ The worker runs only when the chain and `ZYRCLE_OPERATOR_KEY_FILE` are configure
 
 | Method and path | Body | Returns |
 |---|---|---|
-| `POST /v1/operator/merchants` | `{address, name, nit, host_id?, active?}`: the participant's account address or phone key | 201, `{resident_id, address, name, nit, host_id, active}`, also when it updates an existing merchant. The NIT is the KYC reference, checked off line. 404 if nobody signed in with that address, or for an unknown host |
+| `POST /v1/operator/merchants` | `{address, name, nit, host_id?, active?, site_id?, place?, hours?, offer?}`: the participant's account address or phone key; the last four say where participants find it ([ADR 0041](adr/0041-participant-timeline-impact-and-where-to-spend.md)) | 201, `{resident_id, address, name, nit, host_id, active, site_id, place, hours, offer}`, also when it updates an existing merchant (every field is replaced; blank texts become null). The NIT is the KYC reference, checked off line. 404 if nobody signed in with that address, or for an unknown host; 422 if the site is not the merchant's host's |
 | `GET /v1/operator/merchants` | | Every merchant, by name, in the same shape |
 | `GET /v1/operator/redemptions` | `?status=` (`requested`, `pending`, `settled`, `refunded` or `failed`) | The last 100 redemptions, newest first, with merchant name and NIT. Redemptions still `signing` are left out |
 | `POST /v1/operator/redemptions/{id}/settle` | `{bank_ref}` | The pesos were transferred: `settleRedemption` on chain lowers `backing` and retires the ZYR. 409 unless `pending`; 503 without the Treasury operator key |

@@ -15,6 +15,7 @@ import * as Haptics from "expo-haptics";
 import { CheckCircle2, PackageCheck, PackageOpen, ScanLine, Trash2, TriangleAlert, Weight } from "lucide-react-native";
 import { useRef, useState } from "react";
 import { Platform, StyleSheet, Text, TextInput, View } from "react-native";
+import { ContainersCard, EarningsCard } from "@/features/CollectorBoard";
 import { DemoContainers } from "@/features/DemoContainers";
 import { api } from "@/lib/api";
 import { Body, Button, Card, Heading, Muted, Notice, Pill } from "@/ui/kit";
@@ -131,6 +132,7 @@ export default function Collect() {
           <Button title="Escanear contenedor" icon={<ScanLine color={colors.white} size={18} />} onPress={() => setScanning("container")} />
         </Card>
       )}
+      {!c && !scanning && <ContainersCard containers={home.data?.containers ?? []} />}
       {!c && !scanning && <DemoContainers onPick={openContainer} disabled={busy} />}
 
       {c && (
@@ -189,6 +191,7 @@ export default function Collect() {
       )}
 
       <BagsCard bags={home.data?.bags ?? []} onSeal={seal} busy={busy} />
+      <EarningsCard token={token} />
     </Screen>
   );
 }

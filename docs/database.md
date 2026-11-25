@@ -6,7 +6,7 @@ who are new to the codebase.
 
 The code is the source of truth: [`models/`][models] and the migrations in
 [`migrations/versions/`][versions]. If this document and the code disagree, the code wins, and this
-document needs a fix. This document describes the schema at migration `0016`: 37 tables, plus
+document needs a fix. This document describes the schema at migration `0017`: 37 tables, plus
 Alembic's own.
 
 ## Contents
@@ -770,6 +770,7 @@ Marks a participant as a collector. A collector is paid at the same account as a
 | `name` | varchar(200) | no | Name shown to operators. |
 | `active` | boolean | no | Default true. Inactive collectors cannot start collections. |
 | `created_at` | timestamptz | no | |
+| `host_id` | uuid | yes | FK → `host.id`: the host whose containers they empty and are alerted about. Null: every host's ([ADR 0042](adr/0042-collector-fill-alerts-and-earnings.md)). Migration `0017`. |
 
 - `bag.collector_id` and `collection.collector_id` point to `resident.id`, not to this table. The
   schema does not require a `collector` row for them; `_require_collector` in
@@ -823,6 +824,7 @@ id: its `id` travels in the `unlock` and `lock` commands.
 | `created_at`, `updated_at` | timestamptz | no | The measurement timeout counts from `updated_at`. |
 | `last_activity_at` | timestamptz | no | Last time the scale moved by at least `weight_change_g`. The idle timeout (default 10 minutes) counts from it. |
 | `closed_at` | timestamptz | yes | When the final measurement arrived. |
+| `fill_after_mm` | integer | yes | The distance sensor after the lid closed: how full the container was left. Null for collections before migration `0017` or a reading missing from the measurement ([ADR 0042](adr/0042-collector-fill-alerts-and-earnings.md)). |
 
 - `collection_state_valid`: CHECK on `state`.
 - `one_active_collection_per_container`: unique `(container_id)` where `state IN ('authorized',
@@ -1204,11 +1206,16 @@ participant.
 | `resident_id` | uuid | no | Primary key. FK → `resident.id`. |
 | `name` | varchar(200) | no | The business name shown to payers. |
 | `nit` | varchar(32) | no | The tax id: the KYC reference, checked off line. |
-| `host_id` | uuid | yes | FK → `host.id`: the campus it sells on, if any. |
+| `host_id` | uuid | yes | FK → `host.id`: the campus it sells on, if any. Only merchants with a host appear in `GET /v1/merchants`. |
 | `active` | boolean | no | Default true. An inactive merchant cannot charge or redeem. |
 | `created_at` | timestamptz | no | |
+| `site_id` | uuid | yes | FK → `site.id`, a site of `host_id`: the campus where participants find it. Migration `0017`. |
+| `place` | varchar(200) | yes | Where it is inside the site, free text ("Bloque 7, primer piso"). Public. |
+| `hours` | varchar(120) | yes | Its opening hours, free text. Public. |
+| `offer` | varchar(300) | yes | What it sells, free text. Public ([ADR 0041](adr/0041-participant-timeline-impact-and-where-to-spend.md)). |
 
 **Written by:** `name_merchant` in [`payment_routes.py`][payment-routes] (insert or update).
+**Read by:** `where_to_spend` in [`payment_routes.py`][payment-routes] (`GET /v1/merchants`, without `nit`), payments.
 
 #### `payment_request`
 
@@ -1417,7 +1424,7 @@ The outbox for push notifications. It is written in the transaction that caused 
 |---|---|---|---|
 | `id` | uuid | no | Primary key. |
 | `resident_id` | uuid | no | FK → `resident.id`: who to notify. |
-| `kind` | varchar(32) | no | `deposit_review`, `deposit_rejected`, `deposit_approved`, `payout_confirmed`, `settlement_paid`, `recovery_started`, `recovery_done`, `recovery_cancelled`, `payment_received`, `redemption_settled` or `redemption_refunded`. |
+| `kind` | varchar(32) | no | `deposit_review`, `deposit_rejected`, `deposit_approved`, `payout_confirmed`, `settlement_paid`, `deposit_sold`, `container_full` ([ADR 0041](adr/0041-participant-timeline-impact-and-where-to-spend.md), [ADR 0042](adr/0042-collector-fill-alerts-and-earnings.md)), `recovery_started`, `recovery_done`, `recovery_cancelled`, `payment_received`, `redemption_settled` or `redemption_refunded`. |
 | `dedupe_key` | varchar(120) | no | Unique. `<kind>:<id of the cause>`, for example `payout_confirmed:<payout id>`. |
 | `title` | varchar(120) | no | Notification title. |
 | `body` | varchar(400) | no | Notification text. |
@@ -1525,7 +1532,7 @@ enqueued only for an active operator's address.
 ### 3.8 `alembic_version`
 
 Alembic's own bookkeeping table. One row, `version_num varchar(32)`, holds the current revision
-(`0016`).
+(`0017`).
 
 ## 4. State machines
 
@@ -1902,9 +1909,11 @@ Until a worker runs, its rows stay `pending`.
 | [`0014`][m0014] | 2026-11-23 | `collection_center`, `center_price`; `site.center_id`, `sale.center_id`, each with its index and foreign key. | [ADR 0037][adr-0037] |
 | [`0015`][m0015] | 2026-11-23 | `ticket_scan`. | [ADR 0038][adr-0038] |
 | [`0016`][m0016] | 2026-11-23 | `bank_statement`, `bank_line`. | [ADR 0039][adr-0039] |
+| [`0017`][m0017] | 2026-11-24 | `merchant.site_id`, `place`, `hours`, `offer`; `collection.fill_after_mm`; `collector.host_id`; both foreign keys. | [ADR 0041][adr-0041], [ADR 0042][adr-0042] |
 
 In production, `0005` to `0009` went out with block 1 of v1 (2026-11-22), `0010` to `0013` with
-block 2 and `0014` to `0016` with block 3 (both 2026-11-23) ([history](history.md)). The dates in
+block 2 and `0014` to `0016` with block 3 (both 2026-11-23) ([history](history.md)). `0017`
+belongs to block 4 (M18 and M19) and is not in production yet. The dates in
 the table are the `Create Date` lines of the migration files. Every migration has a downgrade.
 Downgrades drop the tables and columns their upgrade added, so the data in them is lost.
 
@@ -2094,6 +2103,7 @@ Found on 2026-11-22 by comparing the code with its comments, docstrings and ADRs
 [m0014]: ../apps/api/migrations/versions/0014_collection_centers.py
 [m0015]: ../apps/api/migrations/versions/0015_ticket_scans.py
 [m0016]: ../apps/api/migrations/versions/0016_bank_statements.py
+[m0017]: ../apps/api/migrations/versions/0017_participant_and_collector.py
 [adr-0002]: adr/0002-own-avalanche-l1.md
 [adr-0003]: adr/0003-advance-and-settlement.md
 [adr-0005]: adr/0005-device-link-mqtt.md
@@ -2116,3 +2126,5 @@ Found on 2026-11-22 by comparing the code with its comments, docstrings and ADRs
 [adr-0038]: adr/0038-reading-scale-tickets-with-ai.md
 [adr-0039]: adr/0039-bank-statement-matching.md
 [adr-0040]: adr/0040-keys-guardian-and-multisig.md
+[adr-0041]: adr/0041-participant-timeline-impact-and-where-to-spend.md
+[adr-0042]: adr/0042-collector-fill-alerts-and-earnings.md

@@ -15,6 +15,7 @@ import { Empty, Loading, Section } from "./shared";
 import { failed } from "@/console/format";
 
 const BAG_STATUS: Record<Bag["status"], string> = { open: "Abierta", sealed: "Cerrada", sold: "Vendida", settled: "Liquidada" };
+const ALL_HOSTS = "all";
 
 /** Collectors, bags and the collections that filled them (docs/adr/0012). */
 export function Collection() {
@@ -31,14 +32,17 @@ function Collectors() {
     const { api } = useConsole();
     const queryClient = useQueryClient();
     const list = useQuery({ queryKey: ["op", "collectors"], queryFn: api.collectors });
+    const hosts = useQuery({ queryKey: ["op", "hosts"], queryFn: api.hosts });
     const [address, setAddress] = useState("");
     const [name, setName] = useState("");
+    const [hostId, setHostId] = useState(ALL_HOSTS);
     const [busy, setBusy] = useState(false);
+    const hostName = (id: string | null) => (id ? hosts.data?.find((h) => h.id === id)?.name ?? "…" : "Todos");
 
     const add = async () => {
         setBusy(true);
         try {
-            await api.nameCollector(address.trim(), name.trim());
+            await api.nameCollector(address.trim(), name.trim(), hostId === ALL_HOSTS ? null : hostId);
             toast.success(`${name} ya es recolector: verá «Recolección» en su app`);
             setAddress("");
             setName("");
@@ -49,9 +53,9 @@ function Collectors() {
             setBusy(false);
         }
     };
-    const toggle = async (address: string, name: string, active: boolean) => {
+    const toggle = async (address: string, name: string, host: string | null, active: boolean) => {
         try {
-            await api.nameCollector(address, name, active);
+            await api.nameCollector(address, name, host, active);
             await queryClient.invalidateQueries({ queryKey: ["op", "collectors"] });
         } catch (e) {
             failed(e);
@@ -61,7 +65,7 @@ function Collectors() {
     return (
         <Section title="Recolectores" description="Personas que vacían contenedores. Pide la dirección que aparece en su app, en «Cuenta»">
             <form
-                className="grid gap-2 sm:grid-cols-[1fr_1fr_auto] items-end mb-4"
+                className="grid gap-2 sm:grid-cols-[1fr_1fr_1fr_auto] items-end mb-4"
                 onSubmit={(e) => {
                     e.preventDefault();
                     add();
@@ -75,6 +79,16 @@ function Collectors() {
                     <Label htmlFor="col-name">Nombre</Label>
                     <Input id="col-name" value={name} onChange={(e) => setName(e.target.value)} />
                 </div>
+                <div className="space-y-1">
+                    <Label>Vacía los contenedores de</Label>
+                    <Select value={hostId} onValueChange={setHostId}>
+                        <SelectTrigger aria-label="Vacía los contenedores de"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value={ALL_HOSTS}>Todas las instituciones</SelectItem>
+                            {(hosts.data ?? []).map((h) => <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
+                </div>
                 <Button type="submit" disabled={busy || !/^0x[0-9a-fA-F]{40}$/.test(address.trim()) || !name.trim()}>
                     <UserPlus className="h-4 w-4 mr-1" /> Nombrar
                 </Button>
@@ -84,6 +98,7 @@ function Collectors() {
                     <TableHeader>
                         <TableRow>
                             <TableHead>Nombre</TableHead>
+                            <TableHead>Institución</TableHead>
                             <TableHead>Cuenta</TableHead>
                             <TableHead />
                         </TableRow>
@@ -92,9 +107,10 @@ function Collectors() {
                         {list.data.map((c) => (
                             <TableRow key={c.resident_id}>
                                 <TableCell className="font-medium">{c.name}</TableCell>
+                                <TableCell>{hostName(c.host_id)}</TableCell>
                                 <TableCell className="font-mono text-xs">{shortHex(c.address)}</TableCell>
                                 <TableCell className="text-right">
-                                    <Button size="sm" variant="outline" onClick={() => toggle(c.address, c.name, !c.active)}>
+                                    <Button size="sm" variant="outline" onClick={() => toggle(c.address, c.name, c.host_id, !c.active)}>
                                         {c.active ? "Desactivar" : "Activar"}
                                     </Button>
                                 </TableCell>

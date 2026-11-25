@@ -5,4 +5,5 @@ export * from "./jwt";
 export * from "./labels";
 export * from "./qr";
 export * from "./siwe";
+export * from "./steps";
 export * from "./scrub";

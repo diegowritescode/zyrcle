@@ -40,6 +40,7 @@ export default function RootLayout() {
             <Stack.Screen name="collect" options={{ title: "Recolección" }} />
             <Stack.Screen name="pay" options={{ title: "Pagar" }} />
             <Stack.Screen name="shop" options={{ title: "Comercio" }} />
+            <Stack.Screen name="spend" options={{ title: "Dónde gastar" }} />
           </Stack>
           </RetiredGate>
         </NotificationsProvider>

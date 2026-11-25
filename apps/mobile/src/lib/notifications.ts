@@ -62,6 +62,8 @@ export async function setUpChannels(): Promise<void> {
     Notifications.setNotificationChannelAsync("deposits", { name: "Depósitos en revisión", importance: DEFAULT }),
     Notifications.setNotificationChannelAsync("turns", { name: "Recordatorios de turno", importance: HIGH }),
     Notifications.setNotificationChannelAsync("account", { name: "Seguridad de tu cuenta", importance: HIGH }),
+    // Collectors: a container passed the fill alert (docs/adr/0042).
+    Notifications.setNotificationChannelAsync("collection", { name: "Contenedores llenos", importance: HIGH }),
   ]);
   const failed = results.find((r) => r.status === "rejected");
   if (failed && !isRunningInExpoGo()) {

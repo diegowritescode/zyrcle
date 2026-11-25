@@ -185,6 +185,31 @@ test("a sale confirmed against the bank settles the participants, the collector 
   expect(sales[0].center_id).toBeTruthy(); // the sale names the center on record
 });
 
+test("the participant follows a deposit to the sale and sees their impact; the collector sees what to empty and what they earned", async () => {
+  // ADR 0041: every step of the deposit, from the lid to the settlement, and the personal impact.
+  await desk.goto(`${WEB}/recycling`, { waitUntil: "networkidle" });
+  await expect(desk.getByText("sesión iniciada con tu firma")).toBeVisible({ timeout: 30_000 });
+  await desk.getByRole("tab", { name: "Mis depósitos" }).click();
+  await expect(desk.getByText("Mi impacto")).toBeVisible();
+  await expect(desk.getByRole("term").filter({ hasText: "CO2e evitado" })).toBeVisible();
+  await desk.getByRole("button", { name: /^Recorrido de PET/ }).first().click();
+  const steps = desk.getByRole("list", { name: "Recorrido del depósito" });
+  await expect(steps.getByText("Recogido", { exact: true })).toBeVisible();
+  await expect(steps.getByText("A Centro de acopio La 80")).toBeVisible();
+  await expect(steps.getByText(/^(Pagado|Liquidado)$/)).toBeVisible();
+  // Leave once the QR reader's WebAssembly has arrived: navigating away mid-download logs an error.
+  await desk
+    .waitForFunction(() => performance.getEntriesByType("resource").some((e) => e.name.includes("zxing_reader")), undefined, { timeout: 10_000 })
+    .catch(() => undefined);
+
+  // ADR 0042: the collector's containers, fullest first, and what the sold bag paid them.
+  const p = collector.page;
+  await p.goto(`${MOB}/collect`, { waitUntil: "networkidle" });
+  await expect(p.getByText("Qué vaciar primero")).toBeVisible();
+  await expect(p.getByText("Lo que has ganado")).toBeVisible();
+  expect(await overflow(p)).toBe(0);
+});
+
 test("the console fits a phone screen", async () => {
   await desk.setViewportSize({ width: 390, height: 844 });
   await desk.goto(`${WEB}/console`, { waitUntil: "networkidle" });
@@ -242,6 +267,14 @@ test("a campus merchant charges with a QR, a participant pays from the phone, an
   await desk.getByLabel("Dirección de su cuenta").fill(shop.address);
   await desk.getByLabel("Nombre del negocio").fill("Cafetería Central");
   await desk.getByLabel("NIT").fill("900123456-7");
+  // Where participants find it (ADR 0041).
+  await desk.getByRole("combobox", { name: "Campus" }).click();
+  await desk.getByRole("option", { name: "Universidad Demo Zyrcle" }).click();
+  await desk.getByRole("combobox", { name: "Sede del comercio" }).click();
+  await desk.getByRole("option", { name: "Campus Norte" }).click();
+  await desk.getByLabel("Dónde queda").fill("Bloque 7, primer piso");
+  await desk.getByLabel("Horario").fill("L-V 7:00 a 18:00");
+  await desk.getByLabel("Qué vende").fill("Café y almuerzos");
   await desk.getByRole("button", { name: "Agregar" }).click();
   await expect(desk.getByRole("cell", { name: "Cafetería Central" }).first()).toBeVisible();
 
@@ -273,4 +306,15 @@ test("a campus merchant charges with a QR, a participant pays from the phone, an
   await expect(desk.getByText("Pagado", { exact: true }).first()).toBeVisible();
   await expect(shop.page.getByText("Pagado en pesos")).toBeVisible();
   expect(await overflow(shop.page)).toBe(0);
+
+  // Participants find it in "Dónde gastar", on the phone and on the web (ADR 0041).
+  await customer.page.goto(`${MOB}/spend`, { waitUntil: "networkidle" });
+  await expect(customer.page.getByText("Cafetería Central")).toBeVisible();
+  await expect(customer.page.getByText("Bloque 7, primer piso")).toBeVisible();
+  expect(await overflow(customer.page)).toBe(0);
+  await desk.goto(`${WEB}/recycling`, { waitUntil: "networkidle" });
+  await desk.getByRole("tab", { name: "Dónde gastar" }).click();
+  const listing = desk.getByRole("region", { name: "Universidad Demo Zyrcle · Campus Norte" });
+  await expect(listing.getByText("Cafetería Central")).toBeVisible();
+  await expect(listing.getByText("L-V 7:00 a 18:00")).toBeVisible();
 });

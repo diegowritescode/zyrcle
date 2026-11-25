@@ -457,6 +457,7 @@ has none). Unknown variables are ignored. "Default" means the column is not set 
 | `ZYRCLE_RELAY_INTERVAL_S` | `2.0` | default | no | Relay worker interval (signed payments, [ADR 0029](adr/0029-closed-loop-payments.md)). |
 | `ZYRCLE_ADVANCE_RATIO_BPS` | `5000` | default | no | Advance as a share of the reference price, in basis points (50 %, [ADR 0023](adr/0023-testnet-economics.md)). |
 | `ZYRCLE_MAX_ADVANCE_COP` | `5000` | default | no | Advance cap per deposit, as in the contract. |
+| `ZYRCLE_FILL_ALERT_PCT` | `80` | default | no | A container at or above this fill level pushes its host's collectors, once per fill cycle ([ADR 0042](adr/0042-collector-fill-alerts-and-earnings.md)). |
 | `ZYRCLE_PAYOUT_INTERVAL_S` | `2.0` | default | no | Payout worker interval. |
 | `ZYRCLE_PUSH_ENABLED` | `true` | default | no | Turns the push notification worker on. |
 | `ZYRCLE_EXPO_PUSH_URL` | `https://exp.host/--/api/v2/push` | default | no | Expo push API base URL. |

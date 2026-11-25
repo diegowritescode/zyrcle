@@ -49,3 +49,21 @@ export const dayLabel = (isoDay: string, today: string) => {
 /** A date on this device's calendar as YYYY-MM-DD (today by default). */
 export const localDay = (d = new Date()) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+/** "nov 2026" for "2026-11". Built by hand, like dayLabel. */
+export const monthLabel = (isoMonth: string) => {
+  const [y, m] = isoMonth.split("-").map(Number);
+  return `${MONTHS[m - 1]} ${y}`;
+};
+
+/** CO2e avoided: "850 g" or "1,17 kg" (docs/adr/0027). */
+export const co2e = (g: number) => grams(g);
+
+/** "hoy", "ayer", "hace 3 días" or "hace 2 meses" since `iso`, from `now`. */
+export const ago = (iso: string, now = new Date()) => {
+  const days = Math.floor((now.getTime() - new Date(iso).getTime()) / 86_400_000);
+  if (days <= 0) return "hoy";
+  if (days === 1) return "ayer";
+  if (days < 60) return `hace ${days} días`;
+  return `hace ${Math.floor(days / 30)} meses`;
+};

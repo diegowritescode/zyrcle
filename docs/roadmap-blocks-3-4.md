@@ -2,8 +2,9 @@
 
 > Status: block 3 (M8 to M17) **done and deployed** on 2026-11-23, with migrations `0014` to `0016`.
 > Since that day the 2-of-3 Safe `0x607c011C6921eA75C1e38223a5E5514eDbA7E43b` holds all eight admin
-> powers of ZyrcleChain and the L1 admin key holds none. Block 4 (M18 to M23) is planned, not
-> started. v1 blocks 1 and 2 are deployed ([roadmap-v1.md](roadmap-v1.md)). Scope and order:
+> powers of ZyrcleChain and the L1 admin key holds none. Block 4 (M18 to M23) started on
+> 2026-11-24: M18 and M19 are built on the branch `block4-m18-m19` with migration `0017`, not
+> deployed yet; M20 to M23 are planned. v1 blocks 1 and 2 are deployed ([roadmap-v1.md](roadmap-v1.md)). Scope and order:
 > [ADR 0030](adr/0030-blocks-3-and-4.md). What each milestone built is under **Built**; what
 > still waits for Diego is in [the last section of block 3](#what-block-3-still-waits-for).
 
@@ -238,7 +239,7 @@ Everything is built and deployed; these switch features on or close what code ca
 
 ## Block 4: every party
 
-> Planned, not started. Nothing below is built.
+> M18 and M19 built on 2026-11-24 (branch `block4-m18-m19`, not deployed yet). M20 to M23 planned.
 
 ### M18. Participant
 - **Each deposit, step by step:** deposited, verified, collected, sold, paid, with the date and the
@@ -247,11 +248,25 @@ Everything is built and deployed; these switch features on or close what code ca
   and rule as the certificates, ADR 0027), per material and per month.
 - **Where to spend:** the campus merchants with location, hours and what they sell, in the app and
   on the web.
+- **Built** ([ADR 0041](adr/0041-participant-timeline-impact-and-where-to-spend.md), proposed):
+  `steps` on each deposit in `GET /v1/me` (deposited, verified, advance, collected, sold, paid);
+  `GET /v1/me/impact`; the `deposit_sold` push when a sale is recorded (the existing
+  `settlement_paid` push covers the payment); merchants' site, place, hours and offer, set in the
+  console, and the public `GET /v1/merchants`. The web app shows the steps, "Mi impacto" and a
+  "Dónde gastar" tab; the mobile app the same in "Mis depósitos" and a `/spend` screen, which reach
+  phones with the next Android build (M23).
 
 ### M19. Collector
 - **Fill alerts:** each container's fill level from its contents and capacity; a push to the host's
   collectors when one passes 80 %; a list ordered by fill and by time since the last emptying.
 - **Earnings:** what each collection paid, by month.
+- **Built** ([ADR 0042](adr/0042-collector-fill-alerts-and-earnings.md), proposed): collections keep
+  the distance sensor's reading, so a container shows empty after a collection (the site dashboard
+  too); the `container_full` push at 80 % (`ZYRCLE_FILL_ALERT_PCT`) to the host's collectors, once
+  per fill cycle; collectors may belong to one host, set in the console; `GET /v1/collector` lists
+  the containers fullest first; `GET /v1/collector/earnings` splits each bag's collector share among
+  the collections that filled it. The mobile app's collection screen shows both; the Android
+  channel `collection` arrives with the next build.
 
 ### M20. Host
 - **Monthly certificate without asking:** on the first days of each month the system issues the

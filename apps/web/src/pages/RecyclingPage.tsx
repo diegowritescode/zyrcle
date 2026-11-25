@@ -1,9 +1,11 @@
-import { History as HistoryIcon, Recycle } from "lucide-react";
+import { History as HistoryIcon, Recycle, Store } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { RecyclingAccess } from "@/components/recycling/RecyclingAccess";
 import { History } from "@/components/recycling/History";
+import { Impact } from "@/components/recycling/Impact";
+import { WhereToSpend } from "@/components/recycling/WhereToSpend";
 import { PrivacyBanner } from "@/components/recycling/PrivacyBanner";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useHosts } from "@/hooks/useHosts";
@@ -31,6 +33,10 @@ const RecyclingPage = () => {
                                     <HistoryIcon className="h-4 w-4 mr-2" />
                                     Mis depósitos
                                 </TabsTrigger>
+                                <TabsTrigger value="spend" className="flex items-center">
+                                    <Store className="h-4 w-4 mr-2" />
+                                    Dónde gastar
+                                </TabsTrigger>
                             </TabsList>
                         </div>
 
@@ -39,7 +45,11 @@ const RecyclingPage = () => {
                             <RecyclingAccess />
                         </TabsContent>
                         <TabsContent value="history" className="m-0">
+                            <Impact token={token} />
                             <History token={token} />
+                        </TabsContent>
+                        <TabsContent value="spend" className="m-0">
+                            <WhereToSpend />
                         </TabsContent>
                     </Tabs>
                 </div>

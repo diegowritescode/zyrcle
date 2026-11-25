@@ -67,6 +67,8 @@ export interface Collector {
     address: string;
     name: string;
     active: boolean;
+    /** The host whose containers they empty; null: every host's (docs/adr/0042). */
+    host_id: string | null;
 }
 
 export interface SettlementRow {
@@ -208,7 +210,14 @@ export interface MerchantRow {
     nit: string;
     host_id: string | null;
     active: boolean;
+    /** Where participants find it (docs/adr/0041). */
+    site_id: string | null;
+    place: string | null;
+    hours: string | null;
+    offer: string | null;
 }
+
+export type MerchantIn = Pick<MerchantRow, "address" | "name" | "nit" | "host_id" | "site_id" | "place" | "hours" | "offer"> & { active?: boolean };
 
 export interface OperatorRedemption extends Redemption {
     merchant: string;
@@ -272,7 +281,8 @@ export function operatorApi(token: string | null, onUnauthorized: () => void) {
         bags: (status?: string) => call<OperatorBag[]>(`/v1/operator/bags${status ? `?status=${status}` : ""}`),
         createBags: (material: string, count: number) => call<Bag[]>("/v1/operator/bags", json("POST", { material, count })),
         collectors: () => call<Collector[]>("/v1/operator/collectors"),
-        nameCollector: (address: string, name: string, active = true) => call<Collector>("/v1/operator/collectors", json("POST", { address, name, active })),
+        nameCollector: (address: string, name: string, host_id: string | null, active = true) =>
+            call<Collector>("/v1/operator/collectors", json("POST", { address, name, host_id, active })),
 
         sales: () => call<Sale[]>("/v1/operator/sales"),
         sale: (id: string) => call<Sale>(`/v1/operator/sales/${id}`),
@@ -308,8 +318,7 @@ export function operatorApi(token: string | null, onUnauthorized: () => void) {
             call<Certificate>("/v1/operator/certificates", json("POST", { host_id, site_id, period })),
 
         merchants: () => call<MerchantRow[]>("/v1/operator/merchants"),
-        nameMerchant: (body: { address: string; name: string; nit: string; host_id: string | null; active?: boolean }) =>
-            call<MerchantRow>("/v1/operator/merchants", json("POST", body)),
+        nameMerchant: (body: MerchantIn) => call<MerchantRow>("/v1/operator/merchants", json("POST", body)),
         redemptions: (status?: string) => call<OperatorRedemption[]>(`/v1/operator/redemptions${status ? `?status=${status}` : ""}`),
         settleRedemption: (id: string, bank_ref: string) => call<Redemption>(`/v1/operator/redemptions/${id}/settle`, json("POST", { bank_ref })),
         refundRedemption: (id: string) => call<Redemption>(`/v1/operator/redemptions/${id}/refund`, json("POST")),
