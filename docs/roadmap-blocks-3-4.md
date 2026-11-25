@@ -248,7 +248,7 @@ Everything is built and deployed; these switch features on or close what code ca
   and rule as the certificates, ADR 0027), per material and per month.
 - **Where to spend:** the campus merchants with location, hours and what they sell, in the app and
   on the web.
-- **Built** ([ADR 0041](adr/0041-participant-timeline-impact-and-where-to-spend.md), proposed):
+- **Built** ([ADR 0041](adr/0041-participant-timeline-impact-and-where-to-spend.md), accepted 2026-11-25):
   `steps` on each deposit in `GET /v1/me` (deposited, verified, advance, collected, sold, paid);
   `GET /v1/me/impact`; the `deposit_sold` push when a sale is recorded (the existing
   `settlement_paid` push covers the payment); merchants' site, place, hours and offer, set in the
@@ -260,7 +260,7 @@ Everything is built and deployed; these switch features on or close what code ca
 - **Fill alerts:** each container's fill level from its contents and capacity; a push to the host's
   collectors when one passes 80 %; a list ordered by fill and by time since the last emptying.
 - **Earnings:** what each collection paid, by month.
-- **Built** ([ADR 0042](adr/0042-collector-fill-alerts-and-earnings.md), proposed): collections keep
+- **Built** ([ADR 0042](adr/0042-collector-fill-alerts-and-earnings.md), accepted 2026-11-25): collections keep
   the distance sensor's reading, so a container shows empty after a collection (the site dashboard
   too); the `container_full` push at 80 % (`ZYRCLE_FILL_ALERT_PCT`) to the host's collectors, once
   per fill cycle; collectors may belong to one host, set in the console; `GET /v1/collector` lists

@@ -13,6 +13,7 @@ timeline
     2026-11-21 : Monorepo and CI (phase 0) : ZyrcleChain v2 live on Fuji : Deposit cycle (phase 1) : Treasury (phase 2)
     2026-11-22 : Live demo (phase 5) : Resident app with Expo (phase 3) : Turns, push, lost-phone recovery : v1 roadmap and block 1 (hosts, collection, sales, console) : Block 2 built (certificates, pilot readiness, campus payments)
     2026-11-23 : Block 2 deployed : Block 3 built and deployed (tests, deploys, monitoring, backups, rate limits, centers, tickets, bank statements) : Admin powers moved to a 2-of-3 Safe
+    2026-11-24 : Block 4 starts - M18 participant and M19 collector built
 ```
 
 ## 2025: the hackathon
@@ -157,9 +158,35 @@ Claude proposed the split and the order, and Diego confirmed it the same day (AD
   which only polls while the socket is down, waited forever. The socket now subscribes first. A
   test races a change against every read; with Diego's approval it was deployed the same night.
 
+## 2026-11-24 and 25: block 4 starts
+
+Diego asked what code was left and chose to start block 4 with the two parties who use Zyrcle every
+day in the pilot: "listo, empieza con eso" (2026-11-24).
+
+- **M18, the participant** ([ADR 0041](adr/0041-participant-timeline-impact-and-where-to-spend.md)).
+  Each deposit shows its steps from the lid to the settlement: deposited, verified, advance,
+  collected, sold (to whom) and paid (how much on top of the advance). A push when the material is
+  sold, and the existing one when the share is paid. "Mi impacto" counts verified and sold kilograms
+  and the CO2e of what was sold, with the certificates' factors. Merchants got a campus, a place,
+  hours and what they sell, and a public list: "Dónde gastar" on the web and in the app.
+- **M19, the collector** ([ADR 0042](adr/0042-collector-fill-alerts-and-earnings.md)). Collections
+  keep the fill sensor's reading, so an emptied container no longer shows full (the site dashboard
+  had that bug). A push to the host's collectors when a container passes 80 %, once until it is
+  emptied; collectors may belong to one host. The collection screen lists the containers fullest
+  first and what each collection paid, split among the collections that filled each bag.
+- Migration `0017`. 130 backend tests and the 19 browser journeys pass, which now check the steps
+  after a sale, the impact, the collector's board and the merchant in "Dónde gastar".
+- **Decisions confirmed** on 2026-11-25 ("si, confirmo, documenta todo"): a deposit counts as sold
+  when the ticket is recorded, since a recorded sale cannot be deleted; no second push when the
+  advance already covered the share; personal CO2e only on what was sold and called indicative; one
+  fill alert per container until it is emptied; collectors without a host see every host; a bag's
+  collector share split by grams; merchants' place and hours as free text.
+- Built on the branch `block4-m18-m19`, not deployed yet. The app's changes reach phones with the
+  next Android build (M23).
+
 Still waiting for Diego: the Sentry account, the backup bucket and its `age` key, the Anthropic
 key, the guardian's own key (runbook 9.13), a new Android build, the legal review, Google Play and
-the chain for real money. Block 4 (M18 to M23) is planned, not started.
+the chain for real money. M20 to M23 of block 4 are planned.
 
 ## Where the old things are
 

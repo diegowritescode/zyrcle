@@ -10,9 +10,10 @@ SIWE message through [`@zyrcle/client`](../../packages/client).
 | Turnos | Book an hour at a container (up to 7 days ahead), see and cancel your turns ([ADR 0009](../../docs/adr/0009-time-slots.md)) |
 | Escanear | Camera QR scanning (`expo-camera`), typed code fallback, the demo's simulated containers |
 | Reciclar | Choose the material, open the lid, live weight over the WebSocket, "Terminé", verdict and the advance paid on chain |
-| Depósitos | The resident's last 20 deposits and their payments: the advance, plus what each got when its bag was sold ([ADR 0013](../../docs/adr/0013-sale-and-settlement.md)) |
+| Depósitos | The resident's last 20 deposits and their payments: the advance, plus what each got when its bag was sold ([ADR 0013](../../docs/adr/0013-sale-and-settlement.md)); tap one for its steps up to the settlement; "Mi impacto" ([ADR 0041](../../docs/adr/0041-participant-timeline-impact-and-where-to-spend.md)) |
+| Dónde gastar | The campus merchants that take ZYR, with place, hours and what they sell (`/spend`, [ADR 0041](../../docs/adr/0041-participant-timeline-impact-and-where-to-spend.md)). Reached from Depósitos |
 | Cuenta | The account address, the recovery email, "¿Perdiste tu teléfono anterior?", notifications, network, links, and (testnet) a new account |
-| Recolección | For collectors only ([ADR 0012](../../docs/adr/0012-collection-and-bags.md)): open a container, scan a bag, take one material out while the container's scale weighs it, residue, close; seal full bags. Reached from Cuenta |
+| Recolección | For collectors only ([ADR 0012](../../docs/adr/0012-collection-and-bags.md)): open a container, scan a bag, take one material out while the container's scale weighs it, residue, close; seal full bags; the containers fullest first and what each collection paid ([ADR 0042](../../docs/adr/0042-collector-fill-alerts-and-earnings.md)). Reached from Cuenta |
 | Pagar | Pay a campus merchant's QR from the account: the phone signs, the backend relays and pays the gas ([ADR 0029](../../docs/adr/0029-closed-loop-payments.md)). Reached from Escanear |
 | Comercio | For merchants only: charge with a QR, see payments, and turn ZYR into pesos. Reached from Cuenta |
 | Recuperar tu cuenta | Bring an older account to this phone with the code sent to its recovery email ([ADR 0010](../../docs/adr/0010-smart-accounts-and-recovery.md)) |

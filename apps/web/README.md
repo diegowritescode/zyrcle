@@ -7,7 +7,7 @@ https://zyrcle.deviego.xyz.
 | Route | What it shows | Data |
 |---|---|---|
 | `/` | Landing | Live totals from `GET /v1/stats` instead of the hackathon's made-up figures |
-| `/recycling` | The resident's deposit: scan the container's QR (camera or typed code), choose the material, live weight, "Terminé", verdict and payment; plus the resident's history | SIWE sign-in, `POST /v1/sessions`, WebSocket `/v1/sessions/{id}/live`, `GET /v1/me` |
+| `/recycling` | The resident's deposit: scan the container's QR (camera or typed code), choose the material, live weight, "Terminé", verdict and payment; the resident's history with each deposit's steps and "Mi impacto"; and "Dónde gastar", the campus merchants ([ADR 0041](../../docs/adr/0041-participant-timeline-impact-and-where-to-spend.md)) | SIWE sign-in, `POST /v1/sessions`, WebSocket `/v1/sessions/{id}/live`, `GET /v1/me`, `GET /v1/me/impact`, `GET /v1/merchants` |
 | `/sites` | A host's dashboard across its sites, or one site's: totals, kilos per day and material, pesos paid per day, each site's numbers or each container's fill level and weight; on a host's view, its impact certificates. `/residence` redirects here | `GET /v1/hosts/{id}/dashboard`, `GET /v1/sites/{id}/dashboard`, `GET /v1/hosts/{id}/certificates` |
 | `/console` | Operations console ([ADR 0014](../../docs/adr/0014-operator-accounts.md)): sign-in by email code, then the tabs below | `/v1/operator/*` |
 | `/certificates/:id` | A host's impact certificate ([ADR 0027](../../docs/adr/0027-impact-certificates.md)): totals per material, CO2e avoided, print view, CSV of the deposits, and "Verificar", which recomputes the root in the browser and compares it with the anchor transaction on ZyrcleChain and with the copy on IPFS | `GET /v1/certificates/{id}`, the public RPC, the IPFS gateway |
@@ -25,10 +25,10 @@ The console's tabs ([`src/pages/Console.tsx`](src/pages/Console.tsx), one compon
 | Resumen | Pending work, the system's health ([ADR 0028](../../docs/adr/0028-pilot-readiness.md)), the Treasury, the containers |
 | Revisión | Approve or reject deposits in review |
 | Incidentes | Resolve mass-balance incidents with a note |
-| Recolección | Name collectors, print bag labels, follow collections |
+| Recolección | Name collectors and the institution whose containers they empty ([ADR 0042](../../docs/adr/0042-collector-fill-alerts-and-earnings.md)), print bag labels, follow collections |
 | Ventas | Read the scale ticket from a photo ([ADR 0038](../../docs/adr/0038-reading-scale-tickets-with-ai.md)), record the sale (prefilled from the photo), match it with the bank statement (CSV or Excel, [ADR 0039](../../docs/adr/0039-bank-statement-matching.md)) or by hand, and read each sale's settlement report |
 | Certificados | Preview and issue a host's or site's monthly certificate |
-| Comercios | Name merchants; settle or refund their redemptions of ZYR for pesos |
+| Comercios | Name merchants with their campus, place, hours and what they sell, shown in "Dónde gastar" ([ADR 0041](../../docs/adr/0041-participant-timeline-impact-and-where-to-spend.md)); settle or refund their redemptions of ZYR for pesos |
 | Sedes | Create hosts and set their payout address; create sites and set their hours |
 | Precios | Centros de acopio ([ADR 0037](../../docs/adr/0037-prices-per-collection-center.md)): each center, its price per material with the suggested median of its sales, and the sites that sell to it; then the general reference prices |
 | Operadores | Admins only: add, rename, promote, demote or deactivate operators |

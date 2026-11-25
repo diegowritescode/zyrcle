@@ -1,8 +1,9 @@
 # ADR 0041: The participant follows each deposit to the sale, sees their impact and where to spend
 
-- Status: proposed (2026-11-24)
+- Status: accepted (2026-11-25)
 - Decided by: Claude, building block 4 (M18) under ADR 0030, which Diego confirmed. Diego asked to
-  start M18 and M19 on 2026-11-24: "listo, empieza con eso". Waiting for his confirmation.
+  start M18 and M19 on 2026-11-24: "listo, empieza con eso". Diego confirmed it on 2026-11-25:
+  "si, confirmo, documenta todo".
 
 ## Context
 A participant saw each deposit with its advance and, once the bag was sold, one figure for what came

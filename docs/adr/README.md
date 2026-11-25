@@ -66,8 +66,8 @@ code format. If a number in the code changes how money, weight or trust is handl
 | [0038](0038-reading-scale-tickets-with-ai.md) | Reading the scale ticket from a photo with Claude; a person confirms | accepted 2026-11-23 | Claude (block 3, M15); Diego confirmed it; needs his Anthropic key |
 | [0039](0039-bank-statement-matching.md) | Matching the bank statement to sales and redemptions, one click each | accepted 2026-11-23 | Claude (block 3, M16); Diego confirmed it |
 | [0040](0040-keys-guardian-and-multisig.md) | The guardian gets its own key; admin powers move to a 2-of-3 Safe | accepted 2026-11-23 | Claude (block 3, M17); Diego confirmed it, chose the signers and approved the handover; the Safe holds every admin power since 2026-11-23 |
-| [0041](0041-participant-timeline-impact-and-where-to-spend.md) | The participant follows each deposit to the sale, sees their impact and where to spend | proposed 2026-11-24 | Claude (block 4, M18); waiting for Diego |
-| [0042](0042-collector-fill-alerts-and-earnings.md) | Collectors get fill alerts, a list of what to empty first, and their earnings | proposed 2026-11-24 | Claude (block 4, M19); waiting for Diego |
+| [0041](0041-participant-timeline-impact-and-where-to-spend.md) | The participant follows each deposit to the sale, sees their impact and where to spend | accepted 2026-11-25 | Claude (block 4, M18); Diego confirmed it |
+| [0042](0042-collector-fill-alerts-and-earnings.md) | Collectors get fill alerts, a list of what to empty first, and their earnings | accepted 2026-11-25 | Claude (block 4, M19); Diego confirmed it |
 
 Records 0016 to 0024 describe decisions taken before this log existed. They were written on
 2026-11-22 from the code, the commit history and the conversations, and keep the date each decision

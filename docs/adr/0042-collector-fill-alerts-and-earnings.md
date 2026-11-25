@@ -1,8 +1,9 @@
 # ADR 0042: Collectors get fill alerts, a list of what to empty first, and their earnings
 
-- Status: proposed (2026-11-24)
+- Status: accepted (2026-11-25)
 - Decided by: Claude, building block 4 (M19) under ADR 0030, which Diego confirmed. Diego asked to
-  start M18 and M19 on 2026-11-24: "listo, empieza con eso". Waiting for his confirmation.
+  start M18 and M19 on 2026-11-24: "listo, empieza con eso". Diego confirmed it on 2026-11-25:
+  "si, confirmo, documenta todo".
 
 ## Context
 A collector learned that a container was full by walking to it. The fill level existed on the site
