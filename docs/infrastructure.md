@@ -4,8 +4,9 @@ This document describes how Zyrcle runs in production, how it is built and relea
 operate or rebuild it. It is written for the engineer who keeps it running.
 
 > Checked against commit `fd05fa7` (2026-11-23) and the decision records up to ADR 0040.
-> Production runs the images of commit `72a875b6e005867851dae5b86612a5a3b656a3c8` (blocks 1 to 3 and block 4's M18 and M19,
-> [ADR 0030](adr/0030-blocks-3-and-4.md), deployed 2026-11-26 at 00:55 UTC, migration 0017).
+> Production runs the images of commit `0d41852d7d836cd2a797b5673b8c1adc0e73ef8b` (blocks 1 to 3, block 4's M18 and M19
+> and the Sentry fix, [ADR 0030](adr/0030-blocks-3-and-4.md), deployed 2026-11-26 at 05:36 UTC,
+> migration 0017).
 > Every statement comes from a file in this repository. When something is not in the repository,
 > this document says so.
 
@@ -122,7 +123,7 @@ flowchart TB
   api -->|"HTTPS"| resend["Resend email API"]
   api -->|"HTTPS, certificate copies"| pinata["Pinata IPFS API"]
   api -.->|"HTTPS, ticket photos<br/>off until a key is set"| anthropic["Anthropic API"]
-  api -.->|"HTTPS, error reports<br/>off until a DSN is set"| sentry["Sentry"]
+  api -.->|"HTTPS, error reports"| sentry["Sentry"]
 
   gha["GitHub Actions<br/>CI and Release images"] -->|"push images"| ghcr[("GHCR<br/>ghcr.io/diegowritescode")]
   ghcr -.->|"docker pull in deploy.sh,<br/>then run by digest"| api
@@ -167,8 +168,8 @@ flowchart TB
 - **Secrets.** `deploy/.env` exists only on the VPS. Private keys are files in
   `~/.avalanche-cli/key/` on the VPS ([ADR 0022](adr/0022-keys-secrets-and-production-changes.md)).
   The admin Safe's owners sign from Diego's wallets and a paper key (section 6.1).
-- **Deployed version.** The images of commit `72a875b`, run by digest since 2026-11-26 00:55 UTC;
-  the database is at migration 0017. `deploy/history.log` on the VPS records every deploy
+- **Deployed version.** The images of commit `0d41852`, run by digest since 2026-11-26 05:36 UTC;
+  the database is at migration 0017 (since 00:55 UTC the same day). `deploy/history.log` on the VPS records every deploy
   (section 8.3).
 - **Backups.** `deploy/backup.sh` runs from cron at 03:15 UTC into `~/backups/zyrcle`
   (runbook 9.10).
@@ -178,7 +179,8 @@ flowchart TB
   | Service | State |
   |---|---|
   | Resend (email), Pinata (IPFS copies), Expo push, the uptime workflow | on |
-  | Sentry (error reports), the off-site bucket, Anthropic (ticket reading) | off until Diego opens the accounts and places the keys |
+  | Sentry (error reports), in the API and the web app since 2026-11-26; in the app from the APK built that day | on |
+  | The off-site bucket, Anthropic (ticket reading) | off until Diego opens the accounts and places the keys |
 
 - **No staging environment** is in the repository.
 
@@ -552,7 +554,7 @@ Both clients bake their settings in at build time. A different deployment needs 
 | `VITE_RPC_URL` | `EXPO_PUBLIC_RPC_URL` | the public RPC URL above | `BLOCKCHAIN_ID` |
 | `VITE_TREASURY_ADDRESS` | none | `0xd7052201140224018b123ecFF7b83B4251790Aeb` | `TREASURY` |
 | `VITE_IPFS_GATEWAY` | none | `https://gateway.pinata.cloud/ipfs/` | `ZYRCLE_IPFS_GATEWAY`, the `connect-src` of `security-headers.conf` |
-| `VITE_SENTRY_DSN` | `EXPO_PUBLIC_SENTRY_DSN` | empty (error reports off) | repository variable `SENTRY_DSN_WEB` for the web image; EAS variable for the app, visibility sensitive so builds on the Mac can read it ([ADR 0033](adr/0033-error-reports-and-uptime.md)) |
+| `VITE_SENTRY_DSN` | `EXPO_PUBLIC_SENTRY_DSN` | the DSN of the project `zyrcle-web` or `zyrcle-mobile` (set 2026-11-26) | repository variable `SENTRY_DSN_WEB` for the web image; EAS variable for the app, visibility sensitive so builds on the Mac can read it ([ADR 0033](adr/0033-error-reports-and-uptime.md)) |
 | `VITE_RELEASE` | none | the commit SHA, passed by the release workflow | the image tag |
 | none | `EXPO_PUBLIC_ACCOUNT_FACTORY` | `0x0bE806Ca77340aA50AF6586CDC2FE2561668DaEA` | `ACCOUNT_FACTORY`, `infra/l1/fuji.env` |
 | none | `EXPO_PUBLIC_WEB_URL` | `https://zyrcle.deviego.xyz` | `WEB_HOST` |
@@ -619,8 +621,8 @@ Files derived from these: `deploy/mosquitto/passwd` (hashed broker passwords) an
 | Credential | Where it lives | Notes |
 |---|---|---|
 | `GITHUB_TOKEN` | Issued by GitHub Actions for each run | The release workflow uses it to push to GHCR (`packages: write`) and, on a manual run, to check that CI passed (`actions: read`). The uptime workflow uses it to open and close issues (`issues: write`). The workflows use no other repository secret. |
-| `SENTRY_DSN_WEB` | GitHub repository variable (not a secret) | The web image's Sentry DSN, passed as a build argument. Unset on 2026-11-23. |
-| Sentry account | none yet | Its DSNs go in three places: `SENTRY_DSN_API` in `deploy/.env`, `SENTRY_DSN_WEB` above, and `EXPO_PUBLIC_SENTRY_DSN` as an EAS variable with visibility sensitive, since builds on the Mac cannot read secret ones ([ADR 0033](adr/0033-error-reports-and-uptime.md)). |
+| `SENTRY_DSN_WEB` | GitHub repository variable (not a secret) | The web image's Sentry DSN (project `zyrcle-web`), passed as a build argument. Set on 2026-11-26. |
+| Sentry account | Organization `aiteralabs` (Diego's), projects `zyrcle-api`, `zyrcle-web` and `zyrcle-mobile`, created 2026-11-25 | Its DSNs go in three places, all set on 2026-11-26: `SENTRY_DSN_API` in `deploy/.env`, `SENTRY_DSN_WEB` above, and `EXPO_PUBLIC_SENTRY_DSN` as an EAS variable with visibility sensitive, since builds on the Mac cannot read secret ones ([ADR 0033](adr/0033-error-reports-and-uptime.md)). |
 | Off-site bucket and age key | none yet | A Cloudflare R2 bucket with a lifecycle rule and a lock, a token scoped to it, and an age key pair whose private half only Diego keeps, offline ([ADR 0034](adr/0034-encrypted-off-site-backups.md)). |
 | Anthropic account | none yet | An API key with a monthly spending limit ([ADR 0038](adr/0038-reading-scale-tickets-with-ai.md)). |
 | Pinata account | Pinata; the JWT is in `deploy/.env` | Placed by Diego on 2026-11-23 ([history.md](history.md)). |

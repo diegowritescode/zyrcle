@@ -224,6 +224,10 @@ The fix caps sentry-sdk below 3 and adds a test that calls the real `init` with 
 with it starts Sentry (2.77.0). That the API image has no lock file is now a known gap
 ([infrastructure.md](infrastructure.md), section 10).
 
+With Diego's approval ("si, autorizo subir los commits y desplegar") the fix went to production at
+05:36 UTC as commit `0d41852`, with the web image that carries its own DSN. A test error sent from
+the API reached Sentry. The APK built the same day carries the app's DSN.
+
 ## Where the old things are
 
 | What | Where |
