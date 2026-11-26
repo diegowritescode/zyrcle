@@ -1,10 +1,11 @@
 # ADR 0043: Android builds run on Diego's Mac, with EAS's own runner and Expo's signing key
 
-- Status: proposed (2026-11-25)
+- Status: accepted (2026-11-25)
 - Decided by: Diego decided to build the APKs on his Mac on 2026-11-25, reusing what his other
   project already does there: "quiero que compilemos nuestros propios apks aqui en la mac, ya lo hago
   para aicfes, que es mi otro proyecto, entonces ve si podemos reutilizar ese sistema". Claude chose
-  how (EAS's runner on the Mac rather than calling Gradle directly) and the checks.
+  how (EAS's runner on the Mac rather than calling Gradle directly) and the checks. Diego confirmed
+  it on 2026-11-25: "confirmo el adr".
 
 ## Context
 ADR 0015 put the builds on Expo's cloud. The free plan allows a few Android builds a month and each

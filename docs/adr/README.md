@@ -68,7 +68,7 @@ code format. If a number in the code changes how money, weight or trust is handl
 | [0040](0040-keys-guardian-and-multisig.md) | The guardian gets its own key; admin powers move to a 2-of-3 Safe | accepted 2026-11-23 | Claude (block 3, M17); Diego confirmed it, chose the signers and approved the handover; the Safe holds every admin power since 2026-11-23 |
 | [0041](0041-participant-timeline-impact-and-where-to-spend.md) | The participant follows each deposit to the sale, sees their impact and where to spend | accepted 2026-11-25 | Claude (block 4, M18); Diego confirmed it |
 | [0042](0042-collector-fill-alerts-and-earnings.md) | Collectors get fill alerts, a list of what to empty first, and their earnings | accepted 2026-11-25 | Claude (block 4, M19); Diego confirmed it |
-| [0043](0043-android-builds-on-the-mac.md) | Android builds run on Diego's Mac, with EAS's own runner and Expo's signing key | proposed 2026-11-25 | Diego decided to build on the Mac; Claude chose how |
+| [0043](0043-android-builds-on-the-mac.md) | Android builds run on Diego's Mac, with EAS's own runner and Expo's signing key | accepted 2026-11-25 | Diego decided to build on the Mac; Claude chose how; Diego confirmed it |
 
 Records 0016 to 0024 describe decisions taken before this log existed. They were written on
 2026-11-22 from the code, the commit history and the conversations, and keep the date each decision

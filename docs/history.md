@@ -197,7 +197,8 @@ Android's command-line tools, the SDK and the NDK). The other project calls Grad
 signs with Android's debug key; Zyrcle cannot, because the APKs on the phones carry the key Expo
 keeps, Android installs updates only with the same key, and uninstalling would erase each phone's
 key. So the build runs EAS's own runner on the Mac (`eas build --local`), which fetches Expo's key
-for the duration of the build ([ADR 0043](adr/0043-android-builds-on-the-mac.md), proposed).
+for the duration of the build ([ADR 0043](adr/0043-android-builds-on-the-mac.md)). Diego confirmed
+it the same day: "confirmo el adr".
 
 The first build took about 8 minutes and gave a 68 MB APK, signed with the same key as the last
 cloud APK. Its own check said the Firebase app ID was missing when it was there: `aapt2 … | grep
