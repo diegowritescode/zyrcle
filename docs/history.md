@@ -15,6 +15,7 @@ timeline
     2026-11-23 : Block 2 deployed : Block 3 built and deployed (tests, deploys, monitoring, backups, rate limits, centers, tickets, bank statements) : Admin powers moved to a 2-of-3 Safe
     2026-11-24 : Block 4 starts - M18 participant and M19 collector built
     2026-11-25 : APKs built on Diego's Mac : M18 and M19 deployed (00:55 UTC on the 26th)
+    2026-11-26 : Sentry DSNs placed : One-minute API outage from sentry-sdk 3, fixed by a version cap
 ```
 
 ## 2025: the hackathon
@@ -187,10 +188,9 @@ day in the pilot: "listo, empieza con eso" (2026-11-24).
   desplegarla en produccion". Commit `72a875b`, migration 0017 behind a fresh backup. The app's
   changes reach phones with the next Android build (M23).
 
-Still waiting for Diego: the Sentry DSNs (the organization exists since 2026-11-25), the backup
-bucket and its `age` key, the Anthropic key, the guardian's own key (runbook 9.13), installing the
-new Android build, the legal review, Google Play and the chain for real money. M20 to M23 of block 4
-are planned.
+Still waiting for Diego: the backup bucket and its `age` key, the Anthropic key, the guardian's own
+key (runbook 9.13), installing the new Android build, the legal review, Google Play and the chain for
+real money. M20 to M23 of block 4 are planned.
 
 ## 2026-11-25: APKs built on the Mac
 
@@ -208,6 +208,21 @@ cloud APK. Its own check said the Firebase app ID was missing when it was there:
 -q` under `pipefail` fails when grep stops reading early. The checks now read each tool's output
 whole, and were tried on the local APK, the last cloud APK and a copy signed with the debug key,
 which they refuse. That APK includes M18 and M19, so it waits for the backend deploy.
+
+## 2026-11-26: Sentry turned on, and a one-minute outage
+
+Diego created the Sentry organization and its three projects, and placed each DSN where its part
+reads it: the API's in `deploy/.env` on the server, the web's as a GitHub repository variable, and
+the app's as an EAS variable with visibility sensitive. The checks compared the DSNs without
+printing them, and caught the API's DSN pasted into the web's variable; Diego replaced it.
+
+When the API restarted with its DSN it crashed on start: `TypeError: Unknown option
+'send_default_pii'`. The image installs the newest version of each Python library, and sentry-sdk
+3.0.1 had just moved that option to `data_collection`; the Mac and CI had 2.75, and the only test of
+the start replaced `sentry_sdk.init`. The API was started again without the DSN about a minute later.
+The fix caps sentry-sdk below 3 and adds a test that calls the real `init` with a DSN; an image built
+with it starts Sentry (2.77.0). That the API image has no lock file is now a known gap
+([infrastructure.md](infrastructure.md), section 10).
 
 ## Where the old things are
 

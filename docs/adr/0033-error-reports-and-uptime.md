@@ -35,3 +35,13 @@ went down, because the checker would be down with them.
   for the app are not uploaded yet, so its stack traces point at the bundle.
 - GitHub can delay scheduled checks by some minutes and pauses them after 60 days without activity
   in the repository. A phone alert needs a service such as UptimeRobot, which Diego can add.
+
+## Amendments
+- **2026-11-26, Claude (an outage while turning reports on):** Diego created the Sentry organization
+  and its three projects (`zyrcle-api`, `zyrcle-web`, `zyrcle-mobile`) and placed the three DSNs.
+  When the API restarted with its DSN it crashed on start: the image had installed sentry-sdk 3.0.1,
+  which no longer accepts `send_default_pii` (it moved to `data_collection`). The API was down about
+  a minute, until it was started again without the DSN. The tests had only replaced
+  `sentry_sdk.init`, so no test saw the rejected option. `apps/api` now requires `sentry-sdk<3`, and
+  a test calls the real `init` with a DSN. Moving to `data_collection` is open; it needs reading
+  how 3.x decides what personal data to send, so nothing personal starts leaving by default.

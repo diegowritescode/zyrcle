@@ -41,3 +41,18 @@ def test_a_dsn_starts_reports_that_pass_through_scrub(settings, monkeypatch):
     assert start_error_reports(on) is True
     assert seen["before_send"] is scrub and seen["send_default_pii"] is False
     assert seen["release"] == "abc" and seen["max_request_body_size"] == "never"
+
+
+def test_the_real_sdk_accepts_our_options(settings):
+    """The test above replaces sentry_sdk.init, so it cannot see an option the SDK rejects. On
+    2026-11-26 sentry-sdk 3.0.1 reached the image, rejected send_default_pii, and the API crashed
+    on start as soon as a DSN was set. This one calls the real init (nothing is sent)."""
+    import sentry_sdk
+
+    on = settings.model_copy(update={"sentry_dsn": "https://k@o1.ingest.sentry.io/1"})
+    try:
+        assert start_error_reports(on) is True
+        assert sentry_sdk.get_client().is_active()
+    finally:
+        sentry_sdk.get_client().close()
+        sentry_sdk.init()  # back to no client, for the other tests

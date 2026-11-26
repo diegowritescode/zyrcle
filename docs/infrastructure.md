@@ -1478,6 +1478,13 @@ Each item is checked against the repository.
 
 **Data and availability**
 
+- **The API image takes the newest version of each Python dependency.** `apps/api/pyproject.toml`
+  sets lower bounds and the Dockerfile installs with `pip`, with no lock file, so a new major version
+  of a library reaches production with the next image. On 2026-11-26 sentry-sdk 3.0.1 did, and the
+  API crashed on start once its Sentry DSN was set ([ADR 0033](adr/0033-error-reports-and-uptime.md),
+  amendments). Sentry is now capped below 3; the rest are still open. The web and mobile apps install
+  from `package-lock.json` and are not affected.
+
 - **Off-site copies wait for their bucket.** `deploy/offsite.sh` copies the dumps, the validator
   identity, the key files and `deploy/.env` off the VPS, encrypted (runbook 9.10), and CI proves the
   path. It does nothing until Diego sets up the bucket and the age key; until then every copy stays

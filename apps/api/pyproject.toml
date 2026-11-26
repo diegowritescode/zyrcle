@@ -20,7 +20,8 @@ dependencies = [
   "pyjwt>=2.15",
   "web3>=8.0",
   "httpx>=0.28",
-  "sentry-sdk[fastapi]>=2.40",
+  # Below 3: 3.0 replaced send_default_pii with data_collection, and the API stopped starting (ADR 0033).
+  "sentry-sdk[fastapi]>=2.40,<3",
   "anthropic>=2.12",
   "openpyxl>=3.1",
   "zyrcle-protocol",
