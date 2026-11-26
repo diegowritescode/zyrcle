@@ -14,6 +14,7 @@ timeline
     2026-11-22 : Live demo (phase 5) : Resident app with Expo (phase 3) : Turns, push, lost-phone recovery : v1 roadmap and block 1 (hosts, collection, sales, console) : Block 2 built (certificates, pilot readiness, campus payments)
     2026-11-23 : Block 2 deployed : Block 3 built and deployed (tests, deploys, monitoring, backups, rate limits, centers, tickets, bank statements) : Admin powers moved to a 2-of-3 Safe
     2026-11-24 : Block 4 starts - M18 participant and M19 collector built
+    2026-11-25 : APKs built on Diego's Mac
 ```
 
 ## 2025: the hackathon
@@ -187,6 +188,22 @@ day in the pilot: "listo, empieza con eso" (2026-11-24).
 Still waiting for Diego: the Sentry account, the backup bucket and its `age` key, the Anthropic
 key, the guardian's own key (runbook 9.13), a new Android build, the legal review, Google Play and
 the chain for real money. M20 to M23 of block 4 are planned.
+
+## 2026-11-25: APKs built on the Mac
+
+Diego asked to build the APKs on his Mac, reusing what his other Expo project does there: "quiero
+que compilemos nuestros propios apks aqui en la mac". The Mac already had the toolchain (Java 21,
+Android's command-line tools, the SDK and the NDK). The other project calls Gradle directly and
+signs with Android's debug key; Zyrcle cannot, because the APKs on the phones carry the key Expo
+keeps, Android installs updates only with the same key, and uninstalling would erase each phone's
+key. So the build runs EAS's own runner on the Mac (`eas build --local`), which fetches Expo's key
+for the duration of the build ([ADR 0043](adr/0043-android-builds-on-the-mac.md), proposed).
+
+The first build took about 8 minutes and gave a 68 MB APK, signed with the same key as the last
+cloud APK. Its own check said the Firebase app ID was missing when it was there: `aapt2 … | grep
+-q` under `pipefail` fails when grep stops reading early. The checks now read each tool's output
+whole, and were tried on the local APK, the last cloud APK and a copy signed with the debug key,
+which they refuse. That APK includes M18 and M19, so it waits for the backend deploy.
 
 ## Where the old things are
 

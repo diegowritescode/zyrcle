@@ -22,3 +22,8 @@ Work is done with an AI assistant that has shell access to the VPS.
 ## Consequences
 - Deploys pause until Diego approves them, which is intended.
 - Rotating a key is a manual runbook (`docs/infrastructure.md`).
+
+## Amendments
+- **2026-11-25, Claude (ADR 0043, proposed):** "spending EAS builds" means builds on Expo's
+  cloud, which use the monthly quota. A build on Diego's Mac spends nothing and needs no approval;
+  giving an APK to people still goes through Diego.

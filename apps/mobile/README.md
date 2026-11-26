@@ -60,6 +60,34 @@ development build, made once with EAS:
 
 iOS needs an Apple Developer account; `eas build` creates the push key when asked.
 
+## Build the APK on the Mac
+
+```bash
+scripts/build-apk.sh            # preview, the installable APK pointed at production
+scripts/build-apk.sh development
+```
+
+It runs EAS's own build on this machine (`eas build --local`,
+[ADR 0043](../../docs/adr/0043-android-builds-on-the-mac.md)): the same profile, the EAS
+environment's variables and the signing key Expo keeps, so the APK installs over the one already on
+the phones. No cloud build is spent. It takes about 8 minutes and leaves
+`dist-apk/zyrcle-<profile>-<commit>.apk`.
+
+The script stops before building when `apps/mobile` or `packages/` have uncommitted changes, and
+after building when the APK is not signed with Expo's key, lacks Firebase's app ID (no push) or
+carries native code for anything but the two ARM families. An APK signed with any other key would
+not install over the app, and uninstalling erases the phone's key: every account would go through
+the 48-hour recovery.
+
+What the Mac needs, all from Homebrew: `openjdk@21` (Gradle for Android does not run on newer
+Java), `android-commandlinetools`, and from `sdkmanager` `platform-tools`, `platforms;android-36`,
+`build-tools;36.0.0` and the NDK; `google-services.json` in this folder; and an open Expo session
+(`npx eas-cli@latest whoami`). EAS's warning that `android.googleServicesFile` "won't be uploaded to
+the builder" is about the cloud; on the Mac the build reads the file from its full path.
+
+Only EAS variables with visibility plain text or sensitive reach a build on the Mac. Secret ones are
+readable only on EAS's servers.
+
 ## Deep link
 
 A container's QR is `zyrcle://c/<id>?code=<code>` and the app registers the `zyrcle` scheme, so in
@@ -88,7 +116,7 @@ other build-time settings, with their defaults in [`src/lib/config.ts`](src/lib/
 Sentry (`@sentry/react-native`, [ADR 0033](../../docs/adr/0033-error-reports-and-uptime.md)),
 started by `startErrorReports` in [`src/lib/errorReports.ts`](src/lib/errorReports.ts) before the
 app renders, so a crash on start is reported too. It is off unless `EXPO_PUBLIC_SENTRY_DSN` is set,
-as an EAS environment variable. The value is read at build time, so reports start with the first
+as an EAS environment variable with visibility sensitive (builds on the Mac cannot read secret ones). The value is read at build time, so reports start with the first
 build made after it is set. No personal data is sent (`sendDefaultPii: false`), and `scrubReport`
 from `@zyrcle/client` cleans every event and breadcrumb.
 
@@ -105,5 +133,5 @@ reminders are scheduled before each turn and cancelled when the booking is gone.
 
 The screens run in a real browser in [`e2e/`](../../e2e/README.md) on the app's web export, on
 every push and pull request: a collection from the phone, a payment to a merchant, and a lost
-phone's recovery. Native builds go through EAS (`eas build`, profiles in `eas.json`); there are no
+phone's recovery. Native builds go through EAS (`scripts/build-apk.sh` on the Mac, profiles in `eas.json`); there are no
 `ios/` or `android/` folders in the repo.

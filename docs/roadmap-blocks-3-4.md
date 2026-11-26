@@ -296,6 +296,9 @@ Everything is built and deployed; these switch features on or close what code ca
   `residence` routes and fields are removed (ADR 0011, amendments). Every party's walkthrough runs
   in CI (M8).
 - **Needs from Diego:** approval of the EAS build.
+- **2026-11-25:** the APK is now built on Diego's Mac with `apps/mobile/scripts/build-apk.sh`, which
+  spends no cloud build ([ADR 0043](adr/0043-android-builds-on-the-mac.md)). What is left from Diego
+  is installing it, after the backend with M18 and M19 is deployed.
 
 ## What stays out
 

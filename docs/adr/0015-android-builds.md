@@ -33,3 +33,8 @@ this machine. The first build weighed 132 MB, and the app re-registered its push
 - No x86 emulator can install these APKs. Add `x86_64` to the list for a build meant for one.
 - The Play Store will need an `.aab` from the `production` profile, a privacy policy and the data
   safety form (roadmap M7).
+
+## Amendments
+- **2026-11-25, Diego decided to build on his Mac** ("quiero que compilemos nuestros propios apks
+  aqui en la mac"): builds run on the Mac with `eas build --local`, same profiles, same variables and
+  the same key Expo keeps (ADR 0043). The cloud build remains for when the Mac is not available.
