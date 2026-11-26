@@ -48,3 +48,7 @@ see what they collected but not what each collection paid them.
   weight instead of height, can come later if a container type needs it.
 - The alert depends on the distance sensor. A container whose sensor fails (no `fill_after_mm`)
   shows "unknown" and raises no alert.
+
+## Amendments
+- **2026-11-26 (UTC), deployed with Diego's approval** ("autorizo unir la rama a main y desplegarla
+  en produccion"): commit `72a875b`, migration 0017, after a backup. Nothing in the decision changed.

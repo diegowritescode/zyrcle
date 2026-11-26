@@ -14,7 +14,7 @@ timeline
     2026-11-22 : Live demo (phase 5) : Resident app with Expo (phase 3) : Turns, push, lost-phone recovery : v1 roadmap and block 1 (hosts, collection, sales, console) : Block 2 built (certificates, pilot readiness, campus payments)
     2026-11-23 : Block 2 deployed : Block 3 built and deployed (tests, deploys, monitoring, backups, rate limits, centers, tickets, bank statements) : Admin powers moved to a 2-of-3 Safe
     2026-11-24 : Block 4 starts - M18 participant and M19 collector built
-    2026-11-25 : APKs built on Diego's Mac
+    2026-11-25 : APKs built on Diego's Mac : M18 and M19 deployed (00:55 UTC on the 26th)
 ```
 
 ## 2025: the hackathon
@@ -182,12 +182,15 @@ day in the pilot: "listo, empieza con eso" (2026-11-24).
   advance already covered the share; personal CO2e only on what was sold and called indicative; one
   fill alert per container until it is emptied; collectors without a host see every host; a bag's
   collector share split by grams; merchants' place and hours as free text.
-- Built on the branch `block4-m18-m19`, not deployed yet. The app's changes reach phones with the
-  next Android build (M23).
+- Built on the branch `block4-m18-m19`. Merged into main and deployed on 2026-11-26 at 00:55 UTC
+  (evening of the 25th in Colombia) with Diego's approval: "autorizo unir la rama a main y
+  desplegarla en produccion". Commit `72a875b`, migration 0017 behind a fresh backup. The app's
+  changes reach phones with the next Android build (M23).
 
-Still waiting for Diego: the Sentry account, the backup bucket and its `age` key, the Anthropic
-key, the guardian's own key (runbook 9.13), a new Android build, the legal review, Google Play and
-the chain for real money. M20 to M23 of block 4 are planned.
+Still waiting for Diego: the Sentry DSNs (the organization exists since 2026-11-25), the backup
+bucket and its `age` key, the Anthropic key, the guardian's own key (runbook 9.13), installing the
+new Android build, the legal review, Google Play and the chain for real money. M20 to M23 of block 4
+are planned.
 
 ## 2026-11-25: APKs built on the Mac
 

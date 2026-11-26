@@ -5,7 +5,7 @@
 > and the foundations of block 3 (tests in CI, pinned deploys, monitoring, backups, rate limits,
 > collection centers, ticket reading, bank statement matching, the Safe). Block 4 has started: M18
 > and M19 (each deposit's steps, personal impact, where to spend, fill alerts, collector earnings)
-> are built but not deployed; M20 to M23 are planned
+> are deployed (2026-11-26); M20 to M23 are planned
 > ([roadmap](roadmap-blocks-3-4.md)). The one-day hackathon build (May 2025) is preserved at tag
 > `v0-hackathon`; how the project got here is in [history.md](history.md). Sections marked
 > *planned* are not built yet. Step-by-step flows with diagrams: [flows.md](flows.md). Schema:

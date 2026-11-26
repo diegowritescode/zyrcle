@@ -239,7 +239,7 @@ Everything is built and deployed; these switch features on or close what code ca
 
 ## Block 4: every party
 
-> M18 and M19 built on 2026-11-24 (branch `block4-m18-m19`, not deployed yet). M20 to M23 planned.
+> M18 and M19 built on 2026-11-24 and deployed on 2026-11-26 (commit `72a875b`). M20 to M23 planned.
 
 ### M18. Participant
 - **Each deposit, step by step:** deposited, verified, collected, sold, paid, with the date and the

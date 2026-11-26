@@ -62,3 +62,7 @@ or where to find them. Their impact existed only in the host's monthly certifica
   to at most what their host's certificates say for the same months.
 - Until the new Android build (M23), the installed app keeps showing the old deposit row; the web app
   shows the steps at once.
+
+## Amendments
+- **2026-11-26 (UTC), deployed with Diego's approval** ("autorizo unir la rama a main y desplegarla
+  en produccion"): commit `72a875b`, migration 0017, after a backup. Nothing in the decision changed.
