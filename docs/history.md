@@ -15,7 +15,7 @@ timeline
     2026-11-23 : Block 2 deployed : Block 3 built and deployed (tests, deploys, monitoring, backups, rate limits, centers, tickets, bank statements) : Admin powers moved to a 2-of-3 Safe
     2026-11-24 : Block 4 starts - M18 participant and M19 collector built
     2026-11-25 : APKs built on Diego's Mac : M18 and M19 deployed (00:55 UTC on the 26th)
-    2026-11-26 : Sentry DSNs placed : One-minute API outage from sentry-sdk 3, fixed by a version cap
+    2026-11-26 : Sentry DSNs placed : One-minute API outage from sentry-sdk 3, fixed by a version cap : A phone's push fixed by a restart; Cuenta shows the registration
 ```
 
 ## 2025: the hackathon
@@ -227,6 +227,21 @@ with it starts Sentry (2.77.0). That the API image has no lock file is now a kno
 With Diego's approval ("si, autorizo subir los commits y desplegar") the fix went to production at
 05:36 UTC as commit `0d41852`, with the web image that carries its own DSN. A test error sent from
 the API reached Sentry. The APK built the same day carries the app's DSN.
+
+## 2026-11-26: the phone that said "Activadas" and got no push
+
+Diego installed the APK built on the Mac and tried the whole cycle. The app had started a new
+account: Android showed the app installed from scratch that night, so the old one had been
+uninstalled first, which erases the phone's key (the signing key was not the cause). Approving that
+account's deposits in the console gave no push. The server had queued them and skipped them: it had
+no token for the account, and the app had not sent one in two hours of use.
+
+The device log, read over wireless debugging, showed why: Google services on the phone answered every
+token request with `SERVICE_NOT_AVAILABLE`, while the network, the Firebase configuration (tested
+from the Mac) and the app were fine. A restart of the phone fixed it; the token reached the server
+and a deposit's payment push arrived. The app had said "Activadas" the whole time, because it shows
+the OS permission, and the failure only reached the console. Cuenta now shows whether the phone is
+registered, or which step failed and why, with a retry button and a report to Sentry (`9e69e26`).
 
 ## Where the old things are
 
