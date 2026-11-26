@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const n = vi.hoisted(() => ({
   listeners: [] as ((token: { type: string; data: string }) => void)[],
   deviceToken: { type: "android", data: "fcm-1" },
+  hang: false,
   expoCalls: 0,
   scheduled: [] as { identifier: string }[],
   cancelled: [] as string[],
@@ -24,6 +25,7 @@ vi.mock("expo-notifications", () => ({
   setNotificationHandler: () => {},
   // Like expo-notifications 58: every native fetch also fires the token listeners.
   getDevicePushTokenAsync: async () => {
+    if (n.hang) return new Promise(() => {});
     const token = { ...n.deviceToken };
     for (const l of n.listeners) l(token);
     return token;
@@ -41,12 +43,15 @@ vi.mock("expo-notifications", () => ({
   scheduleNotificationAsync: async (req: { identifier: string; trigger: { date: number } }) => void n.added.push(req),
 }));
 
-const { keepPushTokenRegistered, syncTurnReminders, REMINDER_MINUTES } = await import("./notifications");
+const { keepPushTokenRegistered, syncTurnReminders, REMINDER_MINUTES, REGISTRATION_STEP_TIMEOUT_MS } = await import(
+  "./notifications"
+);
 const settle = () => new Promise((r) => setTimeout(r, 0));
 
 beforeEach(() => {
   n.listeners.length = 0;
   n.deviceToken = { type: "android", data: "fcm-1" };
+  n.hang = false;
   n.expoCalls = 0;
   n.scheduled = [];
   n.cancelled = [];
@@ -89,6 +94,61 @@ describe("push token registration", () => {
     await settle();
     expect(sent).toEqual(["ExponentPushToken[fcm-1]"]);
     stop();
+  });
+});
+
+describe("registration status", () => {
+  it("says registering, then registered once the server accepted the token", async () => {
+    const statuses: string[] = [];
+    const stop = keepPushTokenRegistered(async () => {}, (s) => void statuses.push(s.state));
+    await settle();
+    await settle();
+    expect(statuses).toEqual(["registering", "registered"]);
+    stop();
+  });
+
+  it("names the step that failed: the phone's token, as on a phone whose Google services refuse", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const failing = vi.spyOn(n, "deviceToken", "get").mockImplementation(() => {
+      throw new Error("Fetching the token failed: java.io.IOException: SERVICE_NOT_AVAILABLE");
+    });
+    const seen: unknown[] = [];
+    const stop = keepPushTokenRegistered(async () => {}, (s) => void seen.push(s));
+    await settle();
+    expect(seen.at(-1)).toEqual({
+      state: "failed",
+      step: "device",
+      message: "Fetching the token failed: java.io.IOException: SERVICE_NOT_AVAILABLE",
+    });
+    failing.mockRestore();
+    stop();
+  });
+
+  it("names the server when it refused the registration", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const seen: unknown[] = [];
+    const stop = keepPushTokenRegistered(
+      async () => {
+        throw new Error("429");
+      },
+      (s) => void seen.push(s),
+    );
+    await settle();
+    await settle();
+    expect(seen.at(-1)).toEqual({ state: "failed", step: "server", message: "429" });
+    stop();
+  });
+
+  it("turns a phone that never hands over its token into a failure", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    n.hang = true;
+    const seen: unknown[] = [];
+    const stop = keepPushTokenRegistered(async () => {}, (s) => void seen.push(s));
+    await vi.advanceTimersByTimeAsync(REGISTRATION_STEP_TIMEOUT_MS + 1);
+    expect(seen.at(-1)).toEqual({ state: "failed", step: "device", message: "sin respuesta en 20 s" });
+    stop();
+    vi.useRealTimers();
   });
 });
 

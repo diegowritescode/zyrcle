@@ -1,5 +1,5 @@
 import { createContext, useContext } from "react";
-import type { Permission, PushSupport } from "@/lib/notifications";
+import type { Permission, PushSupport, Registration } from "@/lib/notifications";
 
 export interface NotificationsState {
   /** Whether this build can receive push notifications (Expo Go on Android cannot). */
@@ -8,6 +8,10 @@ export interface NotificationsState {
   permission: Permission | null;
   /** Ask for the permission (the OS prompt shows only once; after that, Settings). */
   enable: () => Promise<Permission>;
+  /** Whether the server knows where to push for this phone; null until a registration starts. */
+  registration: Registration | null;
+  /** Register again, after a failure. */
+  retry: () => void;
 }
 
 export const NotificationsContext = createContext<NotificationsState | null>(null);

@@ -43,6 +43,12 @@ through Expo's push service; the app schedules the reminder 10 minutes before ea
 phone itself. Permission is asked in context (after booking a turn, or from Inicio or Cuenta), and
 Android gets one channel per kind (Pagos, Depósitos en revisión, Recordatorios de turno).
 
+Cuenta shows whether the server knows where to push, not only whether the OS allows notifications:
+"registrado", or which step failed (the phone's token from Google, Expo's push service, or Zyrcle's
+server) with the error, a button to try again, and a report to Sentry. Each of the first two steps
+gets 20 seconds. On 2026-11-26 a phone said "Activadas" while Google services refused its token
+(`SERVICE_NOT_AVAILABLE`) and no push could reach it; only the device log showed why.
+
 Reminders work in Expo Go. Push does not on Android (Expo Go dropped it in SDK 53): it needs a
 development build, made once with EAS:
 

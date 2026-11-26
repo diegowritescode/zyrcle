@@ -39,6 +39,31 @@ if (native) {
   });
 }
 
+/** Where a registration for push stands. The OS permission alone says nothing about it: the app
+ * can show "Activadas" while the server has no token for this phone, and then no push arrives. */
+export type RegistrationStep = "device" | "expo" | "server";
+export type Registration =
+  | { state: "registering" }
+  | { state: "registered" }
+  | { state: "failed"; step: RegistrationStep; message: string };
+
+/** How long one step of the registration may take. A step that never answers becomes a failure
+ * the person can see, instead of a registration that silently never happens. */
+export const REGISTRATION_STEP_TIMEOUT_MS = 20_000;
+
+function within<T>(promise: Promise<T>): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error(`sin respuesta en ${REGISTRATION_STEP_TIMEOUT_MS / 1000} s`)),
+      REGISTRATION_STEP_TIMEOUT_MS,
+    );
+    promise.then(
+      (value) => (clearTimeout(timer), resolve(value)),
+      (error) => (clearTimeout(timer), reject(error)),
+    );
+  });
+}
+
 /** Whether this build can receive push notifications, and if not, why. */
 export function pushSupport(): PushSupport {
   if (!native) return "web";
@@ -100,23 +125,32 @@ export async function requestPermission(): Promise<Permission> {
  */
 export function keepPushTokenRegistered(
   send: (expoToken: string) => Promise<unknown>,
+  onStatus: (status: Registration) => void = () => {},
 ): () => void {
   let registered: string | null = null;
   let stopped = false;
   const register = async (device?: Notifications.DevicePushToken) => {
+    let step: RegistrationStep = "device";
     try {
-      const token = device ?? (await Notifications.getDevicePushTokenAsync());
+      const token = device ?? (await within(Notifications.getDevicePushTokenAsync()));
       const key = typeof token.data === "string" ? token.data : JSON.stringify(token.data);
       if (stopped || key === registered) return;
       registered = key;
-      const expo = await Notifications.getExpoPushTokenAsync({ projectId, devicePushToken: token });
-      if (!stopped) await send(expo.data);
+      step = "expo";
+      const expo = await within(Notifications.getExpoPushTokenAsync({ projectId, devicePushToken: token }));
+      step = "server";
+      if (stopped) return;
+      await send(expo.data);
+      if (!stopped) onStatus({ state: "registered" });
     } catch (e) {
       registered = null;
       console.warn("push registration failed", e);
+      const message = (e instanceof Error ? e.message : String(e)).slice(0, 300);
+      if (!stopped) onStatus({ state: "failed", step, message });
     }
   };
   const sub = Notifications.addPushTokenListener((token) => void register(token));
+  onStatus({ state: "registering" });
   void register();
   return () => {
     stopped = true;

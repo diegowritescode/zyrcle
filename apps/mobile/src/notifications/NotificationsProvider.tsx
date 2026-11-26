@@ -4,6 +4,7 @@ import { router, type Href } from "expo-router";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { AppState, Platform } from "react-native";
 import { api } from "@/lib/api";
+import { reportError } from "@/lib/errorReports";
 import {
   NOTIFICATION_ROUTES,
   getPermission,
@@ -13,6 +14,7 @@ import {
   setUpChannels,
   syncTurnReminders,
   type Permission,
+  type Registration,
 } from "@/lib/notifications";
 import { useWallet } from "@/wallet/context";
 import { NotificationsContext, type NotificationsState } from "./context";
@@ -49,13 +51,24 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     return result;
   }, []);
 
-  // Tell the API where to push, once per wallet and whenever the OS rotates the token.
+  // Tell the API where to push, once per wallet and whenever the OS rotates the token. A failure
+  // shows in Cuenta and goes to the error reports: before, it only reached the console, and a phone
+  // could say "Activadas" for days while the server had nowhere to push.
+  const [registration, setRegistration] = useState<Registration | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  const retry = useCallback(() => setAttempt((a) => a + 1), []);
   useEffect(() => {
     if (push !== "ok" || permission !== "granted" || !token) return;
-    return keepPushTokenRegistered((pushToken) =>
-      api.registerPushToken(token, pushToken, Platform.OS as "ios" | "android"),
+    return keepPushTokenRegistered(
+      (pushToken) => api.registerPushToken(token, pushToken, Platform.OS as "ios" | "android"),
+      (status) => {
+        setRegistration(status);
+        if (status.state === "failed") {
+          reportError(new Error(`push registration failed at ${status.step}: ${status.message}`));
+        }
+      },
     );
-  }, [permission, token]);
+  }, [permission, token, attempt]);
 
   const bookings = useQuery({
     queryKey: ["bookings", token],
@@ -93,6 +106,9 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     return () => sub.remove();
   }, [queryClient, address]);
 
-  const value = useMemo<NotificationsState>(() => ({ push, permission, enable }), [permission, enable]);
+  const value = useMemo<NotificationsState>(
+    () => ({ push, permission, enable, registration, retry }),
+    [permission, enable, registration, retry],
+  );
   return <NotificationsContext.Provider value={value}>{children}</NotificationsContext.Provider>;
 }

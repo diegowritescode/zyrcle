@@ -9,12 +9,12 @@ import { useState } from "react";
 import { Linking, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { api } from "@/lib/api";
 import { CHAIN_ID, REPO_URL, WEB_URL } from "@/lib/config";
-import { REMINDER_MINUTES, sendTestNotification, type PushSupport } from "@/lib/notifications";
+import { REMINDER_MINUTES, sendTestNotification, type PushSupport, type RegistrationStep } from "@/lib/notifications";
 import { RecoveryAlerts } from "@/account/RecoveryAlerts";
 import { RecoverCard, RecoveryEmailCard } from "@/account/RecoveryEmailCard";
 import { useNotifications } from "@/notifications/context";
 import { confirm } from "@/ui/confirm";
-import { Body, Button, Card, Heading, Muted, Title } from "@/ui/kit";
+import { Body, Button, Card, Heading, Muted, Notice, Title } from "@/ui/kit";
 import { Screen } from "@/ui/Screen";
 import { colors, radius, space } from "@/ui/theme";
 import { useWallet } from "@/wallet/context";
@@ -121,8 +121,14 @@ const PUSH_LIMIT: Record<Exclude<PushSupport, "ok" | "web">, string> = {
   unconfigured: "Esta versión todavía no está conectada al servicio de notificaciones: solo llegan los recordatorios de turno.",
 };
 
+const STEP_LABEL: Record<RegistrationStep, string> = {
+  device: "el teléfono no entregó su código de avisos (Firebase)",
+  expo: "el servicio de avisos de Expo no respondió bien",
+  server: "el servidor de Zyrcle no aceptó el registro",
+};
+
 function NotificationsCard() {
-  const { push, permission, enable } = useNotifications();
+  const { push, permission, enable, registration, retry } = useNotifications();
   const [testSent, setTestSent] = useState(false);
   const on = permission === "granted";
   return (
@@ -138,6 +144,21 @@ function NotificationsCard() {
         Te avisamos cuando te paguen, si un depósito queda en revisión y {REMINDER_MINUTES} minutos antes de cada turno.
       </Body>
       {on && push !== "ok" && push !== "web" && <Muted>{PUSH_LIMIT[push]}</Muted>}
+      {on && push === "ok" && registration?.state === "registering" && (
+        <Muted>Registrando este teléfono para los avisos…</Muted>
+      )}
+      {on && push === "ok" && registration?.state === "registered" && (
+        <Muted>Este teléfono está registrado: los avisos de pagos y depósitos llegan aquí.</Muted>
+      )}
+      {on && push === "ok" && registration?.state === "failed" && (
+        <>
+          <Notice
+            tone="warn"
+            text={`Los avisos de pagos y depósitos no llegarán a este teléfono: ${STEP_LABEL[registration.step]}. Detalle: ${registration.message}`}
+          />
+          <Button title="Reintentar el registro" variant="outline" onPress={retry} />
+        </>
+      )}
       {on && (
         <>
           <Button
