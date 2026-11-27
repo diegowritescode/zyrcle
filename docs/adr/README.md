@@ -69,6 +69,7 @@ code format. If a number in the code changes how money, weight or trust is handl
 | [0041](0041-participant-timeline-impact-and-where-to-spend.md) | The participant follows each deposit to the sale, sees their impact and where to spend | accepted 2026-11-25 | Claude (block 4, M18); Diego confirmed it |
 | [0042](0042-collector-fill-alerts-and-earnings.md) | Collectors get fill alerts, a list of what to empty first, and their earnings | accepted 2026-11-25 | Claude (block 4, M19); Diego confirmed it |
 | [0043](0043-android-builds-on-the-mac.md) | Android builds run on Diego's Mac, with EAS's own runner and Expo's signing key | accepted 2026-11-25 | Diego decided to build on the Mac; Claude chose how; Diego confirmed it |
+| [0044](0044-api-dependencies-locked.md) | The API image installs a lock file, with exact versions and hashes | proposed 2026-11-27 | Diego asked for it first; Claude chose how |
 
 Records 0016 to 0024 describe decisions taken before this log existed. They were written on
 2026-11-22 from the code, the commit history and the conversations, and keep the date each decision

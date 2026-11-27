@@ -72,7 +72,7 @@ Every file in `src/zyrcle_api/` belongs to one row. Modules were split by respon
 ## Run locally
 
 ```bash
-python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt && .venv/bin/pip install -r requirements-dev.txt
 dev/mosquitto/make-passwd.sh                     # dev broker users, password "dev-password"
 docker compose -f dev/compose.yml up -d          # Postgres + Mosquitto with the ACL
 .venv/bin/alembic upgrade head

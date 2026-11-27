@@ -110,7 +110,7 @@ Google Chrome for the end-to-end journeys.
 ```bash
 # Backend: Postgres + Mosquitto, migrations, tests
 cd apps/api
-python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt && .venv/bin/pip install -r requirements-dev.txt
 dev/mosquitto/make-passwd.sh && docker compose -f dev/compose.yml up -d
 .venv/bin/alembic upgrade head && .venv/bin/pytest -q
 

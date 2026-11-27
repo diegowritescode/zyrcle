@@ -57,7 +57,8 @@ jobs:
       - uses: foundry-rs/foundry-toolchain@v1
         with:
           version: v1.5.1
-      - run: pip install -r requirements-dev.txt
+      # The image's exact versions first (ADR 0044), then the editable packages and test tools.
+      - run: pip install -r requirements.txt && pip install -r requirements-dev.txt
       - run: ruff check .
       - run: ruff format --check .
       - name: Migrations apply to an empty database and match the models
@@ -108,7 +109,7 @@ jobs:
             -v "$PWD/dev/mosquitto/passwd:/mosquitto/config/passwd:ro" eclipse-mosquitto:2
       - name: Install the API, the simulator and the apps
         run: |
-          (cd apps/api && pip install -r requirements-dev.txt)
+          (cd apps/api && pip install -r requirements.txt && pip install -r requirements-dev.txt)
           echo "E2E_PY=$(dirname "$(which python)")" >> "$GITHUB_ENV"
           (cd apps/web && npm ci)
           (cd apps/mobile && npm ci)

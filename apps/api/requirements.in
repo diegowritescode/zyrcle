@@ -1,0 +1,6 @@
+# What the API image installs (apps/api/Dockerfile). scripts/lock.sh resolves it into
+# requirements.txt: every package at one exact version, with its hashes (docs/adr/0044).
+# Paths are relative to apps/api, like requirements-dev.txt.
+../../packages/protocol
+../../device/simulator[control]
+.
