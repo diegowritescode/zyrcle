@@ -55,6 +55,7 @@ async def test_a_resident_books_an_hour_and_cancels_it(client, devices, resident
     r = await client.get(f"/v1/containers/ctr-0001/slots?day={day}", headers=headers(resident))
     body = r.json()
     assert len(body["days"]) == 7 and body["day"] == day and len(body["slots"]) == 24
+    assert body["site_name"] and "residence_name" not in body  # removed in M23 (ADR 0011)
     before = await _slot(client, resident, "ctr-0001", day, 10)
     assert before["available"] and not before["mine"] and before["state"] == "future"
 
@@ -68,6 +69,7 @@ async def test_a_resident_books_an_hour_and_cancels_it(client, devices, resident
     assert after["mine"] and after["taken"] == before["taken"] + 1 and not after["available"]
     mine = (await client.get("/v1/bookings", headers=headers(resident))).json()
     assert [b["id"] for b in mine] == [booking["id"]]
+    assert mine[0]["site_name"] and "residence_name" not in mine[0]
 
     again = await _book(client, resident, "ctr-0001", starts)
     assert again.status_code == 409 and again.json()["detail"]["code"] == "already_booked"

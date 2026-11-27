@@ -3,9 +3,6 @@
 Traceability is the product, so the aggregates are public: anyone can see how many kilos each host
 and each of its sites recycled and how many pesos were paid for them. Nothing here identifies a
 participant, and no access code is ever exposed (those only appear on the container's own screen).
-
-`/v1/residences` and the `residence_*` fields are deprecated aliases of the site routes and fields,
-kept while installed apps still read them (docs/adr/0011).
 """
 
 import uuid
@@ -104,7 +101,6 @@ def _container_view(
         "id": container.id,
         "name": container.name,
         "site_id": str(container.site_id),
-        "residence_id": str(container.site_id),  # deprecated alias
         "accepted_materials": container.accepted_materials,
         "online": is_online(device, now, settings),
         "busy": container.id in busy,
@@ -166,7 +162,6 @@ def _place(site: Site, host: Host) -> dict[str, Any]:
         "site_name": site.name,
         "host_id": str(host.id),
         "host_name": host.name,
-        "residence_name": site.name,  # deprecated alias
     }
 
 
@@ -214,13 +209,6 @@ async def sites(request: Request) -> list[dict[str, Any]]:
             )
         ).all()
     return [{**_site_ref(site), "host": _host_ref(host), "containers": n} for site, host, n in rows]
-
-
-@router.get("/residences", deprecated=True)
-async def residences(request: Request) -> list[dict[str, Any]]:
-    """Deprecated alias of /v1/sites, in its old shape."""
-    async with request.app.state.maker() as db:
-        return [{**_site_ref(s), "containers": n} for s, n in await _sites_with_counts(db)]
 
 
 def _window(settings: Settings, days: int) -> tuple[list[date], datetime]:
@@ -407,17 +395,8 @@ async def site_dashboard(
     return {
         "site": _site_ref(site),
         "host": _host_ref(host),
-        "residence": _site_ref(site),  # deprecated alias
         "timezone": settings.timezone,
         "totals": totals,
         "containers": containers,
         **series,
     }
-
-
-@router.get("/residences/{site_id}/dashboard", deprecated=True)
-async def residence_dashboard(
-    site_id: uuid.UUID, request: Request, days: int = Query(default=14, ge=1, le=90)
-) -> dict[str, Any]:
-    """Deprecated alias of /v1/sites/{id}/dashboard."""
-    return await site_dashboard(site_id, request, days)

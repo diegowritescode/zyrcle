@@ -15,7 +15,6 @@ async def test_a_scanned_container_shows_what_it_accepts_but_never_its_code(clie
     assert body["name"] == "Contenedor ctr-0002"
     assert body["site_name"] == "Torres del Río"
     assert body["host_name"] == "Universidad del Río"
-    assert body["residence_name"] == body["site_name"]  # deprecated alias for installed apps
     assert body["accepted_materials"] == ["pet", "metal", "glass"]
     assert body["online"] is True
     assert "qr" not in body and "code" not in str(body).lower()
@@ -93,14 +92,15 @@ async def test_hosts_list_their_sites(client, devices):
     assert torres["containers"] == 3
 
 
-async def test_residence_routes_remain_as_deprecated_aliases(client, devices):
-    """Installed apps still call these (docs/adr/0011)."""
-    old = next(
-        r for r in (await client.get("/v1/residences")).json() if r["name"] == "Torres del Río"
-    )
-    assert old["containers"] == 3
-    dash = (await client.get(f"/v1/residences/{old['id']}/dashboard?days=3")).json()
-    assert dash["residence"] == dash["site"] == {"id": old["id"], "name": "Torres del Río"}
+async def test_the_old_residence_names_are_gone(client, devices):
+    """Removed in M23, once no installed app read them (docs/adr/0011, amendments)."""
+    assert (await client.get("/v1/residences")).status_code == 404
+    site = next(s for s in (await client.get("/v1/sites")).json() if s["name"] == "Torres del Río")
+    assert (await client.get(f"/v1/residences/{site['id']}/dashboard")).status_code == 404
+    dash = (await client.get(f"/v1/sites/{site['id']}/dashboard?days=3")).json()
+    container = (await client.get("/v1/containers/ctr-0002")).json()
+    assert "residence" not in dash and "residence_id" not in dash["containers"][0]
+    assert "residence_name" not in container
 
 
 async def test_registering_a_container_answers_clearly(client, devices):

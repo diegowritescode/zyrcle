@@ -40,7 +40,7 @@ const App = () => (
               <Route path="/sites" element={<Sites />} />
               <Route path="/console" element={<Console />} />
               <Route path="/multisig" element={<Multisig />} />
-              {/* The mobile app links here (docs/adr/0011). */}
+              {/* An address saved or shared before sites existed; the API's aliases are gone (docs/adr/0011). */}
               <Route path="/residence" element={<Navigate to="/sites" replace />} />
               <Route path="/recycling" element={<RecyclingPage />} />
               <Route path="/container/:containerId" element={<ContainerScreen />} />

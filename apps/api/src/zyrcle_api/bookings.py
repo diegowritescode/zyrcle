@@ -197,7 +197,6 @@ def booking_view(
         "container_id": container.id,
         "container_name": container.name,
         "site_name": site.name,
-        "residence_name": site.name,  # deprecated alias (docs/adr/0011)
         "starts_at": start.isoformat(),
         "ends_at": (start + SLOT).isoformat(),
         "day": start.date().isoformat(),
@@ -286,7 +285,6 @@ async def slots(
         "container_id": container.id,
         "container_name": container.name,
         "site_name": site.name,
-        "residence_name": site.name,  # deprecated alias (docs/adr/0011)
         "timezone": str(tz),
         "opens_hour": site.opens_hour,
         "closes_hour": site.closes_hour,

@@ -40,3 +40,11 @@ neither.
 ## Amendments
 - **2026-11-22, Claude (documentation review):** the deprecated `residence` routes and fields go
   once the APK built after block 1 is the one in use; their removal is planned for block 2.
+- **2026-11-27, Claude (removed in M23):** the aliases are gone. Diego said on 2026-11-27 that no one
+  else has Zyrcle installed and asked for the removal ("nadie más lo tiene, haz M23"). His own phone
+  runs an APK built on 2026-11-26, and no code in the apps has read the old names since
+  2026-11-22. `GET /v1/residences` and `GET /v1/residences/{id}/dashboard` now answer 404, and the
+  fields `residence_id`, `residence_name` and `residence` are no longer sent. The web app keeps one
+  thing: the page address `/residence` still takes a visitor to `/sites`, because it is an address
+  someone may have saved or shared, not something an app calls, and it costs one line. The table,
+  its columns and every id are unchanged; only the old names left.

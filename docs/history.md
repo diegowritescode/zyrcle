@@ -16,7 +16,7 @@ timeline
     2026-11-24 : Block 4 starts - M18 participant and M19 collector built
     2026-11-25 : APKs built on Diego's Mac : M18 and M19 deployed (00:55 UTC on the 26th)
     2026-11-26 : Sentry DSNs placed : One-minute API outage from sentry-sdk 3, fixed by a version cap : A phone's push fixed by a restart; Cuenta shows the registration
-    2026-11-27 : The API's dependencies locked : A version code per APK : M21 merchant export and M20 host report, goals and ranking figures built : Diego confirms ADRs 0044 to 0046; deployed at 15:08 UTC
+    2026-11-27 : The API's dependencies locked : A version code per APK : M21 merchant export and M20 host report, goals and ranking figures built : Diego confirms ADRs 0044 to 0046; deployed at 15:08 UTC : M23, the old residence names removed
 ```
 
 ## 2025: the hackathon
@@ -273,6 +273,11 @@ passed, and `deploy.sh` backed up the database, ran migration `0018` and started
 the export and workbook routes answered (the last two refuse a request without a login), and the
 web bundle carries the new screens. Production has no certificate yet, so the PDF was checked only
 in the tests. The APK with version code 2 is meant to be installed after this deploy.
+
+Diego then said no one else has Zyrcle installed ("nadie más lo tiene, haz M23"), so the
+`residence` aliases kept since [ADR 0011](adr/0011-hosts-and-sites.md) were removed: the two old
+routes answer 404 and the old fields are no longer sent. The page address `/residence` on the web
+still leads to `/sites`.
 
 ## Where the old things are
 

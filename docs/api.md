@@ -73,7 +73,8 @@ is no version header and no content negotiation. The `version="0.1.0"` passed to
 [`main.py`](../apps/api/src/zyrcle_api/main.py) only shows up in the OpenAPI document.
 
 Breaking changes are avoided by keeping old names as aliases until installed apps stop using them.
-The only aliases today are the `residence` ones (section 3.2, [ADR 0011](adr/0011-hosts-and-sites.md)).
+There are no aliases today: the `residence` ones were removed on 2026-11-27 (section 3.2,
+[ADR 0011](adr/0011-hosts-and-sites.md)).
 
 ### JSON conventions
 
@@ -460,8 +461,6 @@ No token. These views never show an access code or anything that identifies a pa
 | `GET /v1/sites` | every site with its host | [0011](adr/0011-hosts-and-sites.md) |
 | `GET /v1/hosts/{host_id}/dashboard?days=` | a host's totals, each site's totals, daily series | [0011](adr/0011-hosts-and-sites.md) |
 | `GET /v1/sites/{site_id}/dashboard?days=` | a site's totals, each container's state, daily series | [0011](adr/0011-hosts-and-sites.md) |
-| `GET /v1/residences` **deprecated** | alias of `/v1/sites` in its old shape | [0011](adr/0011-hosts-and-sites.md) |
-| `GET /v1/residences/{site_id}/dashboard?days=` **deprecated** | alias of the site dashboard | [0011](adr/0011-hosts-and-sites.md) |
 | `GET /v1/hosts/{host_id}/certificates` | a host's impact certificates | [0027](adr/0027-impact-certificates.md) |
 | `GET /v1/certificates/{certificate_id}` | one certificate with its leaves, to verify it | [0027](adr/0027-impact-certificates.md) |
 | `GET /v1/certificates/{certificate_id}/pdf` | the certificate as a PDF with a QR to its verification page | [0046](adr/0046-host-monthly-report-goals-and-rankings.md) |
@@ -482,8 +481,7 @@ No token. These views never show an access code or anything that identifies a pa
 
 **`GET /v1/containers`** returns a list ordered by host name, site name and container id. Each item:
 `id`, `name`, `site_id`, `site_name`, `host_id`, `host_name`, `accepted_materials`, `online`,
-`busy` (a deposit session is active on it), `last_seen_at`, plus the deprecated `residence_id` and
-`residence_name`.
+`busy` (a deposit session is active on it), `last_seen_at`.
 
 **`GET /v1/containers/{container_id}`** returns the same object for one container.
 Errors: `404 not_found`.
@@ -502,7 +500,7 @@ Errors: `404 not_found`.
 **`GET /v1/sites/{site_id}/dashboard`**
 
 - Query: `days`, integer 1 to 90, default 14.
-- Returns `{site, host, residence (deprecated, same as site), timezone, totals, containers, activity, payouts}`.
+- Returns `{site, host, timezone, totals, containers, activity, payouts}`.
 - Each container carries the public container fields plus `fill_pct` (0 to 100, from the latest
   closed lid, a deposit's or a collection's, or `null`; [ADR 0042](adr/0042-collector-fill-alerts-and-earnings.md)),
   `weight_kg` (the scale's reading after that lid closed), `deposits_verified`,
@@ -518,23 +516,22 @@ and name: `{name, host: {id, name}, site: {id, name} or null, place, hours, offe
 and `offer` are free text the operator wrote, or null. It never shows the tax id or the account
 address ([ADR 0041](adr/0041-participant-timeline-impact-and-where-to-spend.md)).
 
-#### Deprecated aliases
+#### Removed aliases
 
-[ADR 0011](adr/0011-hosts-and-sites.md) renamed *residence* to *site* and added hosts. App builds
-already installed read the old names, so they stay as aliases, marked `deprecated=True` in the code
-(they show as deprecated in the OpenAPI docs):
+[ADR 0011](adr/0011-hosts-and-sites.md) renamed *residence* to *site* and added hosts. The old names
+stayed as aliases while installed apps read them, and were removed on 2026-11-27 (M23), once no
+installed app did. A client that still calls them gets these answers:
 
-| Old | New |
-|---|---|
-| `GET /v1/residences` → `[{id, name, containers}]` | `GET /v1/sites` |
-| `GET /v1/residences/{id}/dashboard` | `GET /v1/sites/{id}/dashboard` (it calls the same function) |
-| field `residence_id` on containers | `site_id` |
-| field `residence_name` on containers, bookings and slots | `site_name` |
-| field `residence` on the site dashboard | `site` |
+| Old | Now | Use instead |
+|---|---|---|
+| `GET /v1/residences` | 404 | `GET /v1/sites` |
+| `GET /v1/residences/{id}/dashboard` | 404 | `GET /v1/sites/{id}/dashboard` |
+| field `residence_id` on containers | not sent | `site_id` |
+| field `residence_name` on containers, bookings and slots | not sent | `site_name` |
+| field `residence` on the site dashboard | not sent | `site` |
 
-Site ids are the old residence ids, so ids handed out earlier still work. New code must use the
-site names. No code in `apps/web/src`, `apps/mobile` or `packages/client` reads the old names today.
-Operator routes were renamed outright, because only Zyrcle's own tools call them.
+Site ids are the old residence ids, so ids handed out earlier still work. Operator routes were
+renamed outright in ADR 0011, because only Zyrcle's own tools call them.
 
 
 #### Impact certificates (public)
@@ -716,7 +713,7 @@ Slots are whole local hours. A site is open over `[opens_hour, closes_hour)`. Ea
 **`GET /v1/containers/{container_id}/slots`**
 
 - Query: `day` (`YYYY-MM-DD`, optional, defaults to today in the deployment's time zone).
-- Returns `{container_id, container_name, site_name, residence_name (deprecated), timezone,
+- Returns `{container_id, container_name, site_name, timezone,
   opens_hour, closes_hour, capacity, days, day, slots}`. `days` lists the 7 bookable days, today
   first.
 - Each slot: `{starts_at, ends_at, hour, taken, capacity, mine, state, available}`. `state` is
@@ -743,7 +740,7 @@ left out.
   deposit already used); `409 conflict` (`that hour is over`).
 
 **Booking object** (`booking_view`): `id`, `container_id`, `container_name`, `site_name`,
-`residence_name` (deprecated), `starts_at`, `ends_at`, `day`, `hour`, `state` (`upcoming`, `now`,
+`starts_at`, `ends_at`, `day`, `hour`, `state` (`upcoming`, `now`,
 `used`, `missed` or `cancelled`), `walk_in`.
 
 #### Recovery email and lost-phone recovery
@@ -1586,4 +1583,4 @@ Found on 2026-11-22 by comparing the routes with the two TypeScript clients and 
 | 13 | The demo router runs in production and `GET /v1/demo/containers` lists every container's live QR | Decided (ADR 0028): a pilot deployment with real containers runs without the demo router |
 | 14 | Plain-string errors without a `code` (section 1) | Open: move them to `{"code", "detail"}` when touched |
 | 15 | The edge rate limit's period and source are Traefik's defaults, not checked on the running proxy | Open, M7 |
-| 16 | When the `residence` aliases go (ADR 0011) | Planned for block 4 (M23, [roadmap-blocks-3-4.md](roadmap-blocks-3-4.md)): remove them once the APK built after blocks 3 and 4 is the one in use; tracked in ADR 0011 |
+| 16 | When the `residence` aliases go (ADR 0011) | Done on 2026-11-27 (M23, [roadmap-blocks-3-4.md](roadmap-blocks-3-4.md)): removed once Diego confirmed no one else has the app; recorded in ADR 0011 |

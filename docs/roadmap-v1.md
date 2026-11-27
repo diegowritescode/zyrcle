@@ -58,7 +58,8 @@ H  Weighing station: hardware track, in parallel
 - **Done when:** the demo shows a university host with two campuses, each with its own containers,
   turns and dashboard, and existing data is migrated without loss.
 - **Decision:** [ADR 0011](adr/0011-hosts-and-sites.md), hosts and sites. Built in block 1,
-  deployed on 2026-11-22. The deprecated `residence` aliases go in block 4 (M23).
+  deployed on 2026-11-22. The deprecated `residence` aliases go in block 4 (M23; removed on
+  2026-11-27).
 
 ### M2. Collection (phase 4a)
 - **Why:** the material has to leave the container with its weight and origin intact.

@@ -4,7 +4,8 @@
 > Since that day the 2-of-3 Safe `0x607c011C6921eA75C1e38223a5E5514eDbA7E43b` holds all eight admin
 > powers of ZyrcleChain and the L1 admin key holds none. Block 4 (M18 to M23) started on
 > 2026-11-24: M18 and M19 were built with migration `0017` and deployed on 2026-11-26; M20 and M21
-> were built and deployed on 2026-11-27 (migration `0018`); M22 and M23 are planned. v1 blocks 1 and 2 are deployed ([roadmap-v1.md](roadmap-v1.md)). Scope and order:
+> were built and deployed on 2026-11-27 (migration `0018`); M23 was built the same day, not
+> deployed; M22 is planned. v1 blocks 1 and 2 are deployed ([roadmap-v1.md](roadmap-v1.md)). Scope and order:
 > [ADR 0030](adr/0030-blocks-3-and-4.md). What each milestone built is under **Built**; what
 > still waits for Diego is in [the last section of block 3](#what-block-3-still-waits-for).
 
@@ -139,7 +140,7 @@ M17 Keys: own guardian key, admin powers behind a multisig
   worker, and `api.py` into participant routes, shared dependencies and the operator's setup
   routes. No behavior changes. Modules that are one cohesive class (the chain client, the session
   service, the collection service) stay whole ([ADR 0036](adr/0036-module-boundaries.md)). The
-  deprecated `residence` routes and fields wait for M23, once the new Android build is in use.
+  deprecated `residence` routes and fields waited for M23, once the new Android build was in use.
 - **Done when:** every test still passes and the schema is unchanged (`alembic check`).
 - **Built** ([ADR 0036](adr/0036-module-boundaries.md), `36ea44d`): `models.py` became the package
   `models/` on a shared `base.py`, re-exporting every name; `recovery.py` became `email_codes.py`,
@@ -241,7 +242,8 @@ change was built on the Mac and installed on Diego's phone the same day.
 ## Block 4: every party
 
 > M18 and M19 built on 2026-11-24 and deployed on 2026-11-26 (commit `72a875b`). M20 and M21 built
-> and deployed on 2026-11-27 (commit `67684e3`). M22 and M23 planned.
+> and deployed on 2026-11-27 (commit `67684e3`). M23 built on 2026-11-27, not deployed. M22
+> planned.
 
 ### M18. Participant
 - **Each deposit, step by step:** deposited, verified, collected, sold, paid, with the date and the
@@ -321,6 +323,12 @@ change was built on the Mac and installed on Diego's phone the same day.
   on his phone. The CI journey already walks every party that exists today (participant,
   operator, collector, host, merchant); M20 to M22 extend it. Left: removing the `residence`
   aliases once no phone runs an older build.
+- **Built** (2026-11-27, not deployed, [ADR 0011](adr/0011-hosts-and-sites.md), amendments): Diego confirmed that no
+  one else has Zyrcle installed. `GET /v1/residences` and `GET /v1/residences/{id}/dashboard` are
+  removed and answer 404; containers, bookings, slots and the site dashboard no longer send
+  `residence_id`, `residence_name` or `residence`. No migration: the table was renamed in `0005`.
+  The web keeps the page address `/residence`, which takes a visitor to `/sites`. The journey
+  walks M20 and M21 too; M22 extends it when it is built.
 
 ## What stays out
 
