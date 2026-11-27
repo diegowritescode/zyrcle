@@ -464,6 +464,8 @@ No token. These views never show an access code or anything that identifies a pa
 | `GET /v1/residences/{site_id}/dashboard?days=` **deprecated** | alias of the site dashboard | [0011](adr/0011-hosts-and-sites.md) |
 | `GET /v1/hosts/{host_id}/certificates` | a host's impact certificates | [0027](adr/0027-impact-certificates.md) |
 | `GET /v1/certificates/{certificate_id}` | one certificate with its leaves, to verify it | [0027](adr/0027-impact-certificates.md) |
+| `GET /v1/certificates/{certificate_id}/pdf` | the certificate as a PDF with a QR to its verification page | [0046](adr/0046-host-monthly-report-goals-and-rankings.md) |
+| `GET /v1/hosts/{host_id}/progress?months=` | this month against the goals, and each site's last months | [0046](adr/0046-host-monthly-report-goals-and-rankings.md) |
 | `GET /v1/merchants` | the campus merchants that take ZYR: where they are and what they sell | [0041](adr/0041-participant-timeline-impact-and-where-to-spend.md) |
 
 **`GET /v1/materials`** returns `["cardboard", "glass", "hdpe", "metal", "paper", "pet"]`.
@@ -543,6 +545,16 @@ Operator routes were renamed outright, because only Zyrcle's own tools call them
 |---|---|
 | `GET /v1/hosts/{host_id}/certificates` | The host's certificates, newest month first: host, site, period, totals, `by_material`, `merkle_root`, `status`, `anchor_tx`, `ipfs_cid` and `ipfs_url` (the permanent public copy on IPFS and where to read it; null until pinned or when Pinata is off) |
 | `GET /v1/certificates/{id}` | One certificate plus `leaves: [{deposit_id, material, grams}]`, from which anyone recomputes `merkle_root` (`packages/client/src/certificate.ts` does it in the browser). 404 if unknown |
+| `GET /v1/certificates/{id}/pdf` | `application/pdf`, `Content-Disposition: inline; filename="zyrcle-certificado-<host>-<period>.pdf"`: one A4 page with the figures, the table by material, how they were counted, and how to verify them, with a QR to `ZYRCLE_PUBLIC_WEB_URL/certificates/<id>` ([ADR 0046](adr/0046-host-monthly-report-goals-and-rankings.md)). The same PDF the monthly report emails. 404 if unknown |
+
+**`GET /v1/hosts/{host_id}/progress?months=6`** ([ADR 0046](adr/0046-host-monthly-report-goals-and-rankings.md),
+[`report_routes.py`](../apps/api/src/zyrcle_api/report_routes.py)) returns `{host, timezone, period,
+goal_kg, kg, participants, progress_pct, months, sites}`. `period` is this month (local, still
+running); `kg` counts credited deposits made in it, `participants` the distinct people (once per
+person across sites), `progress_pct` is `kg` against `goal_kg` (null without a goal), and `months`
+the last 1 to 12 months (`months`, default 6), oldest first, each `{period, kg, participants}`.
+`sites` has the same per site plus `id`, `name` and `kg_per_participant`, ordered by `kg`. 404 for
+an unknown host.
 
 ### 3.3 Participant
 
@@ -1007,6 +1019,10 @@ them are under `/v1/operator`.
 | `POST /v1/operator/certificates/preview` | 200 | what a certificate would hold | [0027](adr/0027-impact-certificates.md) |
 | `POST /v1/operator/certificates` | 201 | issue a certificate | [0027](adr/0027-impact-certificates.md) |
 | `GET /v1/operator/certificates` | 200 | every certificate | [0027](adr/0027-impact-certificates.md) |
+| `GET /v1/operator/hosts/{host_id}/reporting` | 200 | a host's monthly report settings, goals and last reports | [0046](adr/0046-host-monthly-report-goals-and-rankings.md) |
+| `PUT /v1/operator/hosts/{host_id}/reporting` | 200 | opt in or out of the monthly report, its emails, the host's goal | [0046](adr/0046-host-monthly-report-goals-and-rankings.md) |
+| `PUT /v1/operator/sites/{site_id}/goal` | 200 | a site's monthly goal | [0046](adr/0046-host-monthly-report-goals-and-rankings.md) |
+| `GET /v1/operator/hosts/{host_id}/greenmetric?year=` | 200 | the year's figures for UI GreenMetric, as Excel | [0046](adr/0046-host-monthly-report-goals-and-rankings.md) |
 
 #### Sign-in and self
 
@@ -1295,6 +1311,10 @@ matched_by}`. Credits are positive and debits negative.
 | `POST /v1/operator/certificates/preview` | `{host_id, site_id?, period: "YYYY-MM"}` | What a certificate would hold now, claiming nothing |
 | `POST /v1/operator/certificates` | same | 201, the certificate (`issued`); the anchor worker anchors it. 409 `conflict` if nothing sold is left to certify in that month, or if another certificate just claimed some of it; 404 for an unknown host or a site of another host; 422 for a bad period |
 | `GET /v1/operator/certificates` | | Every certificate |
+| `GET /v1/operator/hosts/{host_id}/reporting` | | `{host_id, monthly_report, report_emails, monthly_goal_kg, sites: [{id, name, monthly_goal_kg}], reports}`; `reports` are the last twelve monthly reports, newest first, `{period, status, certificate_id, recipients, sent_at, last_error}` (`waiting`, `sent`, `empty`, `failed`). 404 for an unknown host |
+| `PUT /v1/operator/hosts/{host_id}/reporting` | `{monthly_report, report_emails?, monthly_goal_kg?}`: up to 10 emails, a goal from 1 to 10,000,000 kg or null | The same view. Emails are trimmed, lowercased and deduplicated. 422 `invalid_email` for one that is not an email; 422 `invalid` when the report is on without an email |
+| `PUT /v1/operator/sites/{site_id}/goal` | `{monthly_goal_kg?}` | `{id, name, monthly_goal_kg}`. Null or absent clears it. 404 for an unknown site |
+| `GET /v1/operator/hosts/{host_id}/greenmetric?year=` | | An `.xlsx` (`attachment; filename="zyrcle-greenmetric-<host>-<year>.xlsx"`) with four sheets: `Resumen` (figures mapped to UI GreenMetric's WS.1, WS.2 and WS.4, with what they cover), `Por mes`, `Por material` and `Certificados` (each with its verification page, IPFS copy and transaction). Kilograms received count credited deposits by the month they were made; recycled ones, material whose sale settled in the year. 422 for a year that has not started |
 
 ### 3.6 Admin only
 

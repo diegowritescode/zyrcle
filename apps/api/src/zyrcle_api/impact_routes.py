@@ -1,14 +1,17 @@
-"""Impact certificates (docs/adr/0027): operators issue them; anyone reads and verifies them."""
+"""Impact certificates (docs/adr/0027): operators issue them; anyone reads and verifies them, and
+downloads them as a PDF (docs/adr/0046)."""
 
 import uuid
 from typing import Annotated, Any
+from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
+from .certificate_pdf import pdf_filename, render_certificate
 from .deps import Operator
 from .errors import SessionError
-from .impact import ImpactService
+from .impact import ImpactService, utcnow
 
 router = APIRouter(prefix="/v1", tags=["impact"])
 
@@ -65,3 +68,22 @@ async def get_certificate(certificate_id: uuid.UUID, impact: Impact) -> dict[str
         return await impact.get(certificate_id)
     except SessionError as e:
         raise _http(e) from None
+
+
+@router.get("/certificates/{certificate_id}/pdf")
+async def certificate_pdf(certificate_id: uuid.UUID, request: Request, impact: Impact) -> Response:
+    """The certificate as a formal PDF with a QR to its verification page (docs/adr/0046), the
+    same one the monthly report emails. Public, like the certificate."""
+    try:
+        view = await impact.get(certificate_id, with_leaves=False)
+    except SessionError as e:
+        raise _http(e) from None
+    settings = request.app.state.settings
+    pdf = render_certificate(
+        view, settings.public_web_url, settings.chain_id, ZoneInfo(settings.timezone), utcnow()
+    )
+    return Response(
+        pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{pdf_filename(view)}"'},
+    )

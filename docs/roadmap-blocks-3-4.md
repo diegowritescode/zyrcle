@@ -3,8 +3,8 @@
 > Status: block 3 (M8 to M17) **done and deployed** on 2026-11-23, with migrations `0014` to `0016`.
 > Since that day the 2-of-3 Safe `0x607c011C6921eA75C1e38223a5E5514eDbA7E43b` holds all eight admin
 > powers of ZyrcleChain and the L1 admin key holds none. Block 4 (M18 to M23) started on
-> 2026-11-24: M18 and M19 were built with migration `0017` and deployed on 2026-11-26; M20 to M23
-> are planned. v1 blocks 1 and 2 are deployed ([roadmap-v1.md](roadmap-v1.md)). Scope and order:
+> 2026-11-24: M18 and M19 were built with migration `0017` and deployed on 2026-11-26; M20 and M21
+> were built on 2026-11-27 (migration `0018`, not deployed); M22 and M23 are planned. v1 blocks 1 and 2 are deployed ([roadmap-v1.md](roadmap-v1.md)). Scope and order:
 > [ADR 0030](adr/0030-blocks-3-and-4.md). What each milestone built is under **Built**; what
 > still waits for Diego is in [the last section of block 3](#what-block-3-still-waits-for).
 
@@ -240,7 +240,8 @@ change was built on the Mac and installed on Diego's phone the same day.
 
 ## Block 4: every party
 
-> M18 and M19 built on 2026-11-24 and deployed on 2026-11-26 (commit `72a875b`). M20 to M23 planned.
+> M18 and M19 built on 2026-11-24 and deployed on 2026-11-26 (commit `72a875b`). M20 and M21 built
+> on 2026-11-27 on the branch `block4-m20-m21`, not deployed. M22 and M23 planned.
 
 ### M18. Participant
 - **Each deposit, step by step:** deposited, verified, collected, sold, paid, with the date and the
@@ -281,6 +282,16 @@ change was built on the Mac and installed on Diego's phone the same day.
   campaigns), each with links to the certificates as evidence. The current questionnaire is
   checked when this milestone starts. The export says what it covers: only what went through
   Zyrcle, not the institution's total waste.
+- **Built** ([ADR 0046](adr/0046-host-monthly-report-goals-and-rankings.md), proposed 2026-11-27,
+  not deployed, migration `0018`): hosts opt in from the console with up to ten emails; from the
+  1st to the 7th of each month a worker issues each one's certificate for the previous month and,
+  once it is anchored, emails a one-page PDF with a QR to the verification page
+  (`GET /v1/certificates/{id}/pdf`, public). Goals per host and per site in the console;
+  `GET /v1/hosts/{id}/progress` and "Metas de <mes> y comparación entre sedes" on the host's panel.
+  `GET /v1/operator/hosts/{id}/greenmetric?year=` gives an Excel workbook mapped to the Waste
+  indicators WS.1, WS.2 and WS.4, checked on 2026-11-27 in public sources (the official
+  questionnaire could not be read), with the certificates as evidence. No campaigns: Zyrcle does
+  not record them, and the workbook says so.
 
 ### M21. Merchant
 - **Accounting export:** charges and redemptions for a date range, with tax id, references and

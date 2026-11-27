@@ -107,3 +107,9 @@ certificate whose every gram anyone can check.
     `certificate_document`),
     [`certificate.ts`](../../packages/client/src/certificate.ts) (`anchorData`, `parseAnchor`),
     [`CertificatePage.tsx`](../../apps/web/src/pages/CertificatePage.tsx).
+- **2026-11-27, Claude (certificates issued by the monthly report, M20):** a worker now issues a
+  host's certificate for the previous month without an operator, for hosts that opted in, under
+  the same rules (sold material, one claim per gram). Its `issued_by` is "el informe mensual
+  automático". Every certificate can also be downloaded as a one-page PDF with a QR to its
+  verification page. Proposed in [ADR 0046](0046-host-monthly-report-goals-and-rankings.md),
+  waiting for Diego's confirmation.

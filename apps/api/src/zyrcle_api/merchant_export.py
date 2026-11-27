@@ -9,8 +9,6 @@ paid and redemptions that never reached the chain moved nothing and are left out
 
 import csv
 import io
-import re
-import unicodedata
 import uuid
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
@@ -23,6 +21,7 @@ from openpyxl.styles import Font
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .filenames import slug
 from .models import Merchant, PaymentRequest, RedemptionRequest
 
 Format = Literal["csv", "xlsx"]
@@ -181,9 +180,7 @@ def totals(rows: list[Movement]) -> list[tuple[str, int]]:
 
 
 def filename(merchant: Merchant, start: date, end: date, fmt: Format) -> str:
-    ascii_name = unicodedata.normalize("NFKD", merchant.name).encode("ascii", "ignore").decode()
-    slug = re.sub(r"[^a-z0-9]+", "-", ascii_name.lower()).strip("-")[:40] or "comercio"
-    return f"zyrcle-{slug}-{start.isoformat()}-a-{end.isoformat()}.{fmt}"
+    return f"zyrcle-{slug(merchant.name, 'comercio')}-{start.isoformat()}-a-{end.isoformat()}.{fmt}"
 
 
 def render(

@@ -237,6 +237,29 @@ const json = (method: string, body?: unknown): RequestInit => ({
     body: body === undefined ? undefined : JSON.stringify(body),
 });
 
+/** A host's monthly report, its goals and its last reports (docs/adr/0046). */
+export interface HostReporting {
+    host_id: string;
+    monthly_report: boolean;
+    report_emails: string[];
+    monthly_goal_kg: number | null;
+    sites: { id: string; name: string; monthly_goal_kg: number | null }[];
+    reports: {
+        period: string;
+        status: "waiting" | "sent" | "empty" | "failed";
+        certificate_id: string | null;
+        recipients: number;
+        sent_at: string | null;
+        last_error: string | null;
+    }[];
+}
+
+export interface ReportingIn {
+    monthly_report: boolean;
+    report_emails: string[];
+    monthly_goal_kg: number | null;
+}
+
 export function operatorApi(token: string | null, onUnauthorized: () => void) {
     async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
         let res: Response;
@@ -330,6 +353,12 @@ export function operatorApi(token: string | null, onUnauthorized: () => void) {
             call<Omit<SiteRow, "host_name">>(`/v1/operator/sites/${id}/schedule`, json("PUT", { opens_hour, closes_hour, slot_capacity })),
 
         certificates: () => call<Certificate[]>("/v1/operator/certificates"),
+        reporting: (hostId: string) => call<HostReporting>(`/v1/operator/hosts/${hostId}/reporting`),
+        setReporting: (hostId: string, body: ReportingIn) => call<HostReporting>(`/v1/operator/hosts/${hostId}/reporting`, json("PUT", body)),
+        setSiteGoal: (siteId: string, monthly_goal_kg: number | null) =>
+            call<{ id: string; monthly_goal_kg: number | null }>(`/v1/operator/sites/${siteId}/goal`, json("PUT", { monthly_goal_kg })),
+        /** The year's figures for UI GreenMetric, as Excel (docs/adr/0046). */
+        greenmetric: (hostId: string, year: number) => file(`/v1/operator/hosts/${hostId}/greenmetric?year=${year}`),
         previewCertificate: (host_id: string, site_id: string | null, period: string) =>
             call<CertificatePreview>("/v1/operator/certificates/preview", json("POST", { host_id, site_id, period })),
         issueCertificate: (host_id: string, site_id: string | null, period: string) =>

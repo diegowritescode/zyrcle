@@ -82,3 +82,6 @@ class EmailMessage(Base):
     last_error: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = _now()
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Files sent with it: [{filename, content_type, content_b64}], such as the monthly certificate's
+    # PDF (docs/adr/0046). Cleared once the email is sent or given up on.
+    attachments: Mapped[list | None] = mapped_column(JSONB)

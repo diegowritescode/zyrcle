@@ -105,6 +105,14 @@ class Settings(BaseSettings):
     pinata_api_url: str = "https://api.pinata.cloud"
     # Where browsers read the copy. The web page's Content-Security-Policy must allow its origin.
     ipfs_gateway: str = "https://gateway.pinata.cloud/ipfs/"
+    # The web app, for links that leave the API: a certificate's verification page in its PDF and in
+    # the monthly report's email (docs/adr/0046).
+    public_web_url: str = "https://zyrcle.deviego.xyz"
+
+    # The monthly report (docs/adr/0046): how often its worker looks, and the last day of a month on
+    # which it still issues the previous month's reports. It runs only with email on.
+    monthly_report_interval_s: float = 600.0
+    monthly_report_last_day: int = 7
 
     # Rate limits per minute (docs/adr/0035): emailed codes and phone sign-in per IP; writes and
     # reads per account, or per IP without one. `rate_limit_proxy_hops`: proxies in front of the API

@@ -38,6 +38,14 @@ class Host(Base):
     # Where the host's share of each sale is paid (docs/adr/0013). None: not paid yet.
     payout_address: Mapped[str | None] = mapped_column(String(42))
     created_at: Mapped[datetime] = _now()
+    # The monthly report (docs/adr/0046): the previous month's certificate, issued and emailed as
+    # a PDF to these contacts in the first days of each month, when the host opted in.
+    monthly_report: Mapped[bool] = mapped_column(default=False, server_default=text("false"))
+    report_emails: Mapped[list[str]] = mapped_column(
+        ARRAY(String(254)), default=list, server_default=text("'{}'")
+    )
+    # Kilograms the host means to recover each month, across its sites (docs/adr/0046).
+    monthly_goal_kg: Mapped[int | None] = mapped_column(Integer)
 
 
 class Site(Base):
@@ -65,6 +73,8 @@ class Site(Base):
         ForeignKey("collection_center.id"), index=True
     )
     created_at: Mapped[datetime] = _now()
+    # Kilograms this site means to recover each month (docs/adr/0046).
+    monthly_goal_kg: Mapped[int | None] = mapped_column(Integer)
 
 
 class Device(Base):

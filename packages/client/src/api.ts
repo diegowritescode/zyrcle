@@ -68,6 +68,37 @@ export interface HostDashboard extends DailySeries {
   sites: (SiteRef & { totals: Totals })[];
 }
 
+/** One month of a host or a site: credited kilograms and the people who recycled. */
+export interface MonthFigures {
+  period: string;
+  kg: number;
+  participants: number;
+}
+
+/** A site against its goal, this month and the last months (GET /v1/hosts/{id}/progress). */
+export interface SiteProgress extends MonthFigures {
+  id: string;
+  name: string;
+  goal_kg: number | null;
+  kg_per_participant: number | null;
+  progress_pct: number | null;
+  months: MonthFigures[];
+}
+
+/** A host's goals and the comparison between its sites (docs/adr/0046). `period` is this month,
+ * still running. */
+export interface HostProgress {
+  host: HostRef;
+  timezone: string;
+  period: string;
+  goal_kg: number | null;
+  kg: number;
+  participants: number;
+  progress_pct: number | null;
+  months: MonthFigures[];
+  sites: SiteProgress[];
+}
+
 /** A host's impact certificate for a month (docs/adr/0027). */
 export interface Certificate {
   id: string;
@@ -516,6 +547,9 @@ export function createApi(baseUrl: string) {
     stats: () => call<Totals>("/v1/stats"),
     hosts: () => call<HostSummary[]>("/v1/hosts"),
     hostCertificates: (hostId: string) => call<Certificate[]>(`/v1/hosts/${hostId}/certificates`),
+    hostProgress: (hostId: string, months = 6) => call<HostProgress>(`/v1/hosts/${hostId}/progress?months=${months}`),
+    /** The certificate as a PDF with a QR to its verification page (docs/adr/0046): a link, not a call. */
+    certificatePdfUrl: (id: string) => `${baseUrl}/v1/certificates/${id}/pdf`,
     certificate: (id: string) => call<Certificate>(`/v1/certificates/${id}`),
     hostDashboard: (hostId: string, days = 14) =>
       call<HostDashboard>(`/v1/hosts/${hostId}/dashboard?days=${days}`),

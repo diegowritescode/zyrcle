@@ -255,6 +255,32 @@ test("an impact certificate is anchored with its IPFS copy and anyone can verify
   await expect(desk.getByRole("link", { name: "Ver y verificar" }).first()).toBeVisible();
 });
 
+test("the host gets its certificate as a PDF every month, a goal per site, and its GreenMetric figures", async () => {
+  // ADR 0046. The PDF anyone can download, the same one the monthly report emails.
+  const certificates = await (await fetch(`${API}/v1/operator/certificates`, { headers: ops() })).json();
+  const pdf = await fetch(`${API}/v1/certificates/${certificates[0].id}/pdf`);
+  expect(pdf.headers.get("content-type")).toBe("application/pdf");
+  expect(Buffer.from(await pdf.arrayBuffer()).subarray(0, 4).toString()).toBe("%PDF");
+
+  await desk.goto(`${WEB}/console`, { waitUntil: "networkidle" });
+  await desk.getByRole("tab", { name: "Certificados" }).click();
+  await desk.getByRole("combobox", { name: "Anfitrión del informe" }).click();
+  await desk.getByRole("option", { name: "Universidad Demo Zyrcle" }).click();
+  await desk.getByLabel("Enviar cada mes el certificado del mes anterior").check();
+  await desk.getByLabel(/Correos que lo reciben/).fill("sostenibilidad@demo.example");
+  await desk.getByLabel("Meta de Campus Norte (kg)").fill("1");
+  await desk.getByRole("button", { name: "Guardar" }).click();
+  await expect(desk.getByText("Guardado: el informe llega el próximo mes")).toBeVisible();
+  const workbook = desk.waitForEvent("download");
+  await desk.getByRole("button", { name: "Descargar Excel" }).click();
+  expect((await workbook).suggestedFilename()).toMatch(/^zyrcle-greenmetric-universidad-demo-zyrcle-\d{4}\.xlsx$/);
+
+  await desk.goto(`${WEB}/sites`, { waitUntil: "networkidle" });
+  const comparison = desk.getByRole("table", { name: "Comparación entre sedes" });
+  await expect(comparison.getByRole("row", { name: /Campus Norte/ })).toContainText("% de 1 kg");
+  expect(await overflow(desk)).toBe(0);
+});
+
 test("a campus merchant charges with a QR, a participant pays from the phone, and the merchant redeems for pesos", async ({ browser }) => {
   test.setTimeout(240_000);
   const shop = await phone(browser, errors, "shop");

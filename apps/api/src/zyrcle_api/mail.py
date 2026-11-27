@@ -12,6 +12,7 @@ import logging
 import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import httpx
 from sqlalchemy import or_, select
@@ -52,19 +53,36 @@ class ResendMail:
         self._sender = sender
 
     async def send(
-        self, *, to: str, subject: str, text: str, html_body: str, idempotency_key: str
+        self,
+        *,
+        to: str,
+        subject: str,
+        text: str,
+        html_body: str,
+        idempotency_key: str,
+        attachments: list[dict[str, str]] | None = None,
     ) -> str:
+        payload: dict[str, Any] = {
+            "from": self._sender,
+            "to": [to],
+            "subject": subject,
+            "text": text,
+            "html": html_body,
+        }
+        if attachments:
+            payload["attachments"] = [
+                {
+                    "filename": a["filename"],
+                    "content": a["content_b64"],
+                    "content_type": a["content_type"],
+                }
+                for a in attachments
+            ]
         try:
             r = await self._http.post(
                 self._url,
                 headers={**self._headers, "Idempotency-Key": idempotency_key},
-                json={
-                    "from": self._sender,
-                    "to": [to],
-                    "subject": subject,
-                    "text": text,
-                    "html": html_body,
-                },
+                json=payload,
             )
         except httpx.HTTPError as e:
             raise MailUnavailable(f"{type(e).__name__}: {e}") from None
@@ -84,9 +102,17 @@ class LogMail:
     """Local development: log emails instead of sending them (settings.email_log_only)."""
 
     async def send(
-        self, *, to: str, subject: str, text: str, html_body: str, idempotency_key: str
+        self,
+        *,
+        to: str,
+        subject: str,
+        text: str,
+        html_body: str,
+        idempotency_key: str,
+        attachments: list[dict[str, str]] | None = None,
     ) -> str:
-        log.warning("email to %s: %s\n%s", to, subject, text)
+        files = ", ".join(a["filename"] for a in attachments or [])
+        log.warning("email to %s: %s%s\n%s", to, subject, f" [{files}]" if files else "", text)
         return f"log-{idempotency_key}"
 
 
@@ -113,8 +139,10 @@ async def enqueue_email(
     text: str,
     html_body: str,
     now: datetime,
+    attachments: list[dict[str, str]] | None = None,
 ) -> None:
-    """Add an email to the outbox, once per `dedupe_key`. Commits with the caller's transaction."""
+    """Add an email to the outbox, once per `dedupe_key`. Commits with the caller's transaction.
+    `attachments` are `{filename, content_type, content_b64}`."""
     await db.execute(
         insert(EmailMessage)
         .values(
@@ -128,12 +156,18 @@ async def enqueue_email(
             status="pending",
             next_attempt_at=now,
             created_at=now,
+            attachments=attachments,
         )
         .on_conflict_do_nothing(index_elements=["dedupe_key"])
     )
 
 
-def render_html(title: str, paragraphs: list[str], code: str | None = None) -> str:
+CODE_FOOTER = "Zyrcle nunca te va a pedir este código ni tu contraseña por teléfono, chat o correo."
+
+
+def render_html(
+    title: str, paragraphs: list[str], code: str | None = None, footer: str = CODE_FOOTER
+) -> str:
     """A plain, mobile-friendly email body. Text is escaped; `code` is shown large."""
     parts = [
         f'<p style="margin:0 0 16px;font-size:16px;line-height:1.5">{html.escape(p)}</p>'
@@ -151,8 +185,7 @@ def render_html(title: str, paragraphs: list[str], code: str | None = None) -> s
         '<p style="margin:0 0 24px;font-size:20px;font-weight:700;color:#10B981">Zyrcle</p>'
         f'<h1 style="margin:0 0 16px;font-size:20px">{html.escape(title)}</h1>'
         + "".join(parts)
-        + '<p style="margin:24px 0 0;font-size:13px;color:#64748B">Zyrcle nunca te va a pedir '
-        "este código ni tu contraseña por teléfono, chat o correo.</p></div>"
+        + f'<p style="margin:24px 0 0;font-size:13px;color:#64748B">{html.escape(footer)}</p></div>'
     )
 
 
@@ -202,6 +235,7 @@ class EmailWorker:
                 text=m.text_body,
                 html_body=m.html_body,
                 idempotency_key=str(m.id),
+                attachments=m.attachments,
             )
         except MailUnavailable as e:
             if m.attempts >= MAX_ATTEMPTS:
@@ -223,5 +257,8 @@ class EmailWorker:
     @staticmethod
     def _finish(m: EmailMessage, status: str, error: str | None) -> None:
         m.status, m.last_error, m.next_attempt_at = status, error, None
+        # A PDF can be made again from its source (GET /v1/certificates/{id}/pdf); the outbox does
+        # not keep a copy of every one sent.
+        m.attachments = None
         if m.kind in CODE_KINDS:
             m.subject, m.text_body, m.html_body = "Código de Zyrcle", "", ""

@@ -20,6 +20,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from .base import Base, _now
 
 CERTIFICATE_STATUSES = ("issued", "anchored", "failed")
+MONTHLY_REPORT_STATUSES = ("waiting", "sent", "empty", "failed")
 
 
 class Certificate(Base):
@@ -78,3 +79,30 @@ class ImpactClaim(Base):
     certificate_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("certificate.id"), index=True)
     grams: Mapped[int] = mapped_column(Integer)
     created_at: Mapped[datetime] = _now()
+
+
+class MonthlyReport(Base):
+    """A host's report for a month (docs/adr/0046), made once in the first days of the next:
+
+    waiting (certificate issued, its anchor pending) -> sent (emailed with the PDF) | failed;
+    empty: nothing sold that month, so no certificate and no email.
+    """
+
+    __tablename__ = "monthly_report"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN (" + ", ".join(f"'{s}'" for s in MONTHLY_REPORT_STATUSES) + ")",
+            name="monthly_report_status_valid",
+        ),
+        CheckConstraint("period ~ '^[0-9]{4}-[0-9]{2}$'", name="monthly_report_period_valid"),
+        Index("one_report_per_host_month", "host_id", "period", unique=True),
+    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
+    host_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("host.id"))
+    period: Mapped[str] = mapped_column(String(7))  # YYYY-MM, local time
+    status: Mapped[str] = mapped_column(String(16))
+    certificate_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("certificate.id"))
+    recipients: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    last_error: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = _now()
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

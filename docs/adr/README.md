@@ -71,6 +71,7 @@ code format. If a number in the code changes how money, weight or trust is handl
 | [0043](0043-android-builds-on-the-mac.md) | Android builds run on Diego's Mac, with EAS's own runner and Expo's signing key | accepted 2026-11-25 | Diego decided to build on the Mac; Claude chose how; Diego confirmed it |
 | [0044](0044-api-dependencies-locked.md) | The API image installs a lock file, with exact versions and hashes | proposed 2026-11-27 | Diego asked for it first; Claude chose how |
 | [0045](0045-merchant-accounting-export.md) | Merchants export their charges and redemptions for their bookkeeping | proposed 2026-11-27 | Claude (block 4, M21) |
+| [0046](0046-host-monthly-report-goals-and-rankings.md) | Hosts get a monthly certificate without asking, goals per site, and ranking figures | proposed 2026-11-27 | Claude (block 4, M20) |
 
 Records 0016 to 0024 describe decisions taken before this log existed. They were written on
 2026-11-22 from the code, the commit history and the conversations, and keep the date each decision

@@ -16,6 +16,7 @@ timeline
     2026-11-24 : Block 4 starts - M18 participant and M19 collector built
     2026-11-25 : APKs built on Diego's Mac : M18 and M19 deployed (00:55 UTC on the 26th)
     2026-11-26 : Sentry DSNs placed : One-minute API outage from sentry-sdk 3, fixed by a version cap : A phone's push fixed by a restart; Cuenta shows the registration
+    2026-11-27 : The API's dependencies locked : A version code per APK : M21 merchant export and M20 host report, goals and ranking figures built
 ```
 
 ## 2025: the hackathon
@@ -242,6 +243,28 @@ from the Mac) and the app were fine. A restart of the phone fixed it; the token 
 and a deposit's payment push arrived. The app had said "Activadas" the whole time, because it shows
 the OS permission, and the failure only reached the console. Cuenta now shows whether the phone is
 registered, or which step failed and why, with a retry button and a report to Sentry (`9e69e26`).
+
+## 2026-11-27: one block overnight
+
+Diego asked for the remaining work in one block, in the order Claude proposed, and went to sleep.
+On the branch `block4-m20-m21`:
+
+- **The API's dependencies are locked** ([ADR 0044](adr/0044-api-dependencies-locked.md)). The
+  image had taken the newest release of every Python library, which is how sentry-sdk 3 crashed
+  the API the day before. `apps/api/requirements.txt` now pins all of them with their hashes, at
+  the versions production ran (checked against the running image with `pip freeze`), and
+  `scripts/lock.sh` updates it on purpose.
+- **Each APK gets its own version code.** EAS raises it on every build, Cuenta shows it as
+  "compilación N", and Sentry receives it with each report.
+- **M21:** merchants export their charges and redemptions as Excel or CSV, from the app and the
+  console ([ADR 0045](adr/0045-merchant-accounting-export.md)).
+- **M20:** hosts that opt in get the previous month's certificate by email, as a PDF with a QR, in
+  the first days of each month; goals per site with a comparison on the host's panel; and an Excel
+  workbook for UI GreenMetric's Waste questionnaire
+  ([ADR 0046](adr/0046-host-monthly-report-goals-and-rankings.md)).
+
+M22 (the collection center's portal) waits for a center that wants it, and M23 (removing the old
+`residence` routes) for Diego to confirm that no phone runs an older APK.
 
 ## Where the old things are
 

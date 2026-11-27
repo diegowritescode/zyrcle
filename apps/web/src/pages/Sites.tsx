@@ -6,6 +6,7 @@ import { Footer } from "@/components/layout/Footer";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { IoTDashboard, type DashboardData } from "@/components/dashboard/IoTDashboard";
 import { CertificateList } from "@/components/dashboard/CertificateList";
+import { GoalsAndSites } from "@/components/dashboard/GoalsAndSites";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { useHosts } from "@/hooks/useHosts";
@@ -79,6 +80,7 @@ const Sites = () => {
                             {data ? (
                                 <>
                                     <IoTDashboard data={data} onSite={pick} />
+                                    {siteId === null && host && <GoalsAndSites hostId={host.id} />}
                                     {siteId === null && host && <CertificateList hostId={host.id} />}
                                 </>
                             ) : failed ? (

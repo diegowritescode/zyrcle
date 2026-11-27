@@ -24,6 +24,7 @@ from .impact_routes import router as impact_router
 from .ipfs import PinataPin
 from .live import LiveHub
 from .mail import EmailWorker, LogMail, ResendMail
+from .monthly_reports import MonthlyReportWorker
 from .mqtt import MqttBridge
 from .notifications import ExpoPush, NotificationWorker
 from .observability import start_error_reports
@@ -34,6 +35,7 @@ from .payouts import PayoutWorker
 from .public import router as public_router
 from .ratelimit import RateLimitMiddleware
 from .recovery_worker import RecoveryWorker
+from .report_routes import router as report_router
 from .sale_routes import router as sale_router
 from .sessions import SessionService
 from .settlement import SettlementWorker
@@ -214,6 +216,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             tasks.append(
                 asyncio.create_task(_every(settings.email_interval_s, emails.run_once, "emails"))
             )
+            reports = MonthlyReportWorker(maker, settings, app.state.impact)
+            app.state.monthly_reports = reports
+            tasks.append(
+                asyncio.create_task(
+                    _every(settings.monthly_report_interval_s, reports.run_once, "monthly-reports")
+                )
+            )
         try:
             yield
         finally:
@@ -249,6 +258,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(operator_router)
     app.include_router(impact_router)
     app.include_router(payment_router)
+    app.include_router(report_router)
     if settings.demo_simulator_url:
         from .demo import router as demo_router
 

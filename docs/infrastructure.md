@@ -476,6 +476,9 @@ has none). Unknown variables are ignored. "Default" means the column is not set 
 | `ZYRCLE_PINATA_JWT` | none | `${PINATA_JWT:-}` | yes | Pinata JWT. With it, each impact certificate is pinned on IPFS before anchoring and its CID goes on chain; without it, certificates are anchored without a copy ([ADR 0027, amendment](adr/0027-impact-certificates.md#amendments)). |
 | `ZYRCLE_PINATA_API_URL` | `https://api.pinata.cloud` | default | no | Pinata API base URL. |
 | `ZYRCLE_IPFS_GATEWAY` | `https://gateway.pinata.cloud/ipfs/` | default | no | Where browsers read the copy (`ipfs_url`). Change it together with the web image's `VITE_IPFS_GATEWAY` and the `connect-src` of `apps/web/security-headers.conf`. |
+| `ZYRCLE_PUBLIC_WEB_URL` | `https://zyrcle.deviego.xyz` | default | no | The web app's address, for the verification page in a certificate's PDF and in the monthly report's email ([ADR 0046](adr/0046-host-monthly-report-goals-and-rankings.md)). |
+| `ZYRCLE_MONTHLY_REPORT_INTERVAL_S` | `600.0` | default | no | How often the monthly report worker looks. It runs only with email on. |
+| `ZYRCLE_MONTHLY_REPORT_LAST_DAY` | `7` | default | no | The last day of a month on which the worker still makes the previous month's reports. |
 | `ZYRCLE_EMAIL_INTERVAL_S` | `1.0` | default | no | Email worker interval. |
 | `ZYRCLE_EMAIL_LOG_ONLY` | `false` | not set | no | Local development only: write emails to the log. |
 | `ZYRCLE_CORS_ORIGINS` | empty | `https://${WEB_HOST}` | no | Comma-separated browser origins allowed to call the API. |

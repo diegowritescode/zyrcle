@@ -24,6 +24,8 @@ dependencies = [
   "sentry-sdk[fastapi]>=2.40,<3",
   "anthropic>=2.12",
   "openpyxl>=3.1",
+  # The monthly certificate's PDF, with its QR (ADR 0046).
+  "reportlab>=5.1",
   "zyrcle-protocol",
 ]
 

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { CheckCircle2, Download, ExternalLink, Leaf, Loader2, Printer, ShieldCheck, XCircle } from "lucide-react";
+import { CheckCircle2, Download, ExternalLink, FileDown, Leaf, Loader2, Printer, ShieldCheck, XCircle } from "lucide-react";
 import { MATERIALS, kg, type Certificate } from "@zyrcle/client";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
@@ -121,6 +121,11 @@ const CertificatePage = () => {
                                         </Button>
                                         <Button variant="outline" onClick={() => window.print()}>
                                             <Printer className="h-4 w-4 mr-1" /> Imprimir
+                                        </Button>
+                                        <Button variant="outline" asChild>
+                                            <a href={api.certificatePdfUrl(c.id)} target="_blank" rel="noreferrer">
+                                                <FileDown className="h-4 w-4 mr-1" /> PDF con QR
+                                            </a>
                                         </Button>
                                         <Button variant="outline" onClick={() => downloadCsv(c)}>
                                             <Download className="h-4 w-4 mr-1" /> Depósitos (CSV)

@@ -12,6 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { CertificatePreview } from "@/console/api";
 import { useConsole } from "@/console/context";
 import { failed } from "@/console/format";
+import { API_URL } from "@/lib/config";
+import { HostReporting } from "./HostReporting";
 import { Empty, Loading, Section, Stat } from "./shared";
 
 const ALL = "all";
@@ -115,6 +117,7 @@ export function Certificates() {
                     )
                 )}
             </Section>
+            <HostReporting />
             <Section title="Certificados emitidos">
                 {!list.data ? <Loading /> : list.data.length === 0 ? <Empty>Aún no hay certificados.</Empty> : (
                     <ul className="divide-y divide-gray-100">
@@ -123,7 +126,10 @@ export function Certificates() {
                                 <span className="font-medium text-eco-forest">{c.host.name}{c.site ? ` · ${c.site.name}` : ""} · {c.period}</span>
                                 <span className="text-sm text-eco-forest/80">{kgOf(c.grams)} · {kgOf(c.co2e_g)} CO₂e · {c.deposits} depósitos</span>
                                 <Badge variant={c.status === "anchored" ? "default" : "outline"}>{c.status === "anchored" ? "Anclado" : c.status === "issued" ? "Anclando…" : "Error"}</Badge>
-                                <Link to={`/certificates/${c.id}`} className="text-sm font-medium text-eco-emerald hover:underline">Ver</Link>
+                                <span className="flex gap-3">
+                                    <Link to={`/certificates/${c.id}`} className="text-sm font-medium text-eco-emerald hover:underline">Ver</Link>
+                                    <a href={`${API_URL}/v1/certificates/${c.id}/pdf`} target="_blank" rel="noreferrer" className="text-sm font-medium text-eco-emerald hover:underline">PDF</a>
+                                </span>
                             </li>
                         ))}
                     </ul>

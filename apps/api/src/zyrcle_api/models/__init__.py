@@ -36,8 +36,10 @@ from .deposits import (
 )
 from .impact import (
     CERTIFICATE_STATUSES,
+    MONTHLY_REPORT_STATUSES,
     Certificate,
     ImpactClaim,
+    MonthlyReport,
 )
 from .messaging import (
     EMAIL_STATUSES,
@@ -123,6 +125,8 @@ __all__ = [
     "INCIDENT_KINDS",
     "INCIDENT_STATUSES",
     "ImpactClaim",
+    "MONTHLY_REPORT_STATUSES",
+    "MonthlyReport",
     "Incident",
     "LINE_STATUSES",
     "MaterialPrice",

@@ -6,7 +6,7 @@ who are new to the codebase.
 
 The code is the source of truth: [`models/`][models] and the migrations in
 [`migrations/versions/`][versions]. If this document and the code disagree, the code wins, and this
-document needs a fix. This document describes the schema at migration `0017`: 37 tables, plus
+document needs a fix. This document describes the schema at migration `0018`: 38 tables, plus
 Alembic's own.
 
 ## Contents
@@ -393,6 +393,8 @@ erDiagram
     site |o--o{ certificate : "one site, or the whole host"
     certificate ||--o{ impact_claim : "claims"
     deposit_session ||--o{ impact_claim : "claimed once per attribute"
+    host ||--o{ monthly_report : "one per month"
+    certificate |o--o{ monthly_report : "emailed as a PDF"
     resident ||--o| merchant : "named merchant"
     host |o--o{ merchant : "campus"
     resident ||--o{ payment_request : "merchant_id, payer_id"
@@ -478,6 +480,9 @@ sites ([ADR 0011][adr-0011], [ADR 0013][adr-0013]).
 | `kind` | varchar(16) | no | `university`, `residential`, `business` or `public`. |
 | `payout_address` | varchar(42) | yes | Where the host's share of each sale is paid. Null until an operator sets it. While it is null, the host's part of a sale waits. |
 | `created_at` | timestamptz | no | Default `now()`. |
+| `monthly_report` | boolean | no | Default false. The host gets the previous month's certificate by email in the first days of each month ([ADR 0046][adr-0046]). Since migration `0018`. |
+| `report_emails` | varchar(254)[] | no | Default `{}`. Who receives the monthly report, normalized, at most ten; at least one while `monthly_report` is on. |
+| `monthly_goal_kg` | integer | yes | Kilograms the host means to recover each month, across its sites. Null: no goal. |
 
 - `host_kind_valid`: CHECK on `kind`.
 
@@ -504,6 +509,7 @@ building, a residential complex. It was the `residence` table until migration `0
 | `slot_capacity` | smallint | no | Default 20. Participants per container per hour ([ADR 0009][adr-0009]). |
 | `center_id` | uuid | yes | FK → `collection_center.id`: the center this site sells to. Its price sizes the advances of the site's deposits ([ADR 0037][adr-0037]). Null: the general table. Since migration `0014`. |
 | `created_at` | timestamptz | no | |
+| `monthly_goal_kg` | integer | yes | Kilograms this site means to recover each month ([ADR 0046][adr-0046]). Null: no goal. Since migration `0018`. |
 
 - `site_hours_valid`: `0 <= opens_hour AND opens_hour < closes_hour AND closes_hour <= 24`. The
   booking code assumes a non-empty window inside one day.
@@ -1171,6 +1177,30 @@ A host's (or one site's) certificate for a month.
 - `certificate_host_period_idx` on `(host_id, period)`; `certificate_due_idx` on
   `(status, next_attempt_at)`, the anchor worker's claim query.
 
+#### `monthly_report`
+
+A host's monthly report ([ADR 0046][adr-0046]): one row per host and month, made in the first days
+of the next month by the `MonthlyReportWorker` in [`monthly_reports.py`][monthly-reports]. Since
+migration `0018`.
+
+| Column | Type | Null | Meaning |
+|---|---|---|---|
+| `id` | uuid | no | Primary key. |
+| `host_id` | uuid | no | FK → `host.id`. |
+| `period` | varchar(7) | no | `YYYY-MM`, local time. |
+| `status` | varchar(16) | no | `waiting` (certificate issued, anchor pending), `sent`, `empty` (nothing sold that month: no certificate, no email) or `failed` (anchor failed, or no email left on the host). |
+| `certificate_id` | uuid | yes | FK → `certificate.id`. Null when `empty`. |
+| `recipients` | integer | no | Default 0. Emails enqueued when it was sent. |
+| `last_error` | text | yes | Why it failed. |
+| `created_at` | timestamptz | no | |
+| `sent_at` | timestamptz | yes | |
+
+- `monthly_report_status_valid`, `monthly_report_period_valid`.
+- `one_report_per_host_month` (unique) on `(host_id, period)`: a report is made once.
+
+**Written by:** [`monthly_reports.py`][monthly-reports]. **Read by:** `GET /v1/operator/hosts/{id}/reporting`
+in [`report_routes.py`][report-routes].
+
 #### `impact_claim`
 
 The claim ledger: one environmental attribute of one deposit, claimed once.
@@ -1458,8 +1488,8 @@ through Resend's HTTP API ([ADR 0010][adr-0010]).
 | Column | Type | Null | Meaning |
 |---|---|---|---|
 | `id` | uuid | no | Primary key. Also the `Idempotency-Key` sent to Resend. |
-| `kind` | varchar(32) | no | `code_verify`, `code_recover`, `code_operator`, `recovery_started`, `recovery_cancelled`, `recovery_done`, or `alert` (a health warning to each active admin, [ADR 0028][adr-0028]). |
-| `dedupe_key` | varchar(120) | no | Unique. For example `code:<email_code id>`, `code_operator:<operator_code id>`, `recovery_started:<recovery id>` or `alert:<warning kind>:<day>:<email>` (at most one per kind, day and admin). |
+| `kind` | varchar(32) | no | `code_verify`, `code_recover`, `code_operator`, `recovery_started`, `recovery_cancelled`, `recovery_done`, `alert` (a health warning to each active admin, [ADR 0028][adr-0028]), or `monthly_report` (a host's certificate with its PDF, [ADR 0046][adr-0046]). |
+| `dedupe_key` | varchar(120) | no | Unique. For example `code:<email_code id>`, `code_operator:<operator_code id>`, `recovery_started:<recovery id>`, `alert:<warning kind>:<day>:<email>` (at most one per kind, day and admin) or `monthly-report:<report id>:<email>`. |
 | `to` | varchar(254) | no | Recipient. `to` is an SQL keyword: quote it in raw SQL. |
 | `subject` | varchar(200) | no | Subject. |
 | `text_body` | text | no | Plain-text body. |
@@ -1471,6 +1501,7 @@ through Resend's HTTP API ([ADR 0010][adr-0010]).
 | `last_error` | text | yes | |
 | `created_at` | timestamptz | no | |
 | `sent_at` | timestamptz | yes | |
+| `attachments` | jsonb | yes | Files sent with it, `[{filename, content_type, content_b64}]`: the monthly report's PDF ([ADR 0046][adr-0046]). Cleared when the row ends `sent` or `failed`. Since migration `0018`. |
 
 - `email_message_dedupe_key_key` (unique): enqueueing is `INSERT … ON CONFLICT (dedupe_key) DO
   NOTHING`.
@@ -1532,7 +1563,7 @@ enqueued only for an active operator's address.
 ### 3.8 `alembic_version`
 
 Alembic's own bookkeeping table. One row, `version_num varchar(32)`, holds the current revision
-(`0017`).
+(`0018`).
 
 ## 4. State machines
 
@@ -1910,10 +1941,11 @@ Until a worker runs, its rows stay `pending`.
 | [`0015`][m0015] | 2026-11-23 | `ticket_scan`. | [ADR 0038][adr-0038] |
 | [`0016`][m0016] | 2026-11-23 | `bank_statement`, `bank_line`. | [ADR 0039][adr-0039] |
 | [`0017`][m0017] | 2026-11-24 | `merchant.site_id`, `place`, `hours`, `offer`; `collection.fill_after_mm`; `collector.host_id`; both foreign keys. | [ADR 0041][adr-0041], [ADR 0042][adr-0042] |
+| [`0018`][m0018] | 2026-11-27 | `host.monthly_report`, `report_emails`, `monthly_goal_kg`; `site.monthly_goal_kg`; `email_message.attachments`; `monthly_report`. | [ADR 0046][adr-0046] |
 
 In production, `0005` to `0009` went out with block 1 of v1 (2026-11-22), `0010` to `0013` with
 block 2 and `0014` to `0016` with block 3 (both 2026-11-23) ([history](history.md)). `0017`
-belongs to block 4 (M18 and M19) and is not in production yet. The dates in
+(block 4, M18 and M19) went out on 2026-11-26. `0018` (block 4, M20) is not in production yet. The dates in
 the table are the `Create Date` lines of the migration files. Every migration has a downgrade.
 Downgrades drop the tables and columns their upgrade added, so the data in them is lost.
 
@@ -1937,10 +1969,10 @@ Downgrades drop the tables and columns their upgrade added, so the data in them 
 3. **Generate the migration.** Revision ids are sequential four-digit strings.
 
    ```bash
-   .venv/bin/alembic revision --autogenerate --rev-id 0017 -m "what changes"
+   .venv/bin/alembic revision --autogenerate --rev-id 0019 -m "what changes"
    ```
 
-   This writes `migrations/versions/0017_what_changes.py`.
+   This writes `migrations/versions/0019_what_changes.py`.
 
 4. **Review it by hand.** Autogenerate is a draft.
    - It does not detect CHECK constraints. Add `op.create_check_constraint(...)` and
@@ -2074,6 +2106,8 @@ Found on 2026-11-22 by comparing the code with its comments, docstrings and ADRs
 [bank]: ../apps/api/src/zyrcle_api/bank.py
 [bank-routes]: ../apps/api/src/zyrcle_api/bank_routes.py
 [impact]: ../apps/api/src/zyrcle_api/impact.py
+[monthly-reports]: ../apps/api/src/zyrcle_api/monthly_reports.py
+[report-routes]: ../apps/api/src/zyrcle_api/report_routes.py
 [payments]: ../apps/api/src/zyrcle_api/payments.py
 [payment-routes]: ../apps/api/src/zyrcle_api/payment_routes.py
 [health]: ../apps/api/src/zyrcle_api/health.py
@@ -2104,6 +2138,7 @@ Found on 2026-11-22 by comparing the code with its comments, docstrings and ADRs
 [m0015]: ../apps/api/migrations/versions/0015_ticket_scans.py
 [m0016]: ../apps/api/migrations/versions/0016_bank_statements.py
 [m0017]: ../apps/api/migrations/versions/0017_participant_and_collector.py
+[m0018]: ../apps/api/migrations/versions/0018_monthly_reports_and_goals.py
 [adr-0002]: adr/0002-own-avalanche-l1.md
 [adr-0003]: adr/0003-advance-and-settlement.md
 [adr-0005]: adr/0005-device-link-mqtt.md
@@ -2128,3 +2163,4 @@ Found on 2026-11-22 by comparing the code with its comments, docstrings and ADRs
 [adr-0040]: adr/0040-keys-guardian-and-multisig.md
 [adr-0041]: adr/0041-participant-timeline-impact-and-where-to-spend.md
 [adr-0042]: adr/0042-collector-fill-alerts-and-earnings.md
+[adr-0046]: adr/0046-host-monthly-report-goals-and-rankings.md

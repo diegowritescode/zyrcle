@@ -40,6 +40,9 @@ Every file in `src/zyrcle_api/` belongs to one row. Modules were split by respon
 | `tickets.py`, `ticket_routes.py` | The scale ticket read from a photo with Claude ([ADR 0038](../../docs/adr/0038-reading-scale-tickets-with-ai.md)): structured output, arithmetic checks, proposed bags; a person confirms. Off without an Anthropic key |
 | `bank.py`, `bank_routes.py` | The bank statement ([ADR 0039](../../docs/adr/0039-bank-statement-matching.md)): CSV or Excel parsed (pure), each movement proposed for a sale or a redemption with a score, matched with one click |
 | `impact.py`, `impact_routes.py`, `domain/impact.py` | Impact certificates ([ADR 0027](../../docs/adr/0027-impact-certificates.md)): monthly per host or site, sold material only, EPA WARM v16 factors, the claim ledger, the Merkle root and the worker that anchors it on chain |
+| `certificate_pdf.py`, `monthly_reports.py` | A certificate as a one-page PDF with a QR to its verification page, and the worker that issues each opted-in host's certificate in the first days of the month and emails the PDF once it is anchored ([ADR 0046](../../docs/adr/0046-host-monthly-report-goals-and-rankings.md)) |
+| `host_reports.py`, `report_routes.py` | A host's progress against its monthly goals with the comparison between sites, the yearly UI GreenMetric workbook, and the operator routes for the report's settings and the goals ([ADR 0046](../../docs/adr/0046-host-monthly-report-goals-and-rankings.md)) |
+| `filenames.py` | Names for the files the API hands out |
 | `payments.py`, `payment_routes.py` | Campus merchants ([ADR 0029](../../docs/adr/0029-closed-loop-payments.md)): charges with a QR, the payer's signed `Execute` checked and relayed with the guardian key (deploying the account if needed), redemptions of ZYR for pesos settled or refunded by the operator; the public list of where to spend ([ADR 0041](../../docs/adr/0041-participant-timeline-impact-and-where-to-spend.md)) |
 | `merchant_export.py` | A merchant's charges and redemptions for a range of local days, as CSV or Excel, for their bookkeeping ([ADR 0045](../../docs/adr/0045-merchant-accounting-export.md)) |
 | `health.py` | Health report for the console and admin email alerts ([ADR 0028](../../docs/adr/0028-pilot-readiness.md)): outboxes, devices, broker, chain head, Treasury, gas of the hot keys. A quiet chain is not a stalled one: it warns only when work has waited as long as the last block is old, and asks the node's `/ext/health` (amendment) |
@@ -84,7 +87,9 @@ cp .env.example .env                             # fill in the two secrets
 
 Optional services stay off until their key is set: `ZYRCLE_RESEND_API_KEY` (or
 `ZYRCLE_EMAIL_LOG_ONLY=true`) for email, `ZYRCLE_PINATA_JWT` for the certificates' IPFS copy,
-`ZYRCLE_ANTHROPIC_API_KEY` for reading tickets, `ZYRCLE_SENTRY_DSN` for error reports. Every
+`ZYRCLE_ANTHROPIC_API_KEY` for reading tickets, `ZYRCLE_SENTRY_DSN` for error reports. The
+monthly report ([ADR 0046](../../docs/adr/0046-host-monthly-report-goals-and-rankings.md)) runs
+with email on. Every
 setting is in [`config.py`](src/zyrcle_api/config.py).
 
 ## Tests
