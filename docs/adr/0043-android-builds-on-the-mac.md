@@ -61,3 +61,14 @@ public, so anyone could sign an "update" of Zyrcle with it.
   Sentry can tell two such builds apart. Raising the number per build is open.
 - The Play Store's `.aab` (profile `production`) can be built the same way when the store comes
   (roadmap M7); the script accepts only `preview` and `development` until then.
+
+## Amendments
+- **2026-11-27, Claude (a version code per build):** the open item above is closed. Diego asked to
+  do it on 2026-11-27, second in the order Claude proposed ("continuemos con tu orden en un bloque
+  grande"). The `preview` and `development` profiles have `autoIncrement`, so EAS raises the
+  remote version code (`appVersionSource: remote`) on every build, the local ones included: the
+  first build after the change, from `46b63c8`, got version code 2. `build-apk.sh` prints it,
+  Cuenta shows it as "compilación N" (through `expo-application`), and each Sentry report carries
+  it as its `dist`. Android installs a higher version code over a lower one as before; it refuses a
+  lower one, so an older APK no longer installs over a newer one. Waiting for Diego's
+  confirmation.

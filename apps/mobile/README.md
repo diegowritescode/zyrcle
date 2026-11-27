@@ -79,6 +79,11 @@ environment's variables and the signing key Expo keeps, so the APK installs over
 the phones. No cloud build is spent. It takes about 8 minutes and leaves
 `dist-apk/zyrcle-<profile>-<commit>.apk`.
 
+Each build gets the next version code, which EAS keeps (2 was the first, on 2026-11-27). The script
+prints it, Cuenta shows it at the bottom as "compilación N", and Sentry receives it with each report.
+Android refuses to install a lower version code over a higher one, so an older APK no longer
+replaces a newer one.
+
 The script stops before building when `apps/mobile` or `packages/` have uncommitted changes, and
 after building when the APK is not signed with Expo's key, lacks Firebase's app ID (no push) or
 carries native code for anything but the two ARM families. An APK signed with any other key would
