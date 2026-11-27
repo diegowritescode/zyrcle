@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { pesos, shortHex } from "@zyrcle/client";
+import * as Application from "expo-application";
 import * as Clipboard from "expo-clipboard";
 import Constants from "expo-constants";
 import * as WebBrowser from "expo-web-browser";
@@ -109,7 +110,10 @@ export default function Account() {
       </Card>
 
       <Button title="Crear otra cuenta de prueba" variant="outline" icon={<KeyRound color={colors.forest} size={18} />} onPress={reset} />
-      <Muted style={{ textAlign: "center" }}>Zyrcle {Constants.expoConfig?.version ?? ""}</Muted>
+      <Muted style={{ textAlign: "center" }}>
+        Zyrcle {Constants.expoConfig?.version ?? ""}
+        {Application.nativeBuildVersion ? ` · compilación ${Application.nativeBuildVersion}` : ""}
+      </Muted>
     </Screen>
   );
 }

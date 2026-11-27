@@ -68,8 +68,11 @@ if [[ "$abis" != "arm64-v8a armeabi-v7a " ]]; then
   echo "native code for '$abis', expected only arm64-v8a and armeabi-v7a (ADR 0015)" >&2
   exit 1
 fi
+badging="$("$tools/aapt2" dump badging "$apk")"
+version_code="$(sed -n "s/.*versionCode='\([0-9]*\)'.*/\1/p" <<<"$badging")"
 echo
 echo "APK:          $apk ($(du -h "$apk" | cut -f1))"
+echo "Version code: $version_code (EAS raises it on every build; Cuenta shows it as \"compilación\")"
 echo "Commit:       $sha"
 echo "Processors:   $abis"
 echo "Signed with:  Expo's key, $expected_key"

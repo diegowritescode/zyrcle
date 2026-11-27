@@ -1,5 +1,6 @@
 import * as Sentry from "@sentry/react-native";
 import { scrubReport } from "@zyrcle/client";
+import * as Application from "expo-application";
 import Constants from "expo-constants";
 import { SENTRY_DSN } from "./config";
 
@@ -17,6 +18,8 @@ export function startErrorReports(): boolean {
   Sentry.init({
     dsn: SENTRY_DSN,
     release: `zyrcle@${Constants.expoConfig?.version ?? "dev"}`,
+    // The Android version code, one per build (ADR 0043, amendment): which APK sent the report.
+    dist: Application.nativeBuildVersion ?? undefined,
     // Nothing about the person leaves the phone (this SDK still uses sendDefaultPii); scrubReport
     // cleans the rest.
     sendDefaultPii: false,
