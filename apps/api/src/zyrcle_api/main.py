@@ -262,5 +262,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             allow_origins=settings.cors_origin_list,
             allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
             allow_headers=["Authorization", "Content-Type"],
+            # The file name of an export (docs/adr/0045), which a browser hides from scripts
+            # on another origin unless it is listed.
+            expose_headers=["Content-Disposition"],
         )
     return app

@@ -94,6 +94,21 @@ export function Pill({ label, tone = "ok" }: { label: string; tone?: keyof typeo
   );
 }
 
+/** One choice among a few, such as a day or a period; the selected one is filled. */
+export function Chip({ label, hint, selected, onPress }: { label: string; hint?: string; selected: boolean; onPress: () => void }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      onPress={onPress}
+      style={[styles.chip, selected && styles.chipSelected]}
+    >
+      <Text style={[styles.chipText, selected && { color: colors.white }]}>{label}</Text>
+      {hint && <Text style={[styles.chipHint, selected && { color: "rgba(255,255,255,0.85)" }]}>{hint}</Text>}
+    </Pressable>
+  );
+}
+
 export function Notice({ text, tone = "danger" }: { text: string; tone?: "danger" | "warn" | "info" }) {
   const palette =
     tone === "danger"
@@ -123,6 +138,19 @@ export function IconBadge({ children, size = 48 }: { children: ReactNode; size?:
 }
 
 const styles = StyleSheet.create({
+  chip: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.white,
+    borderRadius: radius.md,
+    paddingHorizontal: space(3),
+    paddingVertical: space(2),
+    minHeight: 44,
+    justifyContent: "center",
+  },
+  chipSelected: { backgroundColor: colors.emerald, borderColor: colors.emerald },
+  chipText: { fontSize: 14, fontWeight: "600", color: colors.forestDark },
+  chipHint: { fontSize: 11, color: colors.muted, marginTop: 1 },
   title: { fontSize: 28, fontWeight: "700", color: colors.forestDark, letterSpacing: -0.3 },
   heading: { fontSize: 18, fontWeight: "600", color: colors.forest },
   body: { fontSize: 15, lineHeight: 22, color: colors.textSoft },

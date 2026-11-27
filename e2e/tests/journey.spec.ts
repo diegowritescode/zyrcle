@@ -6,6 +6,7 @@
  *
  * The steps build on each other and run in order.
  */
+import { readFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
 import { API, Errors, MOB, SERVICES, WEB, emailCode, openPage, ops, overflow, phone, rpc, sleep } from "./helpers";
 
@@ -306,6 +307,17 @@ test("a campus merchant charges with a QR, a participant pays from the phone, an
   await expect(desk.getByText("Pagado", { exact: true }).first()).toBeVisible();
   await expect(shop.page.getByText("Pagado en pesos")).toBeVisible();
   expect(await overflow(shop.page)).toBe(0);
+
+  // The bookkeeping export, from the app and from the console (ADR 0045).
+  const fromApp = shop.page.waitForEvent("download");
+  await shop.page.getByRole("button", { name: "Descargar en Excel" }).click();
+  expect((await fromApp).suggestedFilename()).toMatch(/^zyrcle-cafeteria-central-\d{4}-\d{2}-01-a-\d{4}-\d{2}-\d{2}\.xlsx$/);
+  const fromConsole = desk.waitForEvent("download");
+  await desk.getByRole("button", { name: "Exportar en CSV: Cafetería Central" }).click();
+  const csv = await readFile((await (await fromConsole).path())!, "utf8");
+  expect(csv).toMatch(/,Cobro,pagado,2500,Almuerzo,/);
+  expect(csv).toMatch(/,Canje,transferido,2000,Canje de ZYR por pesos,/);
+  expect(csv).toContain(",Cafetería Central,900123456-7");
 
   // Participants find it in "Dónde gastar", on the phone and on the web (ADR 0041).
   await customer.page.goto(`${MOB}/spend`, { waitUntil: "networkidle" });

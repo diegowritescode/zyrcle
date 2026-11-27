@@ -1,10 +1,11 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { dateTime, paymentErrorMessage, pesos, type Payment, type Redemption } from "@zyrcle/client";
-import { Banknote, Plus } from "lucide-react-native";
+import { dateTime, exportPeriods, paymentErrorMessage, pesos, type ExportFormat, type Payment, type Redemption } from "@zyrcle/client";
+import { Banknote, FileSpreadsheet, Plus } from "lucide-react-native";
 import { useState } from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
 import { api } from "@/lib/api";
-import { Body, Button, Card, Heading, Muted, Notice, Pill } from "@/ui/kit";
+import { handOver } from "@/lib/handOver";
+import { Body, Button, Card, Chip, Heading, Muted, Notice, Pill } from "@/ui/kit";
 import { QrCode } from "@/ui/QrCode";
 import { Screen } from "@/ui/Screen";
 import { colors, radius, space } from "@/ui/theme";
@@ -29,6 +30,9 @@ export default function Shop() {
   const [current, setCurrent] = useState<Payment | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const periods = exportPeriods(new Date());
+  const [period, setPeriod] = useState(periods[0].label);
+  const [exporting, setExporting] = useState<ExportFormat | null>(null);
   const home = useQuery({ queryKey: ["merchant", token], queryFn: () => api.merchant(token!), enabled: token !== null, refetchInterval: 3_000 });
   const live = home.data?.charges.find((c) => c.id === current?.id) ?? current;
 
@@ -58,6 +62,20 @@ export default function Shop() {
       await api.signRedemption(token!, intent.id, await signExecute(intent.typed_data));
       setRedeem("");
     });
+
+  /** Charges and redemptions for the bookkeeping (docs/adr/0045). */
+  const download = async (format: ExportFormat) => {
+    setExporting(format);
+    setError(null);
+    try {
+      const chosen = periods.find((p) => p.label === period) ?? periods[0];
+      await handOver(await api.merchantExport(token!, chosen, format));
+    } catch (e) {
+      setError(paymentErrorMessage(e));
+    } finally {
+      setExporting(null);
+    }
+  };
 
   if (home.isError) {
     return (
@@ -113,6 +131,18 @@ export default function Shop() {
           </View>
         ))}
       </Card>
+
+      <Card style={{ gap: space(3) }}>
+        <Heading>Para tu contabilidad</Heading>
+        <Muted>Tus cobros pagados y tus cambios a pesos, con tu NIT, las referencias y las transacciones.</Muted>
+        <View style={styles.chips}>
+          {periods.map((p) => (
+            <Chip key={p.label} label={p.label} hint={`${p.start.slice(5)} a ${p.end.slice(5)}`} selected={p.label === period} onPress={() => setPeriod(p.label)} />
+          ))}
+        </View>
+        <Button title="Descargar en Excel" icon={<FileSpreadsheet color={colors.white} size={18} />} loading={exporting === "xlsx"} disabled={exporting !== null} onPress={() => download("xlsx")} />
+        <Button title="Descargar en CSV" variant="outline" loading={exporting === "csv"} disabled={exporting !== null} onPress={() => download("csv")} />
+      </Card>
     </Screen>
   );
 }
@@ -128,6 +158,7 @@ const styles = StyleSheet.create({
     color: colors.forestDark,
     backgroundColor: colors.white,
   },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: space(2) },
   row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: space(2), paddingVertical: space(1) },
   rowText: { flex: 1, fontSize: 15, color: colors.forestDark },
 });

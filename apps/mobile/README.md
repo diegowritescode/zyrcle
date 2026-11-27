@@ -15,7 +15,7 @@ SIWE message through [`@zyrcle/client`](../../packages/client).
 | Cuenta | The account address, the recovery email, "¿Perdiste tu teléfono anterior?", notifications, network, links, and (testnet) a new account |
 | Recolección | For collectors only ([ADR 0012](../../docs/adr/0012-collection-and-bags.md)): open a container, scan a bag, take one material out while the container's scale weighs it, residue, close; seal full bags; the containers fullest first and what each collection paid ([ADR 0042](../../docs/adr/0042-collector-fill-alerts-and-earnings.md)). Reached from Cuenta |
 | Pagar | Pay a campus merchant's QR from the account: the phone signs, the backend relays and pays the gas ([ADR 0029](../../docs/adr/0029-closed-loop-payments.md)). Reached from Escanear |
-| Comercio | For merchants only: charge with a QR, see payments, and turn ZYR into pesos. Reached from Cuenta |
+| Comercio | For merchants only: charge with a QR, see payments, turn ZYR into pesos, and export the movements for their bookkeeping as Excel or CSV through the share sheet ([ADR 0045](../../docs/adr/0045-merchant-accounting-export.md)). Reached from Cuenta |
 | Recuperar tu cuenta | Bring an older account to this phone with the code sent to its recovery email ([ADR 0010](../../docs/adr/0010-smart-accounts-and-recovery.md)) |
 
 ## Wallet and account

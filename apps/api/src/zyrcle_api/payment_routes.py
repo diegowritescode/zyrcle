@@ -1,12 +1,15 @@
 """Paying merchants and redeeming ZYR (docs/adr/0029): participants, merchants and operators."""
 
 import uuid
+from datetime import date
 from typing import Annotated, Any, Literal
+from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import or_, select
 
+from . import auth, merchant_export
 from .chain import load_account_file
 from .deps import Operator, Resident
 from .errors import SessionError
@@ -116,6 +119,48 @@ async def sign_redemption(
         raise _http(e) from None
 
 
+ExportFormat = Annotated[merchant_export.Format, Query(alias="format")]
+
+
+async def _export(
+    request: Request, merchant_id: uuid.UUID, start: date, end: date, fmt: str, operator: bool
+) -> Response:
+    """The accounting export (docs/adr/0045). A merchant the operator switched off still gets
+    theirs: the movements happened, and the bookkeeping needs them."""
+    async with request.app.state.maker() as db:
+        merchant = await db.get(Merchant, merchant_id)
+        if merchant is None:
+            if operator:
+                raise HTTPException(404, {"code": "not_found", "detail": "unknown merchant"})
+            raise HTTPException(403, {"code": "forbidden", "detail": "only merchants can do this"})
+        try:
+            out = await merchant_export.export(
+                db,
+                merchant,
+                start,
+                end,
+                fmt,
+                ZoneInfo(request.app.state.settings.timezone),
+                auth.utcnow(),
+            )
+        except ValueError as e:
+            raise HTTPException(422, {"code": "invalid", "detail": str(e)}) from None
+    return Response(
+        out.content,
+        media_type=out.media_type,
+        headers={"Content-Disposition": f'attachment; filename="{out.filename}"'},
+    )
+
+
+@router.get("/merchant/export")
+async def export_mine(
+    resident: Resident, request: Request, start: date, end: date, fmt: ExportFormat = "csv"
+) -> Response:
+    """The merchant's own charges and redemptions from `start` to `end` (local dates, both
+    included), as CSV or Excel."""
+    return await _export(request, resident, start, end, fmt, operator=False)
+
+
 # ---------------------------------------------------------------- operator
 
 
@@ -197,6 +242,19 @@ async def list_merchants(_: Operator, request: Request) -> list[dict[str, Any]]:
             .order_by(Merchant.name)
         )
         return [merchant_view(m, r) for m, r in rows]
+
+
+@router.get("/operator/merchants/{resident_id}/export")
+async def export_for_operator(
+    resident_id: uuid.UUID,
+    _: Operator,
+    request: Request,
+    start: date,
+    end: date,
+    fmt: ExportFormat = "csv",
+) -> Response:
+    """The same export as the merchant's, from the console."""
+    return await _export(request, resident_id, start, end, fmt, operator=True)
 
 
 @router.get("/merchants")

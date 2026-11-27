@@ -1,6 +1,6 @@
 /** The operator API (docs/adr/0014), used only by the console. Participants' calls live in
  * packages/client. Every call carries the operator's session token. */
-import type { Bag, Certificate, Collection, Redemption, Session } from "@zyrcle/client";
+import { exportQuery, type Bag, type Certificate, type Collection, type DownloadedFile, type ExportFormat, type Period, type Redemption, type Session } from "@zyrcle/client";
 import { API_URL } from "@/lib/config";
 
 export class OperatorApiError extends Error {
@@ -263,6 +263,24 @@ export function operatorApi(token: string | null, onUnauthorized: () => void) {
         return body as T;
     }
 
+    /** A file the API sends as an attachment, with the name it gave it (docs/adr/0045). */
+    async function file(path: string): Promise<DownloadedFile> {
+        let res: Response;
+        try {
+            res = await fetch(`${API_URL}${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+        } catch {
+            throw new OperatorApiError(0, "No hay conexión con el servidor de Zyrcle.");
+        }
+        if (!res.ok) {
+            if (res.status === 401 && token) onUnauthorized();
+            const body = await res.json().catch(() => ({}));
+            const detail = body?.detail?.detail ?? body?.detail ?? res.statusText;
+            throw new OperatorApiError(res.status, typeof detail === "string" ? detail : JSON.stringify(detail), body?.detail?.code);
+        }
+        const name = /filename="([^"]+)"/.exec(res.headers.get("Content-Disposition") ?? "")?.[1] ?? "zyrcle-export";
+        return { name, type: res.headers.get("Content-Type") ?? "application/octet-stream", bytes: new Uint8Array(await res.arrayBuffer()) };
+    }
+
     return {
         requestCode: (email: string) => call<{ sent_to: string; resend_in_s: number }>("/v1/operator/login/code", json("POST", { email })),
         login: (email: string, code: string) => call<{ token: string; operator: OperatorAccount }>("/v1/operator/login", json("POST", { email, code })),
@@ -319,6 +337,8 @@ export function operatorApi(token: string | null, onUnauthorized: () => void) {
 
         merchants: () => call<MerchantRow[]>("/v1/operator/merchants"),
         nameMerchant: (body: MerchantIn) => call<MerchantRow>("/v1/operator/merchants", json("POST", body)),
+        merchantExport: (residentId: string, period: Period, format: ExportFormat) =>
+            file(`/v1/operator/merchants/${residentId}/export?${exportQuery(period, format)}`),
         redemptions: (status?: string) => call<OperatorRedemption[]>(`/v1/operator/redemptions${status ? `?status=${status}` : ""}`),
         settleRedemption: (id: string, bank_ref: string) => call<Redemption>(`/v1/operator/redemptions/${id}/settle`, json("POST", { bank_ref })),
         refundRedemption: (id: string) => call<Redemption>(`/v1/operator/redemptions/${id}/refund`, json("POST")),

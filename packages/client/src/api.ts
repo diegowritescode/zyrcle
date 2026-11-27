@@ -447,6 +447,25 @@ const post = (body?: unknown): RequestInit => ({
 });
 
 /** Everything the apps call, bound to one API base URL. */
+/** A file the API sent: what `merchantExport` returns. */
+export interface DownloadedFile {
+  name: string;
+  type: string;
+  bytes: Uint8Array;
+}
+
+export type ExportFormat = "csv" | "xlsx";
+
+/** Local days, both included, as YYYY-MM-DD. */
+export interface Period {
+  start: string;
+  end: string;
+}
+
+export function exportQuery(period: Period, format: ExportFormat): string {
+  return new URLSearchParams({ start: period.start, end: period.end, format }).toString();
+}
+
 export function createApi(baseUrl: string) {
   async function call<T>(path: string, init: RequestInit = {}, token?: string): Promise<T> {
     let res: Response;
@@ -462,16 +481,32 @@ export function createApi(baseUrl: string) {
       throw new ApiError(0, "No hay conexión con el servidor de Zyrcle.");
     }
     const body = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      const detail = body?.detail?.detail ?? body?.detail ?? res.statusText;
-      if (res.status === 429 && body?.detail?.code === "rate_limited") throw new ApiError(429, TOO_FAST, "rate_limited");
-      throw new ApiError(
-        res.status,
-        typeof detail === "string" ? detail : JSON.stringify(detail),
-        body?.detail?.code,
-      );
-    }
+    if (!res.ok) fail(res, body);
     return body as T;
+  }
+
+  function fail(res: Response, body: { detail?: { detail?: string; code?: string } | string }): never {
+    const detail = (typeof body?.detail === "object" ? body.detail.detail : undefined) ?? body?.detail ?? res.statusText;
+    const code = typeof body?.detail === "object" ? body.detail.code : undefined;
+    if (res.status === 429 && code === "rate_limited") throw new ApiError(429, TOO_FAST, "rate_limited");
+    throw new ApiError(res.status, typeof detail === "string" ? detail : JSON.stringify(detail), code);
+  }
+
+  /** A file the API sends as an attachment (an export): its bytes and the name the API gave it. */
+  async function file(path: string, token: string): Promise<DownloadedFile> {
+    let res: Response;
+    try {
+      res = await fetch(`${baseUrl}${path}`, { headers: { Authorization: `Bearer ${token}` } });
+    } catch {
+      throw new ApiError(0, "No hay conexión con el servidor de Zyrcle.");
+    }
+    if (!res.ok) fail(res, await res.json().catch(() => ({})));
+    const name = /filename="([^"]+)"/.exec(res.headers.get("Content-Disposition") ?? "")?.[1];
+    return {
+      name: name ?? path.split("?")[0].split("/").pop() ?? "zyrcle",
+      type: res.headers.get("Content-Type") ?? "application/octet-stream",
+      bytes: new Uint8Array(await res.arrayBuffer()),
+    };
   }
 
   const api = {
@@ -544,6 +579,10 @@ export function createApi(baseUrl: string) {
       call<{ id: string; typed_data: TypedExecute }>("/v1/merchant/redemptions", post({ amount_cop }), token),
     signRedemption: (token: string, id: string, signed: SignedExecute) =>
       call<Redemption>(`/v1/merchant/redemptions/${id}/sign`, post(signed), token),
+    /** Charges and redemptions from `start` to `end` (YYYY-MM-DD, both included) for the
+     * merchant's bookkeeping (docs/adr/0045). */
+    merchantExport: (token: string, period: Period, format: ExportFormat) =>
+      file(`/v1/merchant/export?${exportQuery(period, format)}`, token),
 
     demo: {
       containers: () => call<DemoContainer[]>("/v1/demo/containers"),

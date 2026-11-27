@@ -231,7 +231,8 @@ environment variable named `ZYRCLE_` plus the setting's name in capitals.
 
 [`main.py`](../apps/api/src/zyrcle_api/main.py) adds CORS only when `ZYRCLE_CORS_ORIGINS` is set
 (comma-separated). It allows those origins, the methods `GET POST PUT PATCH DELETE` and the headers
-`Authorization` and `Content-Type`. It does not allow credentials (cookies); the API does not use
+`Authorization` and `Content-Type`, and lets scripts read `Content-Disposition`, the file name of
+an export ([ADR 0045](adr/0045-merchant-accounting-export.md)). It does not allow credentials (cookies); the API does not use
 them. Production allows `https://zyrcle.deviego.xyz`. For the web app on your machine, set
 `ZYRCLE_CORS_ORIGINS=http://localhost:8080` ([`apps/web/README.md`](../apps/web/README.md)). The
 Expo app makes native requests and does not need CORS.
@@ -576,6 +577,7 @@ All routes need a participant JWT, except the two sign-in routes.
 | `POST /v1/merchant/charges` | 201 | merchants only: charge with a QR | [0029](adr/0029-closed-loop-payments.md) |
 | `POST /v1/merchant/redemptions` | 201 | merchants only: start turning ZYR into pesos | [0029](adr/0029-closed-loop-payments.md) |
 | `POST /v1/merchant/redemptions/{redemption_id}/sign` | 200 | merchants only: sign that redemption | [0029](adr/0029-closed-loop-payments.md) |
+| `GET /v1/merchant/export` | 200 | merchants only: charges and redemptions for the bookkeeping, CSV or Excel | [0045](adr/0045-merchant-accounting-export.md) |
 
 #### Sign-in
 
@@ -820,7 +822,8 @@ The phone signs an EIP-712 `Execute` for its own smart account; the backend rela
 #### Merchants (participants with the role)
 
 A participant JWT whose participant an operator named a merchant (`POST /v1/operator/merchants`).
-The first three answer `403 forbidden` to anyone else, an inactive merchant included; signing works
+The first three answer `403 forbidden` to anyone else, an inactive merchant included (the export
+does not); signing works
 only on your own redemption (404 otherwise), and a second signature returns it unchanged.
 
 | Method and path | Body | Returns |
@@ -829,6 +832,7 @@ only on your own redemption (404 otherwise), and a second signature returns it u
 | `POST /v1/merchant/charges` | `{amount_cop, concept?}`: 1 to 1,000,000 pesos, a concept up to 120 characters | 201, the charge with its QR `zyrcle://p/<id>`, valid 10 minutes |
 | `POST /v1/merchant/redemptions` | `{amount_cop}`: 1 to 100,000,000 | 201, `{id, typed_data}`: an `Execute` that sends that ZYR to the Treasury's `redeem(ref)` |
 | `POST /v1/merchant/redemptions/{id}/sign` | `{signature, deadline, nonce}` | The redemption, `requested`; the relay worker puts it on chain (`pending`). 403 if the signature is not from this phone's key |
+| `GET /v1/merchant/export?start=&end=&format=` | | A file, `csv` (the default) or `xlsx`, with `Content-Disposition: attachment; filename="zyrcle-<merchant>-<start>-a-<end>.<format>"`: one row per paid charge (dated when paid) and per redemption whose ZYR left the account (`pending`, `settled`, `refunded`; dated when requested), with date, type, status, pesos, concept, reference, transaction, transfer date, bank reference, closing transaction, name and NIT. `start` and `end` are local days (`ZYRCLE_TIMEZONE`), both included, at most 366 days apart. Excel adds a header and totals; CSV is UTF-8 with a byte order mark. Text that starts like a formula is never one ([ADR 0045](adr/0045-merchant-accounting-export.md)). 403 for non-merchants; an inactive merchant still gets theirs. 422 for a backwards or too long range |
 
 ### 3.4 Collector
 
@@ -984,6 +988,7 @@ them are under `/v1/operator`.
 | `GET /v1/operator/sales/{sale_id}` | 200 | a sale with its settlement report | [0013](adr/0013-sale-and-settlement.md) |
 | `POST /v1/operator/merchants` | 201 | name (or update) a merchant | [0029](adr/0029-closed-loop-payments.md) |
 | `GET /v1/operator/merchants` | 200 | every merchant | [0029](adr/0029-closed-loop-payments.md) |
+| `GET /v1/operator/merchants/{resident_id}/export` | 200 | a merchant's bookkeeping export | [0045](adr/0045-merchant-accounting-export.md) |
 | `GET /v1/operator/redemptions` | 200 | redemptions, by status | [0029](adr/0029-closed-loop-payments.md) |
 | `POST /v1/operator/redemptions/{redemption_id}/settle` | 200 | the pesos were transferred | [0029](adr/0029-closed-loop-payments.md) |
 | `POST /v1/operator/redemptions/{redemption_id}/refund` | 200 | give the ZYR back instead | [0029](adr/0029-closed-loop-payments.md) |
@@ -1218,6 +1223,7 @@ The worker runs only when the chain and `ZYRCLE_OPERATOR_KEY_FILE` are configure
 |---|---|---|
 | `POST /v1/operator/merchants` | `{address, name, nit, host_id?, active?, site_id?, place?, hours?, offer?}`: the participant's account address or phone key; the last four say where participants find it ([ADR 0041](adr/0041-participant-timeline-impact-and-where-to-spend.md)) | 201, `{resident_id, address, name, nit, host_id, active, site_id, place, hours, offer}`, also when it updates an existing merchant (every field is replaced; blank texts become null). The NIT is the KYC reference, checked off line. 404 if nobody signed in with that address, or for an unknown host; 422 if the site is not the merchant's host's |
 | `GET /v1/operator/merchants` | | Every merchant, by name, in the same shape |
+| `GET /v1/operator/merchants/{resident_id}/export?start=&end=&format=` | | The same file as `GET /v1/merchant/export` for that merchant. 404 for an unknown one |
 | `GET /v1/operator/redemptions` | `?status=` (`requested`, `pending`, `settled`, `refunded` or `failed`) | The last 100 redemptions, newest first, with merchant name and NIT. Redemptions still `signing` are left out |
 | `POST /v1/operator/redemptions/{id}/settle` | `{bank_ref}` | The pesos were transferred: `settleRedemption` on chain lowers `backing` and retires the ZYR. 409 unless `pending`; 503 without the Treasury operator key |
 | `POST /v1/operator/redemptions/{id}/refund` | | `refundRedemption` returns the ZYR to the merchant's account. 503 without the Treasury operator key |

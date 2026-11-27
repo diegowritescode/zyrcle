@@ -9,7 +9,7 @@ import { api } from "@/lib/api";
 import { REMINDER_MINUTES } from "@/lib/notifications";
 import { useNotifications } from "@/notifications/context";
 import { confirm } from "@/ui/confirm";
-import { Body, Button, Card, Heading, IconBadge, Muted, Notice, Pill, Title } from "@/ui/kit";
+import { Body, Button, Card, Chip, Heading, IconBadge, Muted, Notice, Pill, Title } from "@/ui/kit";
 import { Screen } from "@/ui/Screen";
 import { colors, radius, space } from "@/ui/theme";
 import { useWallet } from "@/wallet/context";
@@ -221,20 +221,6 @@ function BookingRow({ booking: b, today, onCancel }: { booking: Booking; today: 
   );
 }
 
-function Chip({ label, hint, selected, onPress }: { label: string; hint?: string; selected: boolean; onPress: () => void }) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected }}
-      onPress={onPress}
-      style={[styles.chip, selected && styles.chipSelected]}
-    >
-      <Text style={[styles.chipText, selected && { color: colors.white }]}>{label}</Text>
-      {hint && <Text style={[styles.chipHint, selected && { color: "rgba(255,255,255,0.85)" }]}>{hint}</Text>}
-    </Pressable>
-  );
-}
-
 function SlotCell({ slot, saving, onPress }: { slot: Slot; saving: boolean; onPress: () => void }) {
   const left = slot.capacity - slot.taken;
   const note = slot.mine ? "Tu turno" : left <= 0 ? "Lleno" : `${left} ${left === 1 ? "cupo" : "cupos"}`;
@@ -271,19 +257,6 @@ function SlotCell({ slot, saving, onPress }: { slot: Slot; saving: boolean; onPr
 const styles = StyleSheet.create({
   label: { fontSize: 13, fontWeight: "600", color: colors.textSoft, textTransform: "uppercase", letterSpacing: 0.4 },
   chips: { gap: space(2), paddingRight: space(2) },
-  chip: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.white,
-    borderRadius: radius.md,
-    paddingHorizontal: space(3),
-    paddingVertical: space(2),
-    minHeight: 44,
-    justifyContent: "center",
-  },
-  chipSelected: { backgroundColor: colors.emerald, borderColor: colors.emerald },
-  chipText: { fontSize: 14, fontWeight: "600", color: colors.forestDark },
-  chipHint: { fontSize: 11, color: colors.muted, marginTop: 1 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: space(2) },
   cell: {
     width: "31.5%",

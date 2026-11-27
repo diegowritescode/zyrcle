@@ -285,6 +285,12 @@ change was built on the Mac and installed on Diego's phone the same day.
 ### M21. Merchant
 - **Accounting export:** charges and redemptions for a date range, with tax id, references and
   transactions, as CSV and Excel, from the app and from the console.
+- **Built** ([ADR 0045](adr/0045-merchant-accounting-export.md), proposed 2026-11-27, not
+  deployed): `GET /v1/merchant/export` and `GET /v1/operator/merchants/{id}/export`, CSV or Excel,
+  one row per paid charge and per redemption whose ZYR left the account, in Bogotá's days. The
+  merchant screen of the app has "Para tu contabilidad" (this month, last month, this year), which
+  hands the file to the phone's share sheet; the console's merchant list exports any range. The
+  phone needs the next APK (`expo-sharing`).
 
 ### M22. Collection center portal
 - **What:** the center's staff sign in with an email code, like operators. They register a purchase

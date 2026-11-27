@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { accountErrorMessage, ApiError, bookingErrorMessage, startErrorMessage } from "./api";
+import { accountErrorMessage, ApiError, bookingErrorMessage, createApi, startErrorMessage } from "./api";
 
 describe("error messages", () => {
   it("explains a closed container with its hours", () => {
@@ -75,5 +75,43 @@ describe("rate limits", () => {
     } finally {
       globalThis.fetch = original;
     }
+  });
+});
+
+describe("merchantExport", () => {
+  const respond = (body: BodyInit, answer: ResponseInit) => {
+    const calls: { url: string; init?: RequestInit }[] = [];
+    globalThis.fetch = (async (url: string, init?: RequestInit) => {
+      calls.push({ url, init });
+      return new Response(body, answer);
+    }) as typeof fetch;
+    return calls;
+  };
+
+  it("downloads the bytes with the name the API gave the file", async () => {
+    const calls = respond("﻿Fecha\r\n", {
+      headers: {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": 'attachment; filename="zyrcle-cafe-2026-11-01-a-2026-11-30.csv"',
+      },
+    });
+    const { api } = createApi("https://api.test");
+    const file = await api.merchantExport("tok", { start: "2026-11-01", end: "2026-11-30" }, "csv");
+    expect(calls[0].url).toBe("https://api.test/v1/merchant/export?start=2026-11-01&end=2026-11-30&format=csv");
+    expect(calls[0].init?.headers).toEqual({ Authorization: "Bearer tok" });
+    expect(file.name).toBe("zyrcle-cafe-2026-11-01-a-2026-11-30.csv");
+    expect(file.type).toBe("text/csv; charset=utf-8");
+    // The byte order mark arrives too (a plain TextDecoder would drop it from the text).
+    expect(new TextDecoder("utf-8", { ignoreBOM: true }).decode(file.bytes)).toBe("﻿Fecha\r\n");
+  });
+
+  it("turns the API's refusal into an ApiError", async () => {
+    respond(JSON.stringify({ detail: { code: "forbidden", detail: "only merchants can do this" } }), { status: 403 });
+    const { api } = createApi("https://api.test");
+    await expect(api.merchantExport("tok", { start: "2026-11-01", end: "2026-11-30" }, "xlsx")).rejects.toMatchObject({
+      status: 403,
+      code: "forbidden",
+      message: "only merchants can do this",
+    });
   });
 });

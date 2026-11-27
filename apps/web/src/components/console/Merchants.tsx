@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { dateTime, pesos, shortHex } from "@zyrcle/client";
-import { Banknote, Pencil, Store, Undo2 } from "lucide-react";
+import { dateTime, exportPeriods, pesos, shortHex, type ExportFormat } from "@zyrcle/client";
+import { Banknote, FileSpreadsheet, Pencil, Store, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import type { MerchantRow, OperatorRedemption } from "@/console/api";
 import { useConsole } from "@/console/context";
 import { failed } from "@/console/format";
+import { saveFile } from "@/lib/saveFile";
 import { Empty, Loading, Section } from "./shared";
 
 const NONE = "none";
@@ -99,6 +100,11 @@ function MerchantList() {
     const hosts = useQuery({ queryKey: ["op", "hosts"], queryFn: api.hosts });
     const sites = useQuery({ queryKey: ["op", "sites"], queryFn: api.sites });
     const [form, setForm] = useState(EMPTY_FORM);
+    const [period, setPeriod] = useState(() => {
+        const { start, end } = exportPeriods(new Date())[0];
+        return { start, end };
+    });
+    const [exporting, setExporting] = useState<string | null>(null);
     const set = (field: keyof typeof EMPTY_FORM) => (value: string) => setForm((f) => ({ ...f, [field]: value }));
     const hostSites = (sites.data ?? []).filter((s) => s.host_id === form.hostId);
     const editing = list.data?.some((m) => m.address.toLowerCase() === form.address.trim().toLowerCase());
@@ -120,6 +126,17 @@ function MerchantList() {
             await queryClient.invalidateQueries({ queryKey: ["op", "merchants"] });
         } catch (e) {
             failed(e);
+        }
+    };
+    /** The merchant's charges and redemptions for their bookkeeping (docs/adr/0045). */
+    const download = async (m: MerchantRow, format: ExportFormat) => {
+        setExporting(`${m.resident_id}:${format}`);
+        try {
+            saveFile(await api.merchantExport(m.resident_id, period, format));
+        } catch (e) {
+            failed(e);
+        } finally {
+            setExporting(null);
         }
     };
     const edit = (m: MerchantRow) =>
@@ -196,6 +213,18 @@ function MerchantList() {
                 </div>
             </form>
             {!list.data ? <Loading /> : list.data.length === 0 ? <Empty>Aún no hay comercios.</Empty> : (
+                <>
+                <div className="flex flex-wrap items-end gap-2 mb-2">
+                    <div className="space-y-1">
+                        <Label htmlFor="export-start">Exportar movimientos desde</Label>
+                        <Input id="export-start" type="date" value={period.start} max={period.end} onChange={(e) => setPeriod((p) => ({ ...p, start: e.target.value }))} />
+                    </div>
+                    <div className="space-y-1">
+                        <Label htmlFor="export-end">hasta</Label>
+                        <Input id="export-end" type="date" value={period.end} min={period.start} onChange={(e) => setPeriod((p) => ({ ...p, end: e.target.value }))} />
+                    </div>
+                    <p className="text-xs text-eco-forest/60 pb-2">Cobros pagados y cambios a pesos, con NIT, referencias y transacciones, para la contabilidad del comercio.</p>
+                </div>
                 <Table>
                     <TableHeader>
                         <TableRow>
@@ -215,7 +244,13 @@ function MerchantList() {
                                     {m.host_id ? [m.place, m.hours].filter(Boolean).join(" · ") || "Sin ubicación" : "No aparece: sin campus"}
                                 </TableCell>
                                 <TableCell className="font-mono text-xs">{shortHex(m.address)}</TableCell>
-                                <TableCell className="text-right">
+                                <TableCell className="text-right space-x-1 whitespace-nowrap">
+                                    <Button size="sm" variant="outline" disabled={exporting !== null || !period.start || !period.end} onClick={() => download(m, "xlsx")} aria-label={`Exportar en Excel: ${m.name}`}>
+                                        <FileSpreadsheet className="h-3.5 w-3.5 mr-1" /> Excel
+                                    </Button>
+                                    <Button size="sm" variant="outline" disabled={exporting !== null || !period.start || !period.end} onClick={() => download(m, "csv")} aria-label={`Exportar en CSV: ${m.name}`}>
+                                        CSV
+                                    </Button>
                                     <Button size="sm" variant="outline" onClick={() => edit(m)} aria-label={`Editar ${m.name}`}>
                                         <Pencil className="h-3.5 w-3.5 mr-1" /> Editar
                                     </Button>
@@ -224,6 +259,7 @@ function MerchantList() {
                         ))}
                     </TableBody>
                 </Table>
+                </>
             )}
         </Section>
     );
