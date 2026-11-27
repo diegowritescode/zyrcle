@@ -1,10 +1,10 @@
 # ADR 0044: The API image installs a lock file, with exact versions and hashes
 
-- Status: proposed (2026-11-27)
+- Status: accepted (2026-11-27)
 - Decided by: Diego asked on 2026-11-27 to do this first, before M20 and M21, as the first item in
   the order Claude proposed ("continuemos con tu orden en un bloque grande"). Claude chose how
-  (uv, resolving inside the image's base, pip check in the build). Waiting for Diego's
-  confirmation.
+  (uv, resolving inside the image's base, pip check in the build). Diego confirmed it on
+  2026-11-27: "confirmo los adrs y autorizo unir a main y desplegar".
 
 ## Context
 `apps/api/pyproject.toml` gives each dependency a lower bound, and the Dockerfile installed them

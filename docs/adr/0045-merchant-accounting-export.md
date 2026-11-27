@@ -1,10 +1,10 @@
 # ADR 0045: Merchants export their charges and redemptions for their bookkeeping
 
-- Status: proposed (2026-11-27)
+- Status: accepted (2026-11-27)
 - Decided by: the milestone is M21 of block 4 ([ADR 0030](0030-blocks-3-and-4.md)), which Diego
   accepted with the plan. On 2026-11-27 he asked to build it in this order ("continuemos con tu
-  orden en un bloque grande"). Claude chose what goes in the file and how it is offered. Waiting for
-  Diego's confirmation.
+  orden en un bloque grande"). Claude chose what goes in the file and how it is offered. Diego
+  confirmed it on 2026-11-27: "confirmo los adrs y autorizo unir a main y desplegar".
 
 ## Context
 A campus merchant charges participants in ZYR and turns ZYR into pesos ([ADR 0029](0029-closed-loop-payments.md)).

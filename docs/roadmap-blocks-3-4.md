@@ -282,7 +282,7 @@ change was built on the Mac and installed on Diego's phone the same day.
   campaigns), each with links to the certificates as evidence. The current questionnaire is
   checked when this milestone starts. The export says what it covers: only what went through
   Zyrcle, not the institution's total waste.
-- **Built** ([ADR 0046](adr/0046-host-monthly-report-goals-and-rankings.md), proposed 2026-11-27,
+- **Built** ([ADR 0046](adr/0046-host-monthly-report-goals-and-rankings.md), accepted 2026-11-27,
   not deployed, migration `0018`): hosts opt in from the console with up to ten emails; from the
   1st to the 7th of each month a worker issues each one's certificate for the previous month and,
   once it is anchored, emails a one-page PDF with a QR to the verification page
@@ -296,7 +296,7 @@ change was built on the Mac and installed on Diego's phone the same day.
 ### M21. Merchant
 - **Accounting export:** charges and redemptions for a date range, with tax id, references and
   transactions, as CSV and Excel, from the app and from the console.
-- **Built** ([ADR 0045](adr/0045-merchant-accounting-export.md), proposed 2026-11-27, not
+- **Built** ([ADR 0045](adr/0045-merchant-accounting-export.md), accepted 2026-11-27, not
   deployed): `GET /v1/merchant/export` and `GET /v1/operator/merchants/{id}/export`, CSV or Excel,
   one row per paid charge and per redemption whose ZYR left the account, in Bogotá's days. The
   merchant screen of the app has "Para tu contabilidad" (this month, last month, this year), which

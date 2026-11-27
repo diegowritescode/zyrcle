@@ -70,5 +70,5 @@ public, so anyone could sign an "update" of Zyrcle with it.
   first build after the change, from `46b63c8`, got version code 2. `build-apk.sh` prints it,
   Cuenta shows it as "compilación N" (through `expo-application`), and each Sentry report carries
   it as its `dist`. Android installs a higher version code over a lower one as before; it refuses a
-  lower one, so an older APK no longer installs over a newer one. Waiting for Diego's
-  confirmation.
+  lower one, so an older APK no longer installs over a newer one. Diego confirmed it on
+  2026-11-27: "confirmo los adrs y autorizo unir a main y desplegar".

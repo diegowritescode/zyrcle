@@ -1,9 +1,10 @@
 # ADR 0046: Hosts get a monthly certificate without asking, goals per site, and ranking figures
 
-- Status: proposed (2026-11-27)
+- Status: accepted (2026-11-27)
 - Decided by: the milestone is M20 of block 4 ([ADR 0030](0030-blocks-3-and-4.md)), which Diego
   accepted with the plan. On 2026-11-27 he asked to build it in this order ("continuemos con tu
-  orden en un bloque grande"). Claude chose the rules below. Waiting for Diego's confirmation.
+  orden en un bloque grande"). Claude chose the rules below. Diego confirmed them on
+  2026-11-27: "confirmo los adrs y autorizo unir a main y desplegar".
 
 ## Context
 A host (the university) gets an impact certificate only when an operator issues one in the
