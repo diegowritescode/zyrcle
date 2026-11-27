@@ -4,7 +4,7 @@
 > Since that day the 2-of-3 Safe `0x607c011C6921eA75C1e38223a5E5514eDbA7E43b` holds all eight admin
 > powers of ZyrcleChain and the L1 admin key holds none. Block 4 (M18 to M23) started on
 > 2026-11-24: M18 and M19 were built with migration `0017` and deployed on 2026-11-26; M20 and M21
-> were built on 2026-11-27 (migration `0018`, not deployed); M22 and M23 are planned. v1 blocks 1 and 2 are deployed ([roadmap-v1.md](roadmap-v1.md)). Scope and order:
+> were built and deployed on 2026-11-27 (migration `0018`); M22 and M23 are planned. v1 blocks 1 and 2 are deployed ([roadmap-v1.md](roadmap-v1.md)). Scope and order:
 > [ADR 0030](adr/0030-blocks-3-and-4.md). What each milestone built is under **Built**; what
 > still waits for Diego is in [the last section of block 3](#what-block-3-still-waits-for).
 
@@ -241,7 +241,7 @@ change was built on the Mac and installed on Diego's phone the same day.
 ## Block 4: every party
 
 > M18 and M19 built on 2026-11-24 and deployed on 2026-11-26 (commit `72a875b`). M20 and M21 built
-> on 2026-11-27 on the branch `block4-m20-m21`, not deployed. M22 and M23 planned.
+> and deployed on 2026-11-27 (commit `67684e3`). M22 and M23 planned.
 
 ### M18. Participant
 - **Each deposit, step by step:** deposited, verified, collected, sold, paid, with the date and the
@@ -283,7 +283,7 @@ change was built on the Mac and installed on Diego's phone the same day.
   checked when this milestone starts. The export says what it covers: only what went through
   Zyrcle, not the institution's total waste.
 - **Built** ([ADR 0046](adr/0046-host-monthly-report-goals-and-rankings.md), accepted 2026-11-27,
-  not deployed, migration `0018`): hosts opt in from the console with up to ten emails; from the
+  deployed 2026-11-27, migration `0018`): hosts opt in from the console with up to ten emails; from the
   1st to the 7th of each month a worker issues each one's certificate for the previous month and,
   once it is anchored, emails a one-page PDF with a QR to the verification page
   (`GET /v1/certificates/{id}/pdf`, public). Goals per host and per site in the console;
@@ -296,8 +296,8 @@ change was built on the Mac and installed on Diego's phone the same day.
 ### M21. Merchant
 - **Accounting export:** charges and redemptions for a date range, with tax id, references and
   transactions, as CSV and Excel, from the app and from the console.
-- **Built** ([ADR 0045](adr/0045-merchant-accounting-export.md), accepted 2026-11-27, not
-  deployed): `GET /v1/merchant/export` and `GET /v1/operator/merchants/{id}/export`, CSV or Excel,
+- **Built** ([ADR 0045](adr/0045-merchant-accounting-export.md), accepted 2026-11-27,
+  deployed 2026-11-27): `GET /v1/merchant/export` and `GET /v1/operator/merchants/{id}/export`, CSV or Excel,
   one row per paid charge and per redemption whose ZYR left the account, in Bogotá's days. The
   merchant screen of the app has "Para tu contabilidad" (this month, last month, this year), which
   hands the file to the phone's share sheet; the console's merchant list exports any range. The

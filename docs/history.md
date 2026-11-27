@@ -16,7 +16,7 @@ timeline
     2026-11-24 : Block 4 starts - M18 participant and M19 collector built
     2026-11-25 : APKs built on Diego's Mac : M18 and M19 deployed (00:55 UTC on the 26th)
     2026-11-26 : Sentry DSNs placed : One-minute API outage from sentry-sdk 3, fixed by a version cap : A phone's push fixed by a restart; Cuenta shows the registration
-    2026-11-27 : The API's dependencies locked : A version code per APK : M21 merchant export and M20 host report, goals and ranking figures built
+    2026-11-27 : The API's dependencies locked : A version code per APK : M21 merchant export and M20 host report, goals and ranking figures built : Diego confirms ADRs 0044 to 0046; deployed at 15:08 UTC
 ```
 
 ## 2025: the hackathon
@@ -265,6 +265,14 @@ On the branch `block4-m20-m21`:
 
 M22 (the collection center's portal) waits for a center that wants it, and M23 (removing the old
 `residence` routes) for Diego to confirm that no phone runs an older APK.
+
+In the morning Diego confirmed the four decisions and approved the deploy ("confirmo los adrs y
+autorizo unir a main y desplegar"). The branch went to `main` as `67684e3`; CI and the release
+passed, and `deploy.sh` backed up the database, ran migration `0018` and started the new images at
+15:08 UTC. The API came back healthy with no errors in its log, the public progress endpoint and
+the export and workbook routes answered (the last two refuse a request without a login), and the
+web bundle carries the new screens. Production has no certificate yet, so the PDF was checked only
+in the tests. The APK with version code 2 is meant to be installed after this deploy.
 
 ## Where the old things are
 

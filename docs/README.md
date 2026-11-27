@@ -4,9 +4,10 @@ Start with the document that matches what you need. Everything here is kept curr
 (ADR 0025): a change that moves behaviour, schema, configuration or operation updates these files in
 the same commit.
 
-> Status on 2026-11-25: v1 blocks 1 and 2 (M1 to M7) and block 3 (M8 to M17) are deployed; in block
-> 4, M18 (participant) and M19 (collector) are deployed (2026-11-26, commit `72a875b`; production runs `0d41852`), and M20 to
-> M23 are planned. Production: the web app at `https://zyrcle.deviego.xyz`, the API at
+> Status on 2026-11-27: v1 blocks 1 and 2 (M1 to M7) and block 3 (M8 to M17) are deployed; in block
+> 4, M18 (participant) and M19 (collector) are deployed (2026-11-26, commit `72a875b`), M20 (host)
+> and M21 (merchant) are deployed (2026-11-27, production runs `67684e3`), and M22 and M23 are
+> planned. Production: the web app at `https://zyrcle.deviego.xyz`, the API at
 > `https://zyrcle-backend.deviego.xyz`, one VPS with Docker Compose, and ZyrcleChain v2, an
 > Avalanche L1 on Fuji whose admin powers are held by a 2-of-3 Safe.
 

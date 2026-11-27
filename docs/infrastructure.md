@@ -4,9 +4,9 @@ This document describes how Zyrcle runs in production, how it is built and relea
 operate or rebuild it. It is written for the engineer who keeps it running.
 
 > Checked against commit `fd05fa7` (2026-11-23) and the decision records up to ADR 0040.
-> Production runs the images of commit `0d41852d7d836cd2a797b5673b8c1adc0e73ef8b` (blocks 1 to 3, block 4's M18 and M19
-> and the Sentry fix, [ADR 0030](adr/0030-blocks-3-and-4.md), deployed 2026-11-26 at 05:36 UTC,
-> migration 0017).
+> Production runs the images of commit `67684e352c3f10c80bc0d2d03ddc7685af5876ae` (blocks 1 to 3,
+> block 4's M18 to M21 and the locked API dependencies, [ADR 0030](adr/0030-blocks-3-and-4.md),
+> deployed 2026-11-27 at 15:08 UTC, migration 0018).
 > Every statement comes from a file in this repository. When something is not in the repository,
 > this document says so.
 
@@ -168,8 +168,8 @@ flowchart TB
 - **Secrets.** `deploy/.env` exists only on the VPS. Private keys are files in
   `~/.avalanche-cli/key/` on the VPS ([ADR 0022](adr/0022-keys-secrets-and-production-changes.md)).
   The admin Safe's owners sign from Diego's wallets and a paper key (section 6.1).
-- **Deployed version.** The images of commit `0d41852`, run by digest since 2026-11-26 05:36 UTC;
-  the database is at migration 0017 (since 00:55 UTC the same day). `deploy/history.log` on the VPS records every deploy
+- **Deployed version.** The images of commit `67684e3`, run by digest since 2026-11-27 15:08 UTC;
+  the database is at migration 0018 (since the same deploy). `deploy/history.log` on the VPS records every deploy
   (section 8.3).
 - **Backups.** `deploy/backup.sh` runs from cron at 03:15 UTC into `~/backups/zyrcle`
   (runbook 9.10).
@@ -1482,15 +1482,6 @@ gas float has another holder (runbook 9.12).
 Each item is checked against the repository.
 
 **Data and availability**
-
-- **The API image takes the newest version of each Python dependency.** `apps/api/pyproject.toml`
-  sets lower bounds and the Dockerfile installs with `pip`, with no lock file, so a new major version
-  of a library reaches production with the next image. On 2026-11-26 sentry-sdk 3.0.1 did, and the
-  API crashed on start once its Sentry DSN was set ([ADR 0033](adr/0033-error-reports-and-uptime.md),
-  amendments). Sentry is now capped below 3. The fix for the rest is built and waits for its
-  deploy: the image installs `apps/api/requirements.txt`, exact versions with hashes, written by
-  `apps/api/scripts/lock.sh` ([ADR 0044](adr/0044-api-dependencies-locked.md)). The web and mobile
-  apps install from `package-lock.json` and are not affected.
 
 - **Off-site copies wait for their bucket.** `deploy/offsite.sh` copies the dumps, the validator
   identity, the key files and `deploy/.env` off the VPS, encrypted (runbook 9.10), and CI proves the
