@@ -4,9 +4,9 @@ This document describes how Zyrcle runs in production, how it is built and relea
 operate or rebuild it. It is written for the engineer who keeps it running.
 
 > Checked against commit `fd05fa7` (2026-11-23) and the decision records up to ADR 0040.
-> Production runs the images of commit `67684e352c3f10c80bc0d2d03ddc7685af5876ae` (blocks 1 to 3,
-> block 4's M18 to M21 and the locked API dependencies, [ADR 0030](adr/0030-blocks-3-and-4.md),
-> deployed 2026-11-27 at 15:08 UTC, migration 0018).
+> Production runs the images of commit `47e7fee0e97fba430ead76817853376f3b4d552c` (blocks 1 to 3,
+> block 4's M18 to M21 and M23, and the locked API dependencies,
+> [ADR 0030](adr/0030-blocks-3-and-4.md), deployed 2026-11-27 at 20:41 UTC, migration 0018).
 > Every statement comes from a file in this repository. When something is not in the repository,
 > this document says so.
 
@@ -168,8 +168,8 @@ flowchart TB
 - **Secrets.** `deploy/.env` exists only on the VPS. Private keys are files in
   `~/.avalanche-cli/key/` on the VPS ([ADR 0022](adr/0022-keys-secrets-and-production-changes.md)).
   The admin Safe's owners sign from Diego's wallets and a paper key (section 6.1).
-- **Deployed version.** The images of commit `67684e3`, run by digest since 2026-11-27 15:08 UTC;
-  the database is at migration 0018 (since the same deploy). `deploy/history.log` on the VPS records every deploy
+- **Deployed version.** The images of commit `47e7fee`, run by digest since 2026-11-27 20:41 UTC;
+  the database is at migration 0018 (since 15:08 UTC the same day). `deploy/history.log` on the VPS records every deploy
   (section 8.3).
 - **Backups.** `deploy/backup.sh` runs from cron at 03:15 UTC into `~/backups/zyrcle`
   (runbook 9.10).

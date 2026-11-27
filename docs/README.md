@@ -6,8 +6,8 @@ the same commit.
 
 > Status on 2026-11-27: v1 blocks 1 and 2 (M1 to M7) and block 3 (M8 to M17) are deployed; in block
 > 4, M18 (participant) and M19 (collector) are deployed (2026-11-26, commit `72a875b`), M20 (host)
-> and M21 (merchant) are deployed (2026-11-27, production runs `67684e3`), M23 (the old
-> `residence` names removed) is built and not deployed, and M22 is planned. Production: the web app at `https://zyrcle.deviego.xyz`, the API at
+> and M21 (merchant) and M23 (the old `residence` names removed) are deployed (2026-11-27,
+> production runs `47e7fee`), and M22 is planned. Production: the web app at `https://zyrcle.deviego.xyz`, the API at
 > `https://zyrcle-backend.deviego.xyz`, one VPS with Docker Compose, and ZyrcleChain v2, an
 > Avalanche L1 on Fuji whose admin powers are held by a 2-of-3 Safe.
 
