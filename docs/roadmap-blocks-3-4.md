@@ -3,8 +3,8 @@
 > Status: block 3 (M8 to M17) **done and deployed** on 2026-11-23, with migrations `0014` to `0016`.
 > Since that day the 2-of-3 Safe `0x607c011C6921eA75C1e38223a5E5514eDbA7E43b` holds all eight admin
 > powers of ZyrcleChain and the L1 admin key holds none. Block 4 (M18 to M23) started on
-> 2026-11-24: M18 and M19 are built on the branch `block4-m18-m19` with migration `0017`, not
-> deployed yet; M20 to M23 are planned. v1 blocks 1 and 2 are deployed ([roadmap-v1.md](roadmap-v1.md)). Scope and order:
+> 2026-11-24: M18 and M19 were built with migration `0017` and deployed on 2026-11-26; M20 to M23
+> are planned. v1 blocks 1 and 2 are deployed ([roadmap-v1.md](roadmap-v1.md)). Scope and order:
 > [ADR 0030](adr/0030-blocks-3-and-4.md). What each milestone built is under **Built**; what
 > still waits for Diego is in [the last section of block 3](#what-block-3-still-waits-for).
 
@@ -101,7 +101,8 @@ M17 Keys: own guardian key, admin powers behind a multisig
   tokens; no bodies, cookies, headers or user). The uptime workflow runs every 10 minutes and checks
   the API with its broker connection, the web app and the public RPC; a failure opens or updates an
   issue labelled `uptime`. It does not check that blocks are produced: a quiet chain makes none
-  (below). Error reports stay off until the DSNs are placed.
+  (below). Error reports stayed off until the DSNs were placed, which happened on 2026-11-26 for
+  the API, the web app and the APK.
 - **Also in block 3:** a false "chain stalled" alert on a quiet, healthy chain led to a health rule
   that warns only when work has waited for the chain as long as its last block is old, plus the
   node's own `/ext/health` ([ADR 0028](adr/0028-pilot-readiness.md), amendment, `d69b62c`).
@@ -225,16 +226,16 @@ M17 Keys: own guardian key, admin powers behind a multisig
 
 ### What block 3 still waits for
 
-Everything is built and deployed; these switch features on or close what code cannot:
+Everything is built and deployed; these switch features on or close what code cannot. Two items
+are done since: the Sentry DSNs were placed on 2026-11-26 (M10), and the APK with every block 3
+change was built on the Mac and installed on Diego's phone the same day.
 
 | Waits for Diego | Switches on |
 |---|---|
-| A Sentry account and its three DSNs, on the server, the repository variable and EAS | Error reports (M10) |
 | An R2 bucket with a write-only token, and an `age` key pair made on his machine | The off-site copies and the restore drill (M11) |
 | An Anthropic API key with a monthly spending limit, on the server; photos of real tickets | Reading tickets (M15) |
 | A real statement export, anonymized | Testing the statement parser on the campus's bank (M16) |
 | The guardian's own key, moved in by runbook 9.13 (now a Safe proposal) | The guardian stops sharing the oracle key (M17) |
-| A new Android build | Sentry and every block 3 change in the installed app (with M23) |
 | Legal review, Google Play, the chain for real money | The pilot with real people and pesos (v1 M7, ADR 0028) |
 
 ## Block 4: every party
@@ -299,6 +300,10 @@ Everything is built and deployed; these switch features on or close what code ca
 - **2026-11-25:** the APK is now built on Diego's Mac with `apps/mobile/scripts/build-apk.sh`, which
   spends no cloud build ([ADR 0043](adr/0043-android-builds-on-the-mac.md)). What is left from Diego
   is installing it, after the backend with M18 and M19 is deployed.
+- **2026-11-26:** the backend with M18 and M19 is deployed, and Diego installed the Mac-built APK
+  on his phone. The CI journey already walks every party that exists today (participant,
+  operator, collector, host, merchant); M20 to M22 extend it. Left: removing the `residence`
+  aliases once no phone runs an older build.
 
 ## What stays out
 

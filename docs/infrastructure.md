@@ -1505,7 +1505,7 @@ Each item is checked against the repository.
 - **Testnet only.** ZyrcleChain runs on Fuji. ZYR has no value and the seed capital is simulated
   ([ADR 0023](adr/0023-testnet-economics.md)). The chain for real value is an open M7 decision.
 - **Monitoring has limits.** The health report emails admins (runbook 9.11) and the uptime workflow
-  watches from outside, but Sentry collects nothing until its DSNs are set, GitHub may delay a
+  watches from outside, and Sentry has collected errors since 2026-11-26, but GitHub may delay a
   scheduled check by some minutes and pauses it after 60 days without repository activity, the
   Grafana that ADR 0002 mentions is configured outside this repository, and an unhealthy container
   is not restarted on its own.
